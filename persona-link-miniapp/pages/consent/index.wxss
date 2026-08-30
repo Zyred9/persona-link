@@ -1,0 +1,138 @@
+.consent-page {
+  display: flex;
+  min-height: calc(100vh - 120rpx);
+  flex-direction: column;
+}
+
+.consent-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 76rpx;
+}
+
+.consent-kicker {
+  display: block;
+  color: #945ee8;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.consent-title {
+  display: flex;
+  flex-direction: column;
+  margin-top: 34rpx;
+  font-size: 54rpx;
+  font-weight: 900;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+.heart-mascot {
+  position: relative;
+  width: 142rpx;
+  height: 142rpx;
+  margin-top: 34rpx;
+  background: #c7a5ff;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+}
+
+.heart-mascot__heart {
+  position: absolute;
+  top: 42rpx;
+  left: 50%;
+  width: 46rpx;
+  height: 46rpx;
+  background: #ff7469;
+  border-right: 5rpx solid #201b22;
+  border-bottom: 5rpx solid #201b22;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.heart-mascot__heart::before,
+.heart-mascot__heart::after {
+  position: absolute;
+  width: 46rpx;
+  height: 46rpx;
+  content: '';
+  background: #ff7469;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.heart-mascot__heart::before {
+  top: -24rpx;
+  left: -5rpx;
+  border-bottom-color: transparent;
+}
+
+.heart-mascot__heart::after {
+  top: -5rpx;
+  left: -24rpx;
+  border-right-color: transparent;
+}
+
+.heart-mascot__cheek {
+  position: absolute;
+  bottom: 42rpx;
+  width: 18rpx;
+  height: 18rpx;
+  background: #f5b1c5;
+  border-radius: 50%;
+}
+
+.heart-mascot__cheek--left {
+  left: 20rpx;
+}
+
+.heart-mascot__cheek--right {
+  right: 20rpx;
+}
+
+.consent-card {
+  margin-top: 108rpx;
+  padding: 34rpx 28rpx 38rpx;
+}
+
+.consent-card__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.consent-card__copy {
+  display: block;
+  margin-top: 24rpx;
+  color: #6e6671;
+  font-size: 25rpx;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.consent-legal {
+  margin-top: 76rpx;
+  color: #6e6671;
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+.consent-link {
+  color: #60427e;
+  text-decoration: underline;
+}
+
+.consent-actions {
+  margin-top: auto;
+  padding-top: 70rpx;
+}
+
+.consent-exit {
+  width: 100%;
+  min-height: 70rpx;
+  color: #7b767b;
+  font-size: 26rpx;
+  font-weight: 800;
+}

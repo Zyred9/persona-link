@@ -1,0 +1,89 @@
+<app-nav-bar wx:if="{{view !== 'permission-denied'}}" title="测试结果" show-back="{{true}}"></app-nav-bar>
+
+<view wx:if="{{view === 'result'}}" class="paper-page result-page">
+  <view class="result-card paper-card">
+    <view class="result-card__top">
+      <view>
+        <text class="result-badge">你的类型是</text>
+        <text class="result-name">{{result.name}}</text>
+        <text class="result-description">{{result.description}}</text>
+      </view>
+      <view class="result-face">
+        <view class="result-face__eye result-face__eye--left"></view>
+        <view class="result-face__eye result-face__eye--right"></view>
+        <view class="result-face__cheek result-face__cheek--left"></view>
+        <view class="result-face__cheek result-face__cheek--right"></view>
+        <view class="result-face__smile"></view>
+      </view>
+    </view>
+
+    <view class="score-row">
+      <text class="score-row__label">行动感</text>
+      <view class="score-row__track"><view class="score-row__bar score-row__bar--coral"></view></view>
+      <text class="score-row__value">76</text>
+    </view>
+    <view class="score-row">
+      <text class="score-row__label">共情感</text>
+      <view class="score-row__track"><view class="score-row__bar score-row__bar--mint"></view></view>
+      <text class="score-row__value">68</text>
+    </view>
+  </view>
+
+  <view class="unlock-card paper-card">
+    <text class="unlock-title">🔒 深度解读与成长建议</text>
+    <text class="unlock-copy">解锁后可查看完整分析报告</text>
+    <view class="unlock-actions">
+      <button class="paper-button unlock-actions__button unlock-actions__button--purple" bindtap="watchVideo">观看视频解锁</button>
+      <button class="paper-button unlock-actions__button" bindtap="openMember">开通会员</button>
+    </view>
+  </view>
+
+  <button class="paper-button result-share" open-type="share">分享结果</button>
+</view>
+
+<view wx:elif="{{view === 'ad-failure'}}" class="paper-page state-page">
+  <view class="video-card paper-card"><view class="video-card__play"></view></view>
+  <text class="state-title">暂时无法加载视频</text>
+  <view class="state-description">
+    <text>深度内容仍保持锁定。你可以稍后重试，</text>
+    <text>或选择后台允许的其他合法解锁方式。</text>
+  </view>
+  <view class="state-actions">
+    <button class="paper-button paper-button--primary" bindtap="retryVideo">重新加载</button>
+    <button class="paper-button" bindtap="openMember">开通会员</button>
+    <button class="state-link" bindtap="returnResult">返回结果</button>
+  </view>
+</view>
+
+<view wx:elif="{{view === 'login-gate'}}" class="paper-page state-page">
+  <view class="login-card paper-card">
+    <view class="result-face result-face--yellow">
+      <view class="result-face__eye result-face__eye--left"></view>
+      <view class="result-face__eye result-face__eye--right"></view>
+      <view class="result-face__cheek result-face__cheek--left"></view>
+      <view class="result-face__cheek result-face__cheek--right"></view>
+      <view class="result-face__smile"></view>
+    </view>
+  </view>
+  <text class="state-title">登录后再开通会员</text>
+  <view class="state-description">
+    <text>基础测试不需要登录。为确认支付、会员和</text>
+    <text>跨设备权益，需要完成微信可恢复身份绑定。</text>
+  </view>
+  <view class="state-actions">
+    <button class="paper-button paper-button--primary" bindtap="authorizeLogin">继续授权登录</button>
+    <button class="paper-button" bindtap="returnResult">暂不登录</button>
+  </view>
+</view>
+
+<view wx:else class="paper-page state-page state-page--permission">
+  <view class="permission-card paper-card"><view class="permission-icon"><view></view></view></view>
+  <text class="state-title">未获得相册权限</text>
+  <view class="state-description">
+    <text>你可以在微信设置中开启相册保存权限；</text>
+    <text>拒绝不影响查看或分享结果。</text>
+  </view>
+  <view class="state-actions">
+    <button class="paper-button" bindtap="returnResult">知道了</button>
+  </view>
+</view>

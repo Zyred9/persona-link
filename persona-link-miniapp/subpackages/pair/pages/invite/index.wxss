@@ -1,0 +1,76 @@
+@import "../../common.wxss";
+
+.invite-page {
+  padding-top: 32rpx;
+}
+
+.invite-card {
+  padding: 62rpx 52rpx 0;
+  text-align: center;
+}
+
+.invite-mascots {
+  gap: 18rpx;
+}
+
+.invite-arrow {
+  color: #945ee8;
+  font-size: 37rpx;
+  font-weight: 900;
+}
+
+.invite-title,
+.invite-copy {
+  display: block;
+}
+
+.invite-title {
+  margin-top: 36rpx;
+  font-size: 36rpx;
+  font-weight: 900;
+}
+
+.invite-copy {
+  margin-top: 18rpx;
+  color: #6e6671;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.invite-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 130rpx;
+  margin-top: 54rpx;
+  box-sizing: border-box;
+  color: #ff7469;
+  font-size: 59rpx;
+  font-weight: 800;
+  letter-spacing: 10rpx;
+  border: 4rpx solid #201b22;
+  border-radius: 28rpx;
+}
+
+.invite-copy-button {
+  margin-top: 34rpx;
+}
+
+.invite-share-button {
+  position: relative;
+  top: 22rpx;
+  margin-bottom: -22rpx;
+}
+
+.invite-progress {
+  margin-top: 38rpx;
+}
+
+.invite-note {
+  display: block;
+  margin-top: 8rpx;
+  color: #6e6671;
+  font-size: 22rpx;
+  font-weight: 800;
+  text-align: center;
+}

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "隐私与数据",
+  "usingComponents": {
+    "app-nav-bar": "/components/app-nav-bar/index"
+  }
+}

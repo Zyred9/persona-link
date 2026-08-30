@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "邀请 TA",
+  "usingComponents": {
+    "app-nav-bar": "/components/app-nav-bar/index"
+  }
+}

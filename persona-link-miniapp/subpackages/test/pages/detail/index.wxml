@@ -1,0 +1,56 @@
+<app-nav-bar title="{{isError ? '详情' : '测试详情'}}" show-back="{{true}}"></app-nav-bar>
+
+<view wx:if="{{isError}}" class="paper-page detail-page detail-page--error">
+  <view class="error-hero paper-card">
+    <view class="face face--purple">
+      <view class="face__eye face__eye--left"></view>
+      <view class="face__eye face__eye--right"></view>
+      <view class="face__cheek face__cheek--left"></view>
+      <view class="face__cheek face__cheek--right"></view>
+      <view class="face__smile"></view>
+    </view>
+  </view>
+
+  <view class="error-copy">
+    <text class="error-title">题型暂不可用</text>
+    <view class="error-description">
+      <text>题型状态校验失败，请检查网络后刷新。</text>
+      <text>当前不会创建答题草稿。</text>
+    </view>
+  </view>
+
+  <button class="paper-button detail-action" bindtap="retry">重新校验</button>
+</view>
+
+<view wx:else class="paper-page detail-page">
+  <view class="detail-hero paper-card">
+    <view class="detail-hero__title">
+      <text>{{test.heroFirst}}</text>
+      <text>{{test.heroSecond}}</text>
+    </view>
+    <view class="face face--yellow">
+      <view class="face__eye face__eye--left"></view>
+      <view class="face__eye face__eye--right"></view>
+      <view class="face__cheek face__cheek--left"></view>
+      <view class="face__cheek face__cheek--right"></view>
+      <view class="face__smile"></view>
+    </view>
+  </view>
+
+  <view class="detail-tags">
+    <text class="detail-tag detail-tag--yellow">{{test.category}}</text>
+    <text class="detail-tag detail-tag--purple">{{test.questionCount}}题</text>
+    <text class="detail-tag detail-tag--mint">{{test.duration}}</text>
+  </view>
+
+  <text class="detail-title">{{test.title}}</text>
+  <text class="detail-description">{{test.description}}</text>
+
+  <view class="detail-rules paper-card">
+    <text>1 一题一屏，选择后可继续下一题</text>
+    <text>2 基础结果免费，无需登录、广告或会员</text>
+    <text>3 随时退出，可暂存本次作答进度</text>
+  </view>
+
+  <button class="paper-button paper-button--primary detail-action" bindtap="startTest">开始测试</button>
+</view>

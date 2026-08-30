@@ -1,0 +1,30 @@
+<app-nav-bar title="测试记录" show-back="{{true}}"></app-nav-bar>
+
+<view class="paper-page history-page">
+  <view class="history-summary" aria-label="单人测试 1 条，双人配对 2 条">
+    <view class="history-summary__item history-summary__item--active">单人测试 1</view>
+    <view class="history-summary__item">双人配对 2</view>
+  </view>
+
+  <block wx:for="{{sections}}" wx:key="id" wx:for-item="section">
+    <text wx:if="{{section.title}}" class="paper-section-title history-section-title">{{section.title}}</text>
+    <button
+      wx:for="{{section.items}}"
+      wx:key="meta"
+      class="paper-card history-record history-record--{{item.kind}}"
+      data-kind="{{item.kind}}"
+      bindtap="handleRecordTap"
+    >
+      <view wx:if="{{item.kind === 'single'}}" class="history-face" aria-hidden="true">
+        <view class="history-face__eye history-face__eye--left"></view>
+        <view class="history-face__eye history-face__eye--right"></view>
+        <view class="history-face__smile"></view>
+      </view>
+      <view class="history-record__copy">
+        <text class="history-record__title">{{item.title}}</text>
+        <text class="history-record__result">{{item.result}}</text>
+        <text class="history-record__meta">{{item.meta}}</text>
+      </view>
+    </button>
+  </block>
+</view>

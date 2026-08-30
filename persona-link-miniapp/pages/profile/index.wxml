@@ -1,0 +1,33 @@
+<app-nav-bar title="我的"></app-nav-bar>
+
+<view class="paper-page profile-page">
+  <view class="paper-card profile-card">
+    <view class="profile-face">
+      <view class="profile-heart"></view>
+    </view>
+    <view class="profile-copy">
+      <text class="profile-badge">游客</text>
+      <text class="profile-title">先从一题开始</text>
+      <text class="profile-description">基础测试和双人配对不要求昵称、头像或手机号</text>
+    </view>
+  </view>
+
+  <view class="profile-menu">
+    <button class="paper-card profile-row" bindtap="goHistory">
+      <text>测试记录</text>
+      <text class="profile-row__hint">单人 / 双人</text>
+    </button>
+    <button class="paper-card profile-row" bindtap="goMember">
+      <text>会员中心</text>
+      <text class="profile-row__hint">解锁深度解析</text>
+    </button>
+    <button class="paper-card profile-row" bindtap="goFeedback">
+      <text>反馈与举报</text>
+      <text class="profile-row__arrow">›</text>
+    </button>
+    <button class="paper-card profile-row" bindtap="goSettings">
+      <text>设置</text>
+      <text class="profile-row__arrow">›</text>
+    </button>
+  </view>
+</view>

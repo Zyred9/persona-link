@@ -1,0 +1,39 @@
+.legal-page {
+  padding-top: 36rpx;
+}
+
+.legal-title {
+  display: block;
+  font-size: 48rpx;
+  font-weight: 900;
+}
+
+.legal-kicker {
+  display: block;
+  margin-top: 16rpx;
+  color: #6e6671;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.legal-card {
+  margin-top: 48rpx;
+  padding: 42rpx 30rpx 24rpx;
+}
+
+.legal-paragraph {
+  display: block;
+  margin-bottom: 34rpx;
+  color: #514957;
+  font-size: 27rpx;
+  font-weight: 650;
+  line-height: 1.8;
+}
+
+.legal-version {
+  display: block;
+  margin-top: 30rpx;
+  color: #817b82;
+  font-size: 23rpx;
+  text-align: center;
+}

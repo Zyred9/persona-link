@@ -1,0 +1,81 @@
+@import "../../common.wxss";
+
+.join-page {
+  display: flex;
+  min-height: calc(100vh - 120rpx);
+  flex-direction: column;
+  padding-top: 18rpx;
+}
+
+.join-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 222rpx;
+  font-size: 56rpx;
+  font-weight: 900;
+  background: #e6d8ff;
+}
+
+.join-title {
+  margin-top: 36rpx;
+  font-size: 39rpx;
+  font-weight: 900;
+}
+
+.join-copy {
+  margin-top: 14rpx;
+  color: #6e6671;
+  font-size: 23rpx;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.join-label {
+  margin-top: 68rpx;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.join-input-row {
+  display: flex;
+  gap: 18rpx;
+  margin-top: 20rpx;
+}
+
+.join-input {
+  flex: 1;
+  height: 76rpx;
+  box-sizing: border-box;
+  padding: 0 30rpx;
+  color: #201b22;
+  font-size: 32rpx;
+  font-weight: 900;
+  background: #fffdf8;
+  border: 4rpx solid #201b22;
+  border-radius: 26rpx;
+}
+
+.join-clear {
+  width: 180rpx;
+  min-height: 76rpx;
+}
+
+.join-error {
+  margin-top: 12rpx;
+  color: #dc4339;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.join-tip {
+  margin-top: 36rpx;
+  color: #6e6671;
+  font-size: 21rpx;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.join-submit {
+  margin-top: auto;
+}

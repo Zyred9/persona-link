@@ -1,0 +1,24 @@
+<app-nav-bar title="加入双人测试" show-back="{{true}}"></app-nav-bar>
+
+<view class="paper-page join-page">
+  <view class="paper-card join-hero">我 × TA</view>
+
+  <text class="join-title">双人关系角色测试</text>
+  <text class="join-copy">你将独立完成 30 道单选题。对方无法看到你的答案，双方完成后才会生成报告。</text>
+
+  <text class="join-label">输入或粘贴配对码</text>
+  <view class="join-input-row">
+    <input
+      class="join-input"
+      value="{{pairCode}}"
+      maxlength="5"
+      placeholder="8F29D"
+      bindinput="updatePairCode"
+    />
+    <button class="paper-button join-clear" bindtap="clearPairCode">清空</button>
+  </view>
+  <text wx:if="{{errorMessage}}" class="join-error">{{errorMessage}}</text>
+  <text class="join-tip">确认加入即进入答题；答题过程不展示广告或付费弹窗。</text>
+
+  <button class="paper-button paper-button--primary join-submit" bindtap="confirmJoin">确认加入并开始答题</button>
+</view>

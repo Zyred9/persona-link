@@ -1,0 +1,27 @@
+<app-nav-bar title="隐私与数据" show-back="{{true}}"></app-nav-bar>
+
+<view class="paper-page privacy-page">
+  <view class="paper-card privacy-intro">
+    <text class="privacy-intro__title">你可以管理自己的数据</text>
+    <text class="privacy-intro__copy">查看已同意协议版本、了解数据使用说明，或提交删除请求。</text>
+  </view>
+
+  <view class="privacy-list">
+    <view class="paper-card privacy-row">
+      <text>已同意协议版本</text>
+      <text class="privacy-row__value">{{versionLabel}}</text>
+    </view>
+    <button class="paper-card privacy-row" bindtap="openPrivacyGuide">
+      <text>数据使用说明</text>
+      <text class="privacy-row__arrow">›</text>
+    </button>
+    <button class="paper-card privacy-row privacy-row--danger" bindtap="requestDeletion">
+      <text>申请删除账号关联数据</text>
+      <text class="privacy-row__arrow">›</text>
+    </button>
+  </view>
+
+  <view class="paper-card privacy-note">
+    删除请求会进入后台异步处理。完成后将刷新记录与结果页权限；不会删除他人已生成的独立报告。
+  </view>
+</view>

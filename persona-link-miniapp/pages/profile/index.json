@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "我的",
+  "usingComponents": {
+    "app-nav-bar": "/components/app-nav-bar/index"
+  }
+}

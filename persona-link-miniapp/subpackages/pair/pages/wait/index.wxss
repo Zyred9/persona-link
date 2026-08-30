@@ -1,0 +1,102 @@
+.wait-page {
+  display: flex;
+  min-height: calc(100vh - 120rpx);
+  flex-direction: column;
+  padding-top: 50rpx;
+}
+
+.wait-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx 66rpx 52rpx;
+}
+
+.wait-person {
+  display: flex;
+  width: 156rpx;
+  height: 156rpx;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-direction: column;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+}
+
+.wait-person--self,
+.wait-person--complete {
+  background: #a9e1cc;
+}
+
+.wait-person--pending {
+  background: #ffd867;
+}
+
+.wait-person__name {
+  font-size: 40rpx;
+  font-weight: 900;
+}
+
+.wait-person__status {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+}
+
+.wait-connector {
+  display: flex;
+  width: 162rpx;
+  align-items: center;
+}
+
+.wait-connector__line {
+  flex: 1;
+  border-top: 4rpx dashed #201b22;
+}
+
+.wait-connector__heart {
+  margin: 0 8rpx;
+  color: #ff7469;
+  font-size: 52rpx;
+  -webkit-text-stroke: 3rpx #201b22;
+}
+
+.wait-title {
+  margin-top: 64rpx;
+  font-size: 42rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
+.wait-note-card {
+  margin-top: 44rpx;
+  padding: 34rpx 44rpx;
+  background: #e6d8ff;
+}
+
+.wait-note-card__title,
+.wait-note-card__copy {
+  display: block;
+}
+
+.wait-note-card__title {
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.wait-note-card__copy {
+  margin-top: 14rpx;
+  color: #6e6671;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.wait-actions {
+  margin-top: auto;
+}
+
+.wait-cancel {
+  margin-top: 18rpx;
+}

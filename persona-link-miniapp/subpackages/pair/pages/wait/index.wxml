@@ -1,0 +1,40 @@
+<app-nav-bar title="配对进度"></app-nav-bar>
+
+<view class="paper-page wait-page">
+  <view class="paper-card wait-status-card">
+    <view class="wait-person wait-person--self">
+      <text class="wait-person__name">我</text>
+      <text class="wait-person__status">已完成</text>
+    </view>
+    <view class="wait-connector">
+      <view class="wait-connector__line"></view>
+      <text class="wait-connector__heart">♥</text>
+      <view class="wait-connector__line"></view>
+    </view>
+    <view class="wait-person {{partnerCompleted ? 'wait-person--complete' : 'wait-person--pending'}}">
+      <text class="wait-person__name">TA</text>
+      <text class="wait-person__status">{{partnerCompleted ? '已完成' : '待完成'}}</text>
+    </view>
+  </view>
+
+  <text class="wait-title">{{partnerCompleted ? '双方已完成' : '等待对方完成'}}</text>
+
+  <view class="paper-card wait-note-card">
+    <text class="wait-note-card__title">双方独立作答，不展示彼此答案</text>
+    <text class="wait-note-card__copy">仅显示已完成 / 待完成状态</text>
+  </view>
+
+  <view class="wait-actions">
+    <button
+      wx:if="{{!partnerCompleted}}"
+      class="paper-button paper-button--primary"
+      bindtap="refreshStatus"
+    >刷新状态</button>
+    <button
+      wx:else
+      class="paper-button paper-button--primary"
+      bindtap="viewResult"
+    >查看双人报告</button>
+    <button class="paper-button wait-cancel" bindtap="cancelPair">取消本次配对</button>
+  </view>
+</view>

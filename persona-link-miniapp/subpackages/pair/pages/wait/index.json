@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "配对进度",
+  "usingComponents": {
+    "app-nav-bar": "/components/app-nav-bar/index"
+  }
+}

@@ -1,0 +1,40 @@
+<app-nav-bar title="测试详情" show-back="{{true}}"></app-nav-bar>
+
+<view class="paper-page detail-page">
+  <view class="paper-card detail-hero">
+    <view class="pair-mascots">
+      <view class="pair-mascot">
+        <view class="pair-mascot__heart"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--left"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--right"></view>
+      </view>
+      <view class="pair-mascot pair-mascot--purple">
+        <view class="pair-mascot__heart"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--left"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--right"></view>
+      </view>
+    </view>
+    <text class="detail-hero__label">我 × TA</text>
+  </view>
+
+  <view class="detail-tags">
+    <text class="detail-tag detail-tag--yellow">双人独立作答</text>
+    <text class="detail-tag detail-tag--mint">每人30题</text>
+    <text class="detail-tag detail-tag--purple">每人约4分钟</text>
+  </view>
+
+  <text class="detail-title">双人关系角色测试</text>
+  <text class="detail-copy">双方独立完成后，查看一份相处参考报告</text>
+
+  <view class="paper-card detail-steps">
+    <text>1 你先作答</text>
+    <text>2 邀请 TA</text>
+    <text>3 一起查看</text>
+    <text class="detail-steps__note">默认不展示彼此单题答案</text>
+  </view>
+
+  <view class="detail-actions">
+    <button class="paper-button paper-button--primary" bindtap="startPair">和 TA 一起测</button>
+    <button class="pair-link-button" bindtap="joinPair">已有配对码？加入测试</button>
+  </view>
+</view>

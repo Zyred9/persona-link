@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "协议说明",
+  "usingComponents": {
+    "app-nav-bar": "/components/app-nav-bar/index"
+  }
+}

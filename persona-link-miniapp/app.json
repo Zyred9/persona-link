@@ -1,0 +1,60 @@
+{
+  "pages": [
+    "pages/consent/index",
+    "pages/home/index",
+    "pages/profile/index"
+  ],
+  "subpackages": [
+    {
+      "root": "subpackages/account",
+      "pages": [
+        "pages/legal/index",
+        "pages/settings/index",
+        "pages/privacy/index",
+        "pages/history/index",
+        "pages/member/index",
+        "pages/feedback/index"
+      ]
+    },
+    {
+      "root": "subpackages/test",
+      "pages": [
+        "pages/detail/index",
+        "pages/quiz/index",
+        "pages/result/index"
+      ]
+    },
+    {
+      "root": "subpackages/pair",
+      "pages": [
+        "pages/detail/index",
+        "pages/invite/index",
+        "pages/join/index",
+        "pages/wait/index",
+        "pages/result/index"
+      ]
+    }
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#fffaf1",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#7b767b",
+    "selectedColor": "#945ee8",
+    "backgroundColor": "#fffdf8",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,81 @@
+.pair-mascots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pair-mascot {
+  position: relative;
+  width: 142rpx;
+  height: 142rpx;
+  box-sizing: border-box;
+  background: #ff9a96;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+}
+
+.pair-mascot--purple {
+  background: #bd8cf4;
+}
+
+.pair-mascot__heart {
+  position: absolute;
+  top: 44rpx;
+  left: 50%;
+  width: 42rpx;
+  height: 42rpx;
+  background: #ff7469;
+  border-right: 5rpx solid #201b22;
+  border-bottom: 5rpx solid #201b22;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.pair-mascot__heart::before,
+.pair-mascot__heart::after {
+  position: absolute;
+  width: 42rpx;
+  height: 42rpx;
+  box-sizing: border-box;
+  content: '';
+  background: #ff7469;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+}
+
+.pair-mascot__heart::before {
+  top: -23rpx;
+  left: -5rpx;
+  border-bottom-color: transparent;
+}
+
+.pair-mascot__heart::after {
+  top: -5rpx;
+  left: -23rpx;
+  border-right-color: transparent;
+}
+
+.pair-mascot__cheek {
+  position: absolute;
+  bottom: 35rpx;
+  width: 18rpx;
+  height: 18rpx;
+  background: #f8b2c2;
+  border-radius: 50%;
+}
+
+.pair-mascot__cheek--left {
+  left: 18rpx;
+}
+
+.pair-mascot__cheek--right {
+  right: 18rpx;
+}
+
+.pair-link-button {
+  width: 100%;
+  min-height: 62rpx;
+  color: #60427e;
+  font-size: 25rpx;
+  font-weight: 800;
+  text-decoration: underline;
+}

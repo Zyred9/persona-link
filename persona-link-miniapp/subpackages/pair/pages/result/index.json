@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "双人报告",
+  "usingComponents": {
+    "app-nav-bar": "/components/app-nav-bar/index"
+  }
+}

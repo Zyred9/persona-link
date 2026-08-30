@@ -1,0 +1,66 @@
+page {
+  min-height: 100%;
+  color: #201b22;
+  background-color: #fffaf1;
+  background-image:
+    linear-gradient(rgba(62, 53, 63, 0.055) 1rpx, transparent 1rpx),
+    linear-gradient(90deg, rgba(62, 53, 63, 0.055) 1rpx, transparent 1rpx);
+  background-size: 28rpx 28rpx;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+button {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+}
+
+button::after {
+  border: 0;
+}
+
+.paper-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 0 60rpx calc(52rpx + env(safe-area-inset-bottom));
+}
+
+.paper-card {
+  box-sizing: border-box;
+  background: #fffdf8;
+  border: 4rpx solid #201b22;
+  border-radius: 32rpx;
+}
+
+.paper-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 82rpx;
+  box-sizing: border-box;
+  padding: 18rpx 30rpx;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 1.2;
+  background: #fffdf8;
+  border: 4rpx solid #201b22;
+  border-radius: 999rpx;
+}
+
+.paper-button--primary {
+  color: #fffdf8;
+  background: #ff7469;
+}
+
+.paper-muted {
+  color: #6e6671;
+}
+
+.paper-section-title {
+  margin: 36rpx 0 18rpx;
+  color: #7f7a7f;
+  font-size: 26rpx;
+  font-weight: 800;
+}

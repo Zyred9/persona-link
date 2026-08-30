@@ -1,0 +1,82 @@
+<app-nav-bar title="心动测测" brand="{{true}}"></app-nav-bar>
+
+<view class="paper-page home-page">
+  <block wx:if="{{state === 'ready'}}">
+    <view class="home-hero">
+      <view class="home-title">
+        <text>把此刻的你，</text>
+        <text>收进一张小卡片。</text>
+      </view>
+      <view class="home-heart">♥</view>
+      <view class="home-star">✦</view>
+    </view>
+
+    <view class="pair-card" bindtap="openPairTest">
+      <view class="pair-mascot"><text>♥</text></view>
+      <view class="pair-copy">
+        <view class="pair-title">
+          <text>你和 TA，</text>
+          <text>是哪种相处搭子？</text>
+        </view>
+        <button class="pair-action">和 TA 一起测 ›</button>
+      </view>
+      <text class="pair-spark pair-spark--one">✦</text>
+      <text class="pair-spark pair-spark--two">♡</text>
+    </view>
+
+    <view class="test-grid">
+      <button
+        wx:for="{{tests}}"
+        wx:key="id"
+        class="test-card test-card--{{item.tone}}"
+        data-id="{{item.id}}"
+        bindtap="openSingleTest"
+      >
+        <text class="test-card__title">{{item.title}}</text>
+        <view class="test-card__visual">{{item.icon}}</view>
+        <text class="test-card__meta">{{item.meta}}</text>
+      </button>
+    </view>
+
+    <view class="category-list">
+      <button
+        wx:for="{{categories}}"
+        wx:key="*this"
+        class="category {{selectedCategory === item ? 'category--active' : ''}}"
+        data-category="{{item}}"
+        bindtap="selectCategory"
+      >{{item}}</button>
+    </view>
+
+    <view wx:if="{{tests.length === 0}}" class="category-empty">这个分类还在准备中</view>
+  </block>
+
+  <block wx:elif="{{state === 'loading'}}">
+    <view class="home-intro">
+      <text class="home-kicker">今日刚好适合认识自己</text>
+      <view class="home-title home-title--loading">
+        <text>把此刻的你，</text>
+        <text>收进一张小卡片。</text>
+      </view>
+    </view>
+    <page-state type="loading" title="内容正在加载"></page-state>
+  </block>
+
+  <page-state
+    wx:elif="{{state === 'empty'}}"
+    type="empty"
+    title="暂时没有可用测试"
+    description="{{emptyDescription}}"
+    action-text="刷新一下"
+    bind:action="loadHome"
+  ></page-state>
+
+  <page-state
+    wx:else
+    type="error"
+    title="内容暂时加载失败"
+    description="{{errorDescription}}"
+    action-text="重新加载"
+    bind:action="loadHome"
+  ></page-state>
+</view>

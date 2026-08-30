@@ -1,0 +1,19 @@
+<view wx:if="{{type === 'loading'}}" class="state state--loading">
+  <view class="skeleton skeleton--hero"></view>
+  <view class="skeleton-row">
+    <view class="skeleton skeleton--card"></view>
+    <view class="skeleton skeleton--card skeleton--warm"></view>
+  </view>
+  <text class="state__loading-text">{{title || '内容正在加载'}}</text>
+</view>
+
+<view wx:else class="state state--message">
+  <view class="state__face {{type === 'error' ? 'state__face--error' : ''}}">
+    <view class="state__eye state__eye--left"></view>
+    <view class="state__eye state__eye--right"></view>
+    <view class="state__smile"></view>
+  </view>
+  <text class="state__title">{{title}}</text>
+  <text class="state__description">{{description}}</text>
+  <button wx:if="{{actionText}}" class="state__action" bindtap="handleAction">{{actionText}}</button>
+</view>

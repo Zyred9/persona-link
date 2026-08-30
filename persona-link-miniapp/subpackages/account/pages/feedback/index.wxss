@@ -1,0 +1,46 @@
+.feedback-page {
+  padding-top: 34rpx;
+  padding-bottom: calc(150rpx + env(safe-area-inset-bottom));
+}
+
+.feedback-guide {
+  display: block;
+  color: #6e6671;
+  font-size: 23rpx;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.feedback-input {
+  width: 100%;
+  height: 378rpx;
+  box-sizing: border-box;
+  margin-top: 54rpx;
+  padding: 32rpx 28rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.feedback-input__placeholder {
+  color: #aaa2af;
+  font-weight: 800;
+}
+
+.feedback-note {
+  margin-top: 32rpx;
+  padding: 32rpx 28rpx;
+  color: #6e6671;
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 1.55;
+  background: #fff3d2;
+}
+
+.feedback-submit {
+  position: fixed;
+  right: 60rpx;
+  bottom: calc(44rpx + env(safe-area-inset-bottom));
+  left: 60rpx;
+  width: auto;
+}

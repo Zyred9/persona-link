@@ -1,0 +1,29 @@
+<app-nav-bar title="邀请 TA" show-back="{{true}}"></app-nav-bar>
+
+<view class="paper-page invite-page">
+  <view class="paper-card invite-card">
+    <view class="pair-mascots invite-mascots">
+      <view class="pair-mascot">
+        <view class="pair-mascot__heart"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--left"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--right"></view>
+      </view>
+      <text class="invite-arrow">···➜</text>
+      <view class="pair-mascot pair-mascot--purple">
+        <view class="pair-mascot__heart"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--left"></view>
+        <view class="pair-mascot__cheek pair-mascot__cheek--right"></view>
+      </view>
+    </view>
+
+    <text class="invite-title">把配对邀请发给 TA</text>
+    <text class="invite-copy">对方完成自己的答题后，一起查看报告</text>
+
+    <view class="invite-code">{{pairCode}}</view>
+    <button class="paper-button invite-copy-button" bindtap="copyPairCode">复制配对码</button>
+    <button class="paper-button paper-button--primary invite-share-button" open-type="share">发送给微信好友</button>
+  </view>
+
+  <button class="pair-link-button invite-progress" bindtap="openProgress">查看配对进度</button>
+  <text class="invite-note">邀请不作为解锁或奖励条件</text>
+</view>

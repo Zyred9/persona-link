@@ -1,0 +1,15 @@
+<app-nav-bar title="{{document.title}}" show-back="{{true}}"></app-nav-bar>
+
+<view class="paper-page legal-page">
+  <text class="legal-title">{{document.title}}</text>
+  <text class="legal-kicker">{{document.kicker}}</text>
+
+  <view class="paper-card legal-card">
+    <text
+      wx:for="{{document.paragraphs}}"
+      wx:key="index"
+      class="legal-paragraph"
+    >{{item}}</text>
+  </view>
+
+</view>

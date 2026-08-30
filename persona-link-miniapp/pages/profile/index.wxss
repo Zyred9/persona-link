@@ -1,0 +1,116 @@
+.profile-page {
+  padding-top: 30rpx;
+  padding-bottom: calc(150rpx + env(safe-area-inset-bottom));
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  padding: 46rpx 38rpx;
+}
+
+.profile-face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 132rpx;
+  height: 132rpx;
+  background: #ff9690;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+}
+
+.profile-heart {
+  position: absolute;
+  top: 40rpx;
+  left: 50%;
+  width: 42rpx;
+  height: 42rpx;
+  background: #ff7469;
+  border-right: 5rpx solid #201b22;
+  border-bottom: 5rpx solid #201b22;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.profile-heart::before,
+.profile-heart::after {
+  position: absolute;
+  width: 42rpx;
+  height: 42rpx;
+  content: '';
+  background: #ff7469;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.profile-heart::before {
+  top: -23rpx;
+  left: -5rpx;
+  border-bottom-color: transparent;
+}
+
+.profile-heart::after {
+  top: -5rpx;
+  left: -23rpx;
+  border-right-color: transparent;
+}
+
+.profile-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-left: 40rpx;
+}
+
+.profile-badge {
+  padding: 9rpx 30rpx;
+  font-size: 23rpx;
+  font-weight: 900;
+  background: #ffd866;
+  border: 4rpx solid #201b22;
+  border-radius: 999rpx;
+}
+
+.profile-title {
+  margin-top: 20rpx;
+  font-size: 37rpx;
+  font-weight: 900;
+}
+
+.profile-description {
+  margin-top: 14rpx;
+  color: #6e6671;
+  font-size: 23rpx;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.profile-menu {
+  margin-top: 52rpx;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 90rpx;
+  margin-bottom: 12rpx;
+  padding: 0 28rpx;
+  font-size: 30rpx;
+  font-weight: 900;
+  text-align: left;
+}
+
+.profile-row__hint,
+.profile-row__arrow {
+  color: #817d81;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.profile-row__arrow {
+  font-size: 42rpx;
+}

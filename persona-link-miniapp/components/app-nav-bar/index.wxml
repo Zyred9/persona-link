@@ -1,0 +1,12 @@
+<view
+  class="nav-bar"
+  style="padding-top: {{statusBarHeight}}px; height: {{totalHeight}}px;"
+>
+  <view class="nav-bar__content" style="height: {{contentHeight}}px;">
+    <button wx:if="{{showBack}}" class="nav-bar__back" bindtap="goBack" aria-label="返回">
+      <view class="nav-bar__back-icon"></view>
+    </button>
+    <text class="{{brand ? 'nav-bar__brand' : 'nav-bar__title'}}">{{title}}</text>
+  </view>
+</view>
+<view style="height: {{totalHeight}}px;"></view>

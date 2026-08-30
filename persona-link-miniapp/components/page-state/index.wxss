@@ -1,0 +1,122 @@
+.state {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.state--loading {
+  padding-top: 34rpx;
+}
+
+.skeleton {
+  overflow: hidden;
+  background: #e9dff4;
+  border-radius: 32rpx;
+}
+
+.skeleton--hero {
+  height: 300rpx;
+}
+
+.skeleton-row {
+  display: flex;
+  gap: 26rpx;
+  margin-top: 38rpx;
+}
+
+.skeleton--card {
+  flex: 1;
+  height: 190rpx;
+  background: #eeeae7;
+  border-radius: 28rpx;
+}
+
+.skeleton--warm {
+  background: #f0ebe7;
+}
+
+.state__loading-text {
+  display: block;
+  margin-top: 100rpx;
+  color: #807b80;
+  font-size: 30rpx;
+  font-weight: 800;
+  text-align: center;
+}
+
+.state--message {
+  display: flex;
+  min-height: 940rpx;
+  flex-direction: column;
+  align-items: center;
+  padding: 118rpx 0 180rpx;
+}
+
+.state__face {
+  position: relative;
+  width: 142rpx;
+  height: 142rpx;
+  background: #eadffd;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+}
+
+.state__face--error {
+  background: #c7a5ff;
+}
+
+.state__eye {
+  position: absolute;
+  top: 56rpx;
+  width: 16rpx;
+  height: 16rpx;
+  background: #201b22;
+  border-radius: 50%;
+}
+
+.state__eye--left {
+  left: 38rpx;
+}
+
+.state__eye--right {
+  right: 38rpx;
+}
+
+.state__smile {
+  position: absolute;
+  bottom: 34rpx;
+  left: 50%;
+  width: 44rpx;
+  height: 24rpx;
+  border-bottom: 5rpx solid #201b22;
+  border-radius: 0 0 40rpx 40rpx;
+  transform: translateX(-50%);
+}
+
+.state__title {
+  margin-top: 70rpx;
+  font-size: 42rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
+.state__description {
+  max-width: 540rpx;
+  margin-top: 20rpx;
+  color: #6e6671;
+  font-size: 27rpx;
+  font-weight: 700;
+  line-height: 1.65;
+  text-align: center;
+  white-space: pre-line;
+}
+
+.state__action {
+  width: 100%;
+  min-height: 82rpx;
+  margin-top: auto;
+  font-size: 30rpx;
+  font-weight: 800;
+  background: #fffdf8;
+  border: 4rpx solid #201b22;
+  border-radius: 999rpx;
+}

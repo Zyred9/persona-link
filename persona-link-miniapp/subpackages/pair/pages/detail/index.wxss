@@ -1,0 +1,86 @@
+@import "../../common.wxss";
+
+.detail-page {
+  display: flex;
+  min-height: calc(100vh - 120rpx);
+  flex-direction: column;
+  padding-top: 18rpx;
+}
+
+.detail-hero {
+  padding: 62rpx 28rpx 24rpx;
+  background: #e6d8ff;
+}
+
+.detail-hero .pair-mascots {
+  gap: 92rpx;
+}
+
+.detail-hero__label {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 36rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
+.detail-tags {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 34rpx;
+}
+
+.detail-tag {
+  padding: 11rpx 22rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  border: 3rpx solid #201b22;
+  border-radius: 999rpx;
+  white-space: nowrap;
+}
+
+.detail-tag--yellow {
+  background: #ffd867;
+}
+
+.detail-tag--mint {
+  background: #a9e1cc;
+}
+
+.detail-tag--purple {
+  background: #c5a0f4;
+}
+
+.detail-title {
+  margin-top: 24rpx;
+  font-size: 39rpx;
+  font-weight: 900;
+}
+
+.detail-copy {
+  margin-top: 12rpx;
+  color: #6e6671;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.detail-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 52rpx;
+  padding: 38rpx 28rpx 14rpx;
+  font-size: 27rpx;
+  font-weight: 900;
+}
+
+.detail-steps__note {
+  margin-top: 4rpx;
+  color: #6e6671;
+  font-size: 21rpx;
+}
+
+.detail-actions {
+  margin-top: auto;
+  padding-top: 60rpx;
+}

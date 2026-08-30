@@ -1,0 +1,279 @@
+.result-page,
+.state-page {
+  display: flex;
+  min-height: calc(100vh - 120rpx);
+  flex-direction: column;
+}
+
+.result-card {
+  min-height: 430rpx;
+  margin-top: 28rpx;
+  padding: 24rpx 28rpx 34rpx;
+}
+
+.result-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.result-badge {
+  display: inline-block;
+  padding: 8rpx 24rpx;
+  font-size: 22rpx;
+  font-weight: 900;
+  background: #ffd86a;
+  border: 4rpx solid #201b22;
+  border-radius: 999rpx;
+}
+
+.result-name {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 46rpx;
+  font-weight: 900;
+}
+
+.result-description {
+  display: block;
+  margin-top: 10rpx;
+  color: #6e6671;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.state-description text {
+  display: block;
+}
+
+.result-face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 136rpx;
+  height: 136rpx;
+  background: #ffdbac;
+  border: 5rpx solid #201b22;
+  border-radius: 50%;
+}
+
+.result-face--yellow {
+  width: 142rpx;
+  height: 142rpx;
+  background: #ffda68;
+}
+
+.result-face__eye {
+  position: absolute;
+  top: 53rpx;
+  width: 17rpx;
+  height: 17rpx;
+  background: #201b22;
+  border-radius: 50%;
+}
+
+.result-face__eye--left {
+  left: 39rpx;
+}
+
+.result-face__eye--right {
+  right: 39rpx;
+}
+
+.result-face__cheek {
+  position: absolute;
+  top: 76rpx;
+  width: 20rpx;
+  height: 20rpx;
+  background: #f5b1c5;
+  border-radius: 50%;
+}
+
+.result-face__cheek--left {
+  left: 17rpx;
+}
+
+.result-face__cheek--right {
+  right: 17rpx;
+}
+
+.result-face__smile {
+  position: absolute;
+  top: 72rpx;
+  left: 50%;
+  width: 42rpx;
+  height: 24rpx;
+  border-bottom: 5rpx solid #201b22;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 28rpx;
+}
+
+.score-row__label {
+  width: 102rpx;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.score-row__track {
+  flex: 1;
+  height: 20rpx;
+  overflow: hidden;
+  background: #e9e5e2;
+  border-radius: 999rpx;
+}
+
+.score-row__bar {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.score-row__bar--coral {
+  width: 76%;
+  background: #ff7469;
+}
+
+.score-row__bar--mint {
+  width: 68%;
+  background: #a9e2cf;
+}
+
+.score-row__value {
+  width: 52rpx;
+  font-size: 29rpx;
+  font-weight: 900;
+  text-align: right;
+}
+
+.unlock-card {
+  margin-top: 32rpx;
+  padding: 32rpx 28rpx 26rpx;
+  background: #e7d8ff;
+}
+
+.unlock-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.unlock-copy {
+  display: block;
+  margin-top: 10rpx;
+  color: #6e6671;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.unlock-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 30rpx;
+}
+
+.unlock-actions__button {
+  min-height: 76rpx;
+  flex: 1;
+  padding: 14rpx 18rpx;
+  font-size: 25rpx;
+}
+
+.unlock-actions__button--purple {
+  background: #bd96f4;
+}
+
+.result-share {
+  margin-top: auto;
+}
+
+.video-card,
+.login-card,
+.permission-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 274rpx;
+  margin-top: 28rpx;
+}
+
+.video-card {
+  background: #fff4d8;
+}
+
+.video-card__play {
+  width: 0;
+  height: 0;
+  border-top: 36rpx solid transparent;
+  border-bottom: 36rpx solid transparent;
+  border-left: 62rpx solid #ff7469;
+}
+
+.login-card {
+  background: #fffdf8;
+}
+
+.permission-card {
+  background: #e7d8ff;
+}
+
+.permission-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60rpx;
+  height: 60rpx;
+  border: 7rpx solid #945ee8;
+}
+
+.permission-icon view {
+  width: 30rpx;
+  height: 30rpx;
+  background: #945ee8;
+}
+
+.state-title {
+  margin-top: 74rpx;
+  font-size: 40rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
+.state-description {
+  margin-top: 22rpx;
+  color: #6e6671;
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 1.65;
+  text-align: center;
+  white-space: pre-line;
+}
+
+.state-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: auto;
+  flex-direction: column;
+}
+
+.state-link {
+  min-height: 58rpx;
+  color: #7b767b;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.state-page--permission {
+  min-height: 100vh;
+  padding-top: 30rpx;
+}
+
+.state-page--permission .state-title {
+  margin-top: 42rpx;
+}

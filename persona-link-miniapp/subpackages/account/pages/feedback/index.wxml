@@ -1,0 +1,20 @@
+<app-nav-bar title="反馈与举报" show-back="{{true}}"></app-nav-bar>
+
+<view class="paper-page feedback-page">
+  <text class="feedback-guide">请描述问题或不适内容。请勿提交他人的敏感资料、原始答题内容或支付凭证。</text>
+
+  <textarea
+    class="paper-card feedback-input"
+    value="{{content}}"
+    maxlength="500"
+    placeholder="请填写反馈内容（必填）"
+    placeholder-class="feedback-input__placeholder"
+    bindinput="handleInput"
+  ></textarea>
+
+  <view class="paper-card feedback-note">
+    提交成功后会清空已填写内容；提交失败时保留已填写内容，可重试。
+  </view>
+
+  <button class="paper-button paper-button--primary feedback-submit" bindtap="submitFeedback">提交反馈</button>
+</view>

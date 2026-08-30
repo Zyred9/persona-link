@@ -1,0 +1,41 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { hasDemoSession } from './auth'
+import AdminLayout from './components/AdminLayout.vue'
+import LoginView from './views/LoginView.vue'
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/login', name: 'login', component: LoginView },
+    {
+      path: '/',
+      component: AdminLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: '', name: 'dashboard', component: () => import('./views/DashboardView.vue') },
+        { path: 'home-config', name: 'home-config', component: () => import('./views/HomeConfigView.vue') },
+        { path: 'types', name: 'types', component: () => import('./views/TypeManagementView.vue') },
+        { path: 'types/:id/questions', name: 'question-editor', component: () => import('./views/QuestionEditorView.vue') },
+        { path: 'types/:id/results', name: 'result-rules', component: () => import('./views/ResultRulesView.vue') },
+        { path: 'ai-question-bank', name: 'ai-question-bank', component: () => import('./views/AiQuestionBankView.vue') },
+        { path: 'categories', name: 'categories', component: () => import('./views/CategoriesView.vue') },
+        { path: 'releases', name: 'releases', component: () => import('./views/ReleasesView.vue') },
+        { path: 'analytics', name: 'analytics', component: () => import('./views/AnalyticsView.vue') },
+        { path: 'settings', name: 'settings', component: () => import('./views/SettingsView.vue') },
+      ],
+    },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
+  ],
+})
+
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth && !hasDemoSession()) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (to.name === 'login' && hasDemoSession()) {
+    return { name: 'dashboard' }
+  }
+  return true
+})
+
+export default router
