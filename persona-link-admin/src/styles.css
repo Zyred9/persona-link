@@ -57,6 +57,7 @@ a { color: inherit; text-decoration: none; }
 .brand span { color: #ff7c72; text-shadow: 1px 1px 0 var(--ink); }
 .brand b { color: #ff553d; }
 .operator { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.role-chip { padding: 3px 8px; border-radius: 99px; background: var(--purple-soft); color: #694596; font-size: 12px; font-weight: 800; }
 .operator-face {
   display: grid;
   place-items: center;
@@ -67,7 +68,7 @@ a { color: inherit; text-decoration: none; }
   background: #ffe4ba;
   font-size: 24px;
 }
-.demo-badge, .data-note {
+.data-note {
   padding: 6px 10px;
   border: 1px solid #8f6fc3;
   border-radius: 999px;
@@ -169,17 +170,6 @@ a { color: inherit; text-decoration: none; }
 .danger-button { border-color: #c9584b; color: #b63f32; background: #fff0ed; }
 .text-link { color: #7950a5; font-size: 13px; font-weight: 800; }
 .text-link:hover { color: var(--coral); }
-.demo-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 15px;
-  border: 1px dashed #8f6fc3;
-  border-radius: 12px;
-  background: #f8f0ff;
-  color: #694c83;
-  font-size: 13px;
-}
 .form-message { margin: 12px 0 0; color: #ba4435; font-size: 13px; }
 
 .welcome-row { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 4px; }
@@ -270,8 +260,6 @@ a { color: inherit; text-decoration: none; }
 .brand-heart { width: 68px; height: 68px; margin: 0 auto 20px; display: grid; place-items: center; border: var(--line); border-radius: 46% 54% 50% 50%; background: var(--purple); color: white; font-size: 34px; transform: rotate(-4deg); }
 .login-card h1 { margin: 0; font: 700 42px "STKaiti", "KaiTi", serif; }
 .login-subtitle { margin: 5px 0 20px; color: #ff5c46; font-weight: 800; }
-.demo-login-note { display: grid; gap: 4px; margin-bottom: 22px; padding: 12px; border: 1px dashed #9a7ab8; border-radius: 12px; background: #faf3ff; color: #695c6c; font-size: 12px; }
-.demo-login-note b { color: #754f99; }
 .login-card form { display: grid; gap: 16px; text-align: left; }
 .login-card label { display: grid; gap: 8px; font-weight: 700; }
 .login-card input { width: 100%; padding: 13px 15px; border: var(--line); border-radius: 12px; background: white; outline: none; }
@@ -294,7 +282,7 @@ a { color: inherit; text-decoration: none; }
   .menu-toggle { display: block; }
   .brand { font-size: 19px; }
   .brand b { display: none; }
-  .demo-badge, .operator-name { display: none; }
+  .operator-name { display: none; }
   .logout-button { padding: 4px; }
   .sidebar { position: fixed; z-index: 50; top: 68px; bottom: 0; left: 0; width: 240px; height: auto; transform: translateX(-105%); transition: transform .2s ease; }
   .sidebar.open { transform: translateX(0); }

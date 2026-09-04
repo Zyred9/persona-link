@@ -30,6 +30,11 @@
   white-space: nowrap;
 }
 
+.nav-bar__title {
+  font-family: "Noto Serif CJK SC", "Songti SC", "STKaiti", serif;
+  font-weight: 700;
+}
+
 .nav-bar__brand {
   position: absolute;
   left: 38rpx;

@@ -7,11 +7,15 @@
   <text class="state__loading-text">{{title || '内容正在加载'}}</text>
 </view>
 
-<view wx:else class="state state--message">
-  <view class="state__face {{type === 'error' ? 'state__face--error' : ''}}">
-    <view class="state__eye state__eye--left"></view>
-    <view class="state__eye state__eye--right"></view>
-    <view class="state__smile"></view>
+<view wx:else class="state state--message {{type === 'error' ? 'state--error' : ''}}">
+  <view class="state__visual {{type === 'error' ? 'state__visual--error' : ''}}">
+    <view class="state__face {{type === 'error' ? 'state__face--error' : ''}}">
+      <view class="state__eye state__eye--left"></view>
+      <view class="state__eye state__eye--right"></view>
+      <view class="state__cheek state__cheek--left"></view>
+      <view class="state__cheek state__cheek--right"></view>
+      <view class="state__smile"></view>
+    </view>
   </view>
   <text class="state__title">{{title}}</text>
   <text class="state__description">{{description}}</text>

@@ -1,38 +1,32 @@
-<app-nav-bar wx:if="{{view !== 'permission-denied'}}" title="测试结果" show-back="{{true}}"></app-nav-bar>
+<app-nav-bar title="测试结果" show-back="{{true}}"></app-nav-bar>
 
-<view wx:if="{{view === 'result'}}" class="paper-page result-page">
+<view wx:if="{{state === 'loading'}}" class="paper-page result-page">
+  <page-state type="loading" title="测试报告正在加载"></page-state>
+</view>
+
+<view wx:elif="{{state === 'error'}}" class="paper-page result-page">
+  <page-state type="error" title="报告加载失败" description="{{errorDescription}}" action-text="重新加载" bind:action="retry"></page-state>
+</view>
+
+<view wx:elif="{{view === 'result'}}" class="paper-page result-page">
   <view class="result-card paper-card">
     <view class="result-card__top">
-      <view>
+      <view class="result-card__summary">
         <text class="result-badge">你的类型是</text>
         <text class="result-name">{{result.name}}</text>
         <text class="result-description">{{result.description}}</text>
       </view>
-      <view class="result-face">
-        <view class="result-face__eye result-face__eye--left"></view>
-        <view class="result-face__eye result-face__eye--right"></view>
-        <view class="result-face__cheek result-face__cheek--left"></view>
-        <view class="result-face__cheek result-face__cheek--right"></view>
-        <view class="result-face__smile"></view>
-      </view>
+      <view class="result-face"><view class="result-face__eye result-face__eye--left"></view><view class="result-face__eye result-face__eye--right"></view><view class="result-face__cheek result-face__cheek--left"></view><view class="result-face__cheek result-face__cheek--right"></view><view class="result-face__smile"></view></view>
     </view>
-
-    <view class="score-row">
-      <text class="score-row__label">行动感</text>
-      <view class="score-row__track"><view class="score-row__bar score-row__bar--coral"></view></view>
-      <text class="score-row__value">76</text>
-    </view>
-    <view class="score-row">
-      <text class="score-row__label">共情感</text>
-      <view class="score-row__track"><view class="score-row__bar score-row__bar--mint"></view></view>
-      <text class="score-row__value">68</text>
+    <view wx:for="{{result.dimensions}}" wx:key="dimensionId" class="score-row">
+      <text class="score-row__label">{{item.dimensionName}}</text><view class="score-row__track"><view class="score-row__bar score-row__bar--{{item.barTone}}" style="width: {{item.normalizedScore}}%;"></view></view><text class="score-row__value">{{item.normalizedScore}}</text>
     </view>
   </view>
 
   <view class="unlock-card paper-card">
-    <text class="unlock-title">🔒 深度解读与成长建议</text>
-    <text class="unlock-copy">解锁后可查看完整分析报告</text>
-    <view class="unlock-actions">
+    <text class="unlock-title">{{result.deepDescription ? '深度解读与成长建议' : '🔒 深度解读与成长建议'}}</text>
+    <text class="unlock-copy">{{result.deepDescription || '解锁后可查看完整分析报告'}}</text>
+    <view wx:if="{{!result.deepDescription}}" class="unlock-actions">
       <button class="paper-button unlock-actions__button unlock-actions__button--purple" bindtap="watchVideo">观看视频解锁</button>
       <button class="paper-button unlock-actions__button" bindtap="openMember">开通会员</button>
     </view>
@@ -71,8 +65,8 @@
     <text>跨设备权益，需要完成微信可恢复身份绑定。</text>
   </view>
   <view class="state-actions">
-    <button class="paper-button paper-button--primary" bindtap="authorizeLogin">继续授权登录</button>
-    <button class="paper-button" bindtap="returnResult">暂不登录</button>
+    <button class="paper-button paper-button--primary" loading="{{authorizing}}" disabled="{{authorizing}}" bindtap="authorizeLogin">继续授权登录</button>
+    <button class="paper-button" disabled="{{authorizing}}" bindtap="returnResult">暂不登录</button>
   </view>
 </view>
 

@@ -6,7 +6,7 @@
 }
 
 .result-card {
-  min-height: 430rpx;
+  min-height: 472rpx;
   margin-top: 28rpx;
   padding: 24rpx 28rpx 34rpx;
 }
@@ -15,6 +15,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.result-card__summary {
+  min-width: 0;
+  flex: 1;
+  padding-right: 20rpx;
 }
 
 .result-badge {
@@ -136,12 +142,10 @@
 }
 
 .score-row__bar--coral {
-  width: 76%;
   background: #ff7469;
 }
 
 .score-row__bar--mint {
-  width: 68%;
   background: #a9e2cf;
 }
 
@@ -154,7 +158,7 @@
 
 .unlock-card {
   margin-top: 32rpx;
-  padding: 32rpx 28rpx 26rpx;
+  padding: 26rpx 28rpx 22rpx;
   background: #e7d8ff;
 }
 
@@ -191,6 +195,11 @@
 
 .result-share {
   margin-top: auto;
+  margin-bottom: calc(84rpx + env(safe-area-inset-bottom));
+}
+
+.state-actions {
+  margin-bottom: calc(28rpx + env(safe-area-inset-bottom));
 }
 
 .video-card,
@@ -270,7 +279,6 @@
 }
 
 .state-page--permission {
-  min-height: 100vh;
   padding-top: 30rpx;
 }
 

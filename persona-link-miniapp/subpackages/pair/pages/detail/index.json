@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "测试详情",
   "usingComponents": {
-    "app-nav-bar": "/components/app-nav-bar/index"
+    "app-nav-bar": "/components/app-nav-bar/index",
+    "test-detail": "/components/test-detail/index"
   }
 }

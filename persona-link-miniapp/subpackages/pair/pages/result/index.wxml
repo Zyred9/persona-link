@@ -1,6 +1,9 @@
 <app-nav-bar title="双人报告" show-back="{{true}}"></app-nav-bar>
 
 <view class="paper-page result-page">
+  <page-state wx:if="{{state === 'loading'}}" type="loading" title="双人报告正在加载"></page-state>
+  <page-state wx:elif="{{state === 'error'}}" type="error" title="双人报告加载失败" description="{{errorDescription}}" action-text="重新加载" bind:action="retry"></page-state>
+  <block wx:else>
   <view class="paper-card result-hero">
     <view class="pair-mascots result-mascots">
       <view class="pair-mascot">
@@ -14,18 +17,17 @@
         <view class="pair-mascot__cheek pair-mascot__cheek--right"></view>
       </view>
     </view>
-    <text class="result-role">默契搭子</text>
-    <text class="result-summary">在具体行动里慢慢建立默契</text>
+    <text class="result-role">{{result.title}}</text>
+    <text class="result-summary">{{result.summary}}</text>
   </view>
 
   <view class="paper-card result-detail">
     <text class="result-detail__title">一起做到的事</text>
-    <text>• 有分歧也愿意说清楚</text>
-    <text>• 会把彼此的感受放进计划</text>
-    <text>• 能在日常里给对方稳定回应</text>
+    <text wx:for="{{result.actions}}" wx:key="*this">• {{item}}</text>
   </view>
 
   <text class="result-privacy">双方单题答案默认不可见</text>
 
   <button class="paper-button result-share" open-type="share">分享结果</button>
+  </block>
 </view>

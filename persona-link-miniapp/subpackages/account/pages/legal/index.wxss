@@ -17,6 +17,7 @@
 }
 
 .legal-card {
+  min-height: 690rpx;
   margin-top: 48rpx;
   padding: 42rpx 30rpx 24rpx;
 }

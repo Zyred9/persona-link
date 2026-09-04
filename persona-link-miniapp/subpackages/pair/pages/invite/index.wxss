@@ -62,13 +62,9 @@
   margin-bottom: -22rpx;
 }
 
-.invite-progress {
-  margin-top: 38rpx;
-}
-
 .invite-note {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 42rpx;
   color: #6e6671;
   font-size: 22rpx;
   font-weight: 800;

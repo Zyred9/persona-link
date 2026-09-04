@@ -1,1413 +1,690 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  assetUrl,
+  checkPublish,
+  createAiGenerationTask,
+  deleteQuestion,
+  getAiGenerationTask,
+  getAiGenerationTasks,
+  getCategories,
+  getQuestions,
+  getResultConfig,
+  retryAiGenerationTask,
+  saveQuestion as saveQuestionRequest,
+  saveResultConfig,
+  submitAiGenerationTask,
+  uploadImage,
+  type AiGenerationTask,
+  type AiGenerationTaskSummary,
+  type Category,
+  type Question,
+  type ResultTemplate,
+} from '../api'
+import { isReadOnly } from '../auth'
 
-type ReviewState = 'pending' | 'passed' | 'returned'
+interface AiOption {
+  id?: number
+  text: string
+  dimensionId: number
+  score: number
+}
 
-interface Question {
+interface AiQuestion {
+  id: number
+  questionNo: number
+  sortNo?: number
+  text: string
+  type: 1 | 2
+  dimensionId: number
+  minSelect: number
+  maxSelect: number
+  options: AiOption[]
+}
+
+interface AiRule {
+  id?: number
+  dimensionId: number
+  resultCode?: string
+  sortNo?: number
+  min: number
+  max: number
+  name: string
   content: string
-  type: '单选题' | '多选题'
-  dimension: string
-  options: string[]
-  review: ReviewState
+  deepContent: string
+  shareText: string
 }
 
-interface ResultRule {
-  range: string
-  title: string
-  description: string
-}
-
-interface Dimension {
+interface AiDimension {
+  id: number
+  code: string
   name: string
   icon: string
-  review: ReviewState
-  rules: ResultRule[]
+  rules: AiRule[]
 }
 
 const router = useRouter()
+const route = useRoute()
 const step = ref(1)
-const formTouched = ref(false)
-const proposalVersion = ref(1)
-const progress = ref(0)
+const touched = ref(false)
 const reviewTab = ref<'questions' | 'results'>('questions')
-const currentQuestionIndex = ref(0)
-const currentDimensionIndex = ref(0)
-const reviewMessage = ref('')
-let generationTimer: number | undefined
+const questionIndex = ref(0)
+const dimensionIndex = ref(0)
+const ruleIndex = ref(0)
+const questionQuery = ref('')
+const questionFilter = ref<'all' | 'single' | 'multiple'>('all')
+const pendingRule = ref<{ dimensionIndex: number; ruleIndex: number; previousMax: number } | null>(null)
+const notice = ref('')
+const task = ref<AiGenerationTask | null>(null)
+const categories = ref<Category[]>([])
+const taskHistory = ref<AiGenerationTaskSummary[]>([])
+const historyStatus = ref('')
+const historyPage = ref(1)
+const historyTotal = ref(0)
+const historySize = 5
+const creating = ref(false)
+const uploading = ref(false)
+const loadingReview = ref(false)
+const ruleDirty = ref(false)
+const dirtyQuestionIds = reactive(new Set<number>())
+const requestStorageKey = 'ai-question-bank-request-id'
+const requestId = ref(loadRequestId())
+let timer: number | undefined
+let disposed = false
+const taskStatusLabels: Record<number, string> = { 1: '待生成', 2: '生成中', 3: '待审核', 4: '生成失败', 5: '已提交' }
+const readOnly = isReadOnly()
+
+function loadRequestId(): string {
+  const stored = sessionStorage.getItem(requestStorageKey)
+  if (stored) return stored
+  const created = crypto.randomUUID()
+  sessionStorage.setItem(requestStorageKey, created)
+  return created
+}
 
 const form = reactive({
   name: '情侣沟通方式测试',
-  type: '双人测试',
+  type: 2,
+  categoryId: 0,
+  coverUrl: '',
+  description: '',
+  estimatedMinutes: 5,
   prompt: '生成一套适合情侣的沟通方式测试，语气轻松，不贴标签。',
   bankCount: 100,
   drawCount: 30,
 })
 
-const questions = reactive<Question[]>([
-  {
-    content: '发生分歧时，你更常先做什么？',
-    type: '单选题',
-    dimension: '冲突处理',
-    options: ['先冷静一下，再继续沟通', '马上把自己的想法说清楚', '先听听对方怎么想', '暂时不谈，等情绪过去'],
-    review: 'pending',
-  },
-  {
-    content: '你希望对方怎样回应你的情绪？',
-    type: '多选题',
-    dimension: '情感表达',
-    options: ['认真听我说完', '给我一个拥抱', '一起想解决办法', '先给我一点空间'],
-    review: 'pending',
-  },
-  {
-    content: '沟通中你更在意哪件事？',
-    type: '单选题',
-    dimension: '倾听习惯',
-    options: ['被准确理解', '快速解决问题', '保持气氛轻松', '双方都有表达机会'],
-    review: 'pending',
-  },
-  {
-    content: '讨论重要决定时，你通常会？',
-    type: '单选题',
-    dimension: '关系主动',
-    options: ['主动提出计划', '先了解对方期待', '列出选项一起选', '等更合适的时机再聊'],
-    review: 'pending',
-  },
-])
+const questions = reactive<AiQuestion[]>([])
 
-const dimensions = reactive<Dimension[]>([
-  {
-    name: '冲突处理',
-    icon: '⚡',
-    review: 'pending',
-    rules: [
-      { range: '0 ≤ 分数 < 40', title: '回避观察者', description: '你倾向于回避冲突，避免直接面对问题。' },
-      { range: '40 ≤ 分数 < 70', title: '温和协调者', description: '你倾向于通过协商与妥协，寻求双方都能接受的方案。' },
-      { range: '70 ≤ 分数 ≤ 100', title: '坦诚沟通者', description: '你倾向于直接表达观点，积极沟通解决问题。' },
-    ],
-  },
-  {
-    name: '情感表达',
-    icon: '💗',
-    review: 'pending',
-    rules: [
-      { range: '0 ≤ 分数 < 40', title: '含蓄感受者', description: '你更习惯把感受留在心里，用行动表达在意。' },
-      { range: '40 ≤ 分数 < 70', title: '自然表达者', description: '你会在合适的时候说出感受，也尊重彼此节奏。' },
-      { range: '70 ≤ 分数 ≤ 100', title: '热情分享者', description: '你乐于直接分享情绪，让关系保持充分连接。' },
-    ],
-  },
-  {
-    name: '倾听习惯',
-    icon: '☁',
-    review: 'pending',
-    rules: [
-      { range: '0 ≤ 分数 < 40', title: '快速回应者', description: '你习惯尽快回应，偶尔会错过对方话里的细节。' },
-      { range: '40 ≤ 分数 < 70', title: '平衡倾听者', description: '你能在表达自己与理解对方之间找到平衡。' },
-      { range: '70 ≤ 分数 ≤ 100', title: '耐心共情者', description: '你愿意先听完整，再回应对方真正的需要。' },
-    ],
-  },
-  {
-    name: '关系主动',
-    icon: '♧',
-    review: 'pending',
-    rules: [
-      { range: '0 ≤ 分数 < 40', title: '从容跟随者', description: '你习惯观察关系节奏，在明确后再行动。' },
-      { range: '40 ≤ 分数 < 70', title: '默契协作者', description: '你会根据情境主动，也愿意配合对方。' },
-      { range: '70 ≤ 分数 ≤ 100', title: '积极推动者', description: '你乐于主动发起沟通，为关系创造更多可能。' },
-    ],
-  },
-])
+const dimensions = reactive<AiDimension[]>([])
 
-const stepLabels = ['填写题型信息', '生成题库', '审核题目与结果', '提交题型库']
+const ruleDraft = reactive<AiRule>({ dimensionId: 0, min: 0, max: 100, name: '', content: '', deepContent: '', shareText: '' })
+
 const formError = computed(() => {
   if (!form.name.trim()) return '请填写题型名称'
+  if (!form.categoryId) return '请选择分类标签'
+  if (!form.coverUrl.trim()) return '请上传封面或填写封面 URL'
+  if (!Number.isInteger(form.estimatedMinutes) || form.estimatedMinutes < 1) return '预计用时需为正整数'
   if (!form.prompt.trim()) return '请填写生成要求'
   if (!Number.isInteger(form.bankCount) || form.bankCount < 10 || form.bankCount > 500) return '题库题数需为 10—500 的整数'
-  if (!Number.isInteger(form.drawCount) || form.drawCount < 1 || form.drawCount > form.bankCount) return '单次答题数需为 1—题库题数的整数'
+  if (!Number.isInteger(form.drawCount) || form.drawCount < 1 || form.drawCount > form.bankCount) return '单次答题数不能超过题库题数'
   return ''
 })
-const generatedCount = computed(() => Math.round((form.bankCount * progress.value) / 100))
-const generatedSingleCount = computed(() => Math.round(generatedCount.value * 0.72))
-const generatedMultipleCount = computed(() => generatedCount.value - generatedSingleCount.value)
-const currentPreview = computed(() => questions[Math.min(Math.floor(progress.value / 25), questions.length - 1)])
-const currentQuestion = computed(() => questions[currentQuestionIndex.value])
-const currentDimension = computed(() => dimensions[currentDimensionIndex.value])
-const questionReviewDone = computed(() => questions.every((question) => question.review === 'passed'))
-const resultReviewDone = computed(() => dimensions.every((dimension) => dimension.review === 'passed'))
-const reviewDone = computed(() => questionReviewDone.value && resultReviewDone.value)
-const passedQuestionCount = computed(() => questions.filter((question) => question.review === 'passed').length)
-const returnedQuestionCount = computed(() => questions.filter((question) => question.review === 'returned').length)
+const generatedCount = computed(() => task.value?.generatedQuestionCount ?? 0)
+const progress = computed(() => task.value ? Math.round(task.value.generatedQuestionCount * 100 / task.value.targetQuestionCount) : 0)
+const currentQuestion = computed(() => questions[questionIndex.value]!)
+const currentDimension = computed(() => dimensions[dimensionIndex.value]!)
+const ruleCount = computed(() => dimensions.reduce((total, item) => total + item.rules.length, 0))
+const generationFailed = computed(() => task.value?.taskStatus === 4)
+const generationComplete = computed(() => task.value?.taskStatus === 3 || task.value?.taskStatus === 5)
+const latestQuestion = computed(() => questions[questions.length - 1])
+const singleCount = computed(() => questions.filter((item) => item.type === 1).length)
+const multipleCount = computed(() => questions.filter((item) => item.type === 2).length)
+const filteredQuestions = computed(() => questions
+  .map((question, index) => ({ question, index }))
+  .filter(({ question }) => question.text.includes(questionQuery.value.trim()))
+  .filter(({ question }) => questionFilter.value === 'all' || question.type === (questionFilter.value === 'single' ? 1 : 2)))
+const rulesCovered = computed(() => {
+  if (!currentDimension.value) return false
+  const rules = [...currentDimension.value.rules].sort((left, right) => left.min - right.min)
+  return rules.length > 0
+    && rules[0]!.min === 0
+    && rules[rules.length - 1]!.max === 100
+    && rules.every((rule, index) => rule.min < rule.max && (index === rules.length - 1 || rule.max === rules[index + 1]!.min))
+})
 
-function refreshProposal() {
-  formTouched.value = true
-  if (formError.value) return
-  proposalVersion.value += 1
+watch([questionQuery, questionFilter], () => {
+  if (filteredQuestions.value.some(({ index }) => index === questionIndex.value)) return
+  if (filteredQuestions.value[0]) questionIndex.value = filteredQuestions.value[0].index
+})
+
+async function startGeneration() {
+  touched.value = true
+  if (formError.value || creating.value) return
+  creating.value = true
+  notice.value = ''
+  try {
+    task.value = await createAiGenerationTask({
+      requestId: requestId.value,
+      testName: form.name.trim(),
+      testType: form.type,
+      categoryId: form.categoryId,
+      coverUrl: form.coverUrl.trim(),
+      description: form.description.trim() || undefined,
+      estimatedMinutes: form.estimatedMinutes,
+      promptText: form.prompt.trim(),
+      targetQuestionCount: form.bankCount,
+      drawQuestionCount: form.drawCount,
+    })
+    applyTaskToForm(task.value)
+    step.value = 2
+    await router.replace({ query: { ...route.query, taskId: String(task.value.id) } })
+    sessionStorage.removeItem(requestStorageKey)
+    schedulePoll(0)
+    await loadTaskHistory()
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : 'AI 生成任务创建失败'
+  } finally {
+    creating.value = false
+  }
 }
 
-function startGeneration() {
-  formTouched.value = true
-  if (formError.value) return
-  step.value = 2
-  progress.value = 8
-  generationTimer = window.setInterval(() => {
-    progress.value = Math.min(progress.value + 8, 100)
-    if (progress.value === 100) stopGenerationTimer()
-  }, 260)
+async function loadTaskHistory() {
+  try {
+    const result = await getAiGenerationTasks({ page: historyPage.value, size: historySize, taskStatus: historyStatus.value })
+    taskHistory.value = result.records
+    historyTotal.value = result.total
+  } catch (error) { notice.value = error instanceof Error ? error.message : '任务历史加载失败' }
 }
 
-function stopGenerationTimer() {
-  if (generationTimer === undefined) return
-  window.clearInterval(generationTimer)
-  generationTimer = undefined
+async function changeHistoryPage(offset: number) {
+  historyPage.value += offset
+  await loadTaskHistory()
 }
 
-function enterReview() {
-  stopGenerationTimer()
-  progress.value = 100
-  step.value = 3
+async function restoreTask(taskId: number) {
+  try {
+    task.value = await getAiGenerationTask(taskId)
+    sessionStorage.removeItem(requestStorageKey)
+    applyTaskToForm(task.value)
+    if (task.value.taskStatus === 5) step.value = 4
+    else if (task.value.taskStatus === 3) { step.value = 2; if (await loadReview()) step.value = 3 }
+    else { step.value = 2; if (!generationFailed.value) schedulePoll() }
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '生成任务恢复失败'
+  }
 }
 
-function setQuestionReview(review: ReviewState) {
-  currentQuestion.value.review = review
-  reviewMessage.value = review === 'passed' ? '当前题目已通过' : '当前题目已退回修改'
-  if (currentQuestionIndex.value < questions.length - 1) currentQuestionIndex.value += 1
+async function resumeTask(taskId: number) {
+  await router.replace({ query: { ...route.query, taskId: String(taskId) } })
+  await restoreTask(taskId)
 }
 
-function setAllQuestionReview(review: ReviewState) {
-  questions.forEach((question) => {
-    question.review = review
+function schedulePoll(delay = 1500) {
+  if (disposed) return
+  stopTimer()
+  timer = window.setTimeout(pollTask, delay)
+}
+
+async function pollTask() {
+  if (!task.value) return
+  try {
+    task.value = await getAiGenerationTask(task.value.id)
+    if (task.value.taskStatus === 1 || task.value.taskStatus === 2) {
+      schedulePoll()
+    } else if (task.value.taskStatus === 3) {
+      await loadReview()
+    } else if (task.value.taskStatus === 4) {
+      notice.value = task.value.errorMessage || 'DeepSeek 生成失败，可重试当前批次。'
+    } else if (task.value.taskStatus === 5) {
+      step.value = 4
+    }
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '生成进度查询失败'
+    schedulePoll(3000)
+  }
+}
+
+function stopTimer() {
+  if (timer === undefined) return
+  window.clearTimeout(timer)
+  timer = undefined
+}
+
+async function retryGeneration() {
+  if (!task.value) return
+  try {
+    notice.value = ''
+    task.value = await retryAiGenerationTask(task.value.id)
+    schedulePoll(0)
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '重试失败'
+  }
+}
+
+async function enterReview() {
+  if (!generationComplete.value) return
+  if (questions.length || await loadReview()) step.value = 3
+}
+
+async function removeQuestion(index: number) {
+  const question = questions[index]
+  if (!question || questions.length <= 1) return
+  try {
+    await deleteQuestion(question.id)
+    dirtyQuestionIds.delete(question.id)
+    questions.splice(index, 1)
+    questionIndex.value = Math.min(questionIndex.value, questions.length - 1)
+    notice.value = `第 ${question.questionNo} 题已删除。`
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '题目删除失败'
+  }
+}
+
+function addOption() {
+  if (currentQuestion.value.options.length < 8) {
+    currentQuestion.value.options.push({ text: '', dimensionId: currentQuestion.value.dimensionId, score: 0 })
+    markQuestionDirty()
+  }
+}
+
+function removeOption(index: number) {
+  if (currentQuestion.value.options.length > 2) {
+    currentQuestion.value.options.splice(index, 1)
+    markQuestionDirty()
+  }
+}
+
+function markQuestionDirty() {
+  if (currentQuestion.value) dirtyQuestionIds.add(currentQuestion.value.id)
+}
+
+async function saveQuestion() {
+  if (!currentQuestion.value.text.trim() || currentQuestion.value.options.some((option) => !option.text.trim())) {
+    notice.value = '请补全题目和选项内容。'
+    return
+  }
+  if (currentQuestion.value.type === 2 && (currentQuestion.value.minSelect < 1 || currentQuestion.value.maxSelect > currentQuestion.value.options.length || currentQuestion.value.minSelect > currentQuestion.value.maxSelect)) {
+    notice.value = '多选题的选择数量范围无效。'
+    return
+  }
+  try {
+    const saved = await saveQuestionRequest(task.value!.versionId, {
+      questionType: currentQuestion.value.type,
+      dimensionId: currentQuestion.value.type === 1 ? currentQuestion.value.dimensionId : null,
+      minSelectCount: currentQuestion.value.type === 1 ? 1 : currentQuestion.value.minSelect,
+      maxSelectCount: currentQuestion.value.type === 1 ? 1 : currentQuestion.value.maxSelect,
+      questionNo: currentQuestion.value.questionNo,
+      questionText: currentQuestion.value.text.trim(),
+      requiredFlag: 1,
+      sortNo: currentQuestion.value.sortNo,
+      options: currentQuestion.value.options.map((option, index) => ({
+        optionCode: String.fromCharCode(65 + index),
+        optionText: option.text.trim(),
+        dimensionId: currentQuestion.value.type === 2 ? option.dimensionId : null,
+        scoreValue: option.score,
+        sortNo: currentQuestion.value.options.length - index,
+      })),
+    }, currentQuestion.value.id)
+    questions[questionIndex.value] = mapQuestion(saved)
+    dirtyQuestionIds.delete(saved.id)
+    notice.value = `第 ${currentQuestion.value.questionNo} 题已保存。`
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '题目保存失败'
+  }
+}
+
+function selectDimension(index: number) {
+  if (ruleDirty.value && index !== dimensionIndex.value) {
+    notice.value = '当前结果规则尚未保存，请先保存或取消修改。'
+    return
+  }
+  rollbackPendingRule()
+  dimensionIndex.value = index
+  ruleIndex.value = 0
+  resetRuleDraft()
+}
+
+function editRule(index: number) {
+  if (ruleDirty.value && index !== ruleIndex.value) {
+    notice.value = '当前结果规则尚未保存，请先保存或取消修改。'
+    return
+  }
+  if (pendingRule.value?.dimensionIndex === dimensionIndex.value && pendingRule.value.ruleIndex !== index) rollbackPendingRule()
+  ruleIndex.value = index
+  resetRuleDraft()
+}
+
+function resetRuleDraft() {
+  if (currentDimension.value?.rules[ruleIndex.value]) Object.assign(ruleDraft, currentDimension.value.rules[ruleIndex.value])
+  ruleDirty.value = false
+}
+
+function cancelRuleEdit() {
+  if (pendingRule.value?.dimensionIndex === dimensionIndex.value && pendingRule.value.ruleIndex === ruleIndex.value) {
+    rollbackPendingRule()
+    ruleIndex.value = currentDimension.value.rules.length - 1
+  }
+  resetRuleDraft()
+  notice.value = '已取消结果规则修改。'
+}
+
+function rollbackPendingRule() {
+  if (!pendingRule.value) return
+  const pending = pendingRule.value
+  const rules = dimensions[pending.dimensionIndex]!.rules
+  rules.splice(pending.ruleIndex, 1)
+  if (rules[pending.ruleIndex - 1]) rules[pending.ruleIndex - 1]!.max = pending.previousMax
+  pendingRule.value = null
+}
+
+async function saveRule() {
+  if (!Number.isInteger(ruleDraft.min) || !Number.isInteger(ruleDraft.max) || ruleDraft.min < 0 || ruleDraft.min >= ruleDraft.max || ruleDraft.max > 100) {
+    notice.value = '结果分数区间需为 0—100 内的有效整数区间。'
+    return
+  }
+  if (!ruleDraft.name.trim() || !ruleDraft.content.trim()) {
+    notice.value = '请补全结果名称和基础结果文案。'
+    return
+  }
+  const candidateRules = currentDimension.value.rules.map((rule, index) => index === ruleIndex.value ? { ...ruleDraft } : rule)
+  const sortedRules = [...candidateRules].sort((left, right) => left.min - right.min)
+  const covered = sortedRules[0]?.min === 0
+    && sortedRules[sortedRules.length - 1]?.max === 100
+    && sortedRules.every((rule, index) => rule.min < rule.max && (index === sortedRules.length - 1 || rule.max === sortedRules[index + 1]!.min))
+  if (!covered) {
+    notice.value = '结果规则必须无空档、无重叠地覆盖 0—100。'
+    return
+  }
+  const templates: ResultTemplate[] = dimensions.flatMap((dimension) => {
+    const rules = dimension.id === currentDimension.value.id ? candidateRules : dimension.rules
+    return rules.map((rule, index) => ({
+      id: rule.id,
+      dimensionId: dimension.id,
+      resultCode: rule.resultCode,
+      resultName: rule.name.trim(),
+      scoreMin: rule.min,
+      scoreMax: rule.max,
+      basicResultJson: { text: rule.content.trim() },
+      deepResultJson: rule.deepContent ? { text: rule.deepContent } : undefined,
+      shareCopyJson: rule.shareText ? { text: rule.shareText } : undefined,
+      sortNo: rule.sortNo ?? index,
+    }))
   })
-  reviewMessage.value = review === 'passed' ? '所有示例题目已通过' : '所有示例题目已退回'
+  try {
+    const config = await saveResultConfig(task.value!.versionId, templates)
+    applyResultConfig(config.dimensions, config.templates)
+    pendingRule.value = null
+    notice.value = `${currentDimension.value.name}结果规则已保存。`
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '结果规则保存失败'
+  }
 }
 
-function setDimensionReview(review: ReviewState) {
-  currentDimension.value.review = review
-  reviewMessage.value = review === 'passed' ? '当前结果规则已通过' : '当前结果规则已退回修改'
-  if (currentDimensionIndex.value < dimensions.length - 1) currentDimensionIndex.value += 1
-}
-
-function submitLibrary() {
-  const invalidQuestionIndex = questions.findIndex((question) => !question.content.trim() || question.options.some((option) => !option.trim()))
-  if (invalidQuestionIndex >= 0) {
-    questions[invalidQuestionIndex].review = 'pending'
-    currentQuestionIndex.value = invalidQuestionIndex
-    reviewTab.value = 'questions'
-    reviewMessage.value = `第 ${invalidQuestionIndex + 1} 题内容或选项不完整，请补全后重新审核`
+function addRule() {
+  rollbackPendingRule()
+  const lastRule = currentDimension.value.rules[currentDimension.value.rules.length - 1]!
+  if (lastRule.max - lastRule.min < 2) {
+    notice.value = '当前最后一个区间无法继续拆分。'
     return
   }
-  const invalidDimensionIndex = dimensions.findIndex((dimension) => dimension.rules.some((rule) => !rule.title.trim() || !rule.description.trim()))
-  if (invalidDimensionIndex >= 0) {
-    dimensions[invalidDimensionIndex].review = 'pending'
-    currentDimensionIndex.value = invalidDimensionIndex
-    reviewTab.value = 'results'
-    reviewMessage.value = `${dimensions[invalidDimensionIndex].name}存在不完整的结果规则，请补全后重新审核`
-    return
-  }
-  if (!reviewDone.value) {
-    reviewMessage.value = returnedQuestionCount.value > 0 || dimensions.some((dimension) => dimension.review === 'returned')
-      ? '请先修改并通过所有退回项'
-      : '请先审核全部题目与结果规则'
-    return
-  }
-  step.value = 4
+  const previousMax = lastRule.max
+  const splitScore = Math.floor((lastRule.min + lastRule.max) / 2)
+  lastRule.max = splitScore
+  const resultCode = `${currentDimension.value.code.slice(0, 22)}_${crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`
+  currentDimension.value.rules.push({ dimensionId: currentDimension.value.id, resultCode, min: splitScore, max: 100, name: '新结果', content: '请填写结果文案。', deepContent: '', shareText: '' })
+  pendingRule.value = { dimensionIndex: dimensionIndex.value, ruleIndex: currentDimension.value.rules.length - 1, previousMax }
+  editRule(currentDimension.value.rules.length - 1)
+  notice.value = '已拆分最后一个区间，请编辑并保存新规则。'
 }
 
-function goToTypeLibrary() {
-  void router.push('/types')
+async function submitLibrary() {
+  if (!task.value) return
+  if (dirtyQuestionIds.size || ruleDirty.value) {
+    notice.value = '还有未保存的人工修改，请先保存或取消后再提交。'
+    return
+  }
+  if (pendingRule.value) {
+    notice.value = '请先保存或取消新增的结果规则。'
+    return
+  }
+  try {
+    const check = await checkPublish(task.value.versionId)
+    if (!check.passed) {
+      notice.value = check.errors.join('；')
+      return
+    }
+    task.value = await submitAiGenerationTask(task.value.id)
+    step.value = 4
+    notice.value = 'AI 题库已提交为可继续编辑的草稿版本。'
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '题型库提交失败'
+  }
 }
 
-onUnmounted(stopGenerationTimer)
+function textOf(value: unknown): string {
+  if (value && typeof value === 'object' && 'text' in value) return String((value as { text?: unknown }).text ?? '')
+  return typeof value === 'string' ? value : ''
+}
+
+function mapQuestion(question: Question): AiQuestion {
+  const dimensionId = question.dimensionId ?? question.options[0]?.dimensionId ?? dimensions[0]?.id ?? 0
+  return {
+    id: question.id,
+    questionNo: question.questionNo,
+    sortNo: question.sortNo,
+    text: question.questionText,
+    type: question.questionType as 1 | 2,
+    dimensionId,
+    minSelect: question.minSelectCount,
+    maxSelect: question.maxSelectCount,
+    options: question.options.map((option) => ({ id: option.id, text: option.optionText, dimensionId: option.dimensionId ?? question.dimensionId ?? dimensionId, score: option.scoreValue })),
+  }
+}
+
+function dimensionName(dimensionId: number): string {
+  return dimensions.find((dimension) => dimension.id === dimensionId)?.name || '未关联维度'
+}
+
+function applyTaskToForm(value: AiGenerationTask) {
+  form.name = value.testName
+  form.type = value.testType
+  form.categoryId = value.categoryId
+  form.coverUrl = value.coverUrl
+  form.description = value.description || ''
+  form.estimatedMinutes = value.estimatedMinutes
+  form.bankCount = value.targetQuestionCount
+  form.drawCount = value.drawQuestionCount
+}
+
+function applyResultConfig(resultDimensions: Array<{ id: number; dimensionCode?: string; dimensionName: string }>, templates: ResultTemplate[]) {
+  dimensions.splice(0, dimensions.length, ...resultDimensions.map((dimension, index) => ({
+    id: dimension.id,
+    code: dimension.dimensionCode || `D${index + 1}`,
+    name: dimension.dimensionName,
+    icon: ['ϟ', '♥', '☁', '♧'][index % 4]!,
+    rules: templates.filter((template) => template.dimensionId === dimension.id)
+      .sort((left, right) => Number(left.scoreMin) - Number(right.scoreMin)).map((template) => ({
+      id: template.id,
+      dimensionId: dimension.id,
+      resultCode: template.resultCode,
+      sortNo: template.sortNo,
+      min: Number(template.scoreMin),
+      max: Number(template.scoreMax),
+      name: template.resultName,
+      content: textOf(template.basicResultJson),
+      deepContent: textOf(template.deepResultJson),
+      shareText: textOf(template.shareCopyJson),
+    })),
+  })))
+  dimensionIndex.value = Math.min(dimensionIndex.value, Math.max(0, dimensions.length - 1))
+  ruleIndex.value = 0
+  resetRuleDraft()
+}
+
+async function loadReview(): Promise<boolean> {
+  if (!task.value || loadingReview.value) return false
+  loadingReview.value = true
+  try {
+    const [questionData, resultConfig] = await Promise.all([getQuestions(task.value.versionId), getResultConfig(task.value.versionId)])
+    applyResultConfig(resultConfig.dimensions, resultConfig.templates)
+    questions.splice(0, questions.length, ...questionData.map(mapQuestion))
+    dirtyQuestionIds.clear()
+    questionIndex.value = 0
+    if (!questions.length || !dimensions.length) throw new Error('生成结果不完整，请重试任务')
+    return true
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '审核数据加载失败'
+    return false
+  } finally {
+    loadingReview.value = false
+  }
+}
+
+async function uploadCover(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || uploading.value) return
+  uploading.value = true
+  try {
+    form.coverUrl = await uploadImage(file)
+    notice.value = '封面上传成功。'
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '封面上传失败'
+  } finally {
+    uploading.value = false
+    input.value = ''
+  }
+}
+
+onMounted(async () => {
+  try {
+    categories.value = (await getCategories({ status: 1 })).records
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : '分类加载失败'
+  }
+  await loadTaskHistory()
+  const taskId = Number(route.query.taskId)
+  if (!Number.isInteger(taskId) || taskId <= 0) return
+  await restoreTask(taskId)
+})
+
+onUnmounted(() => {
+  disposed = true
+  stopTimer()
+})
 </script>
 
 <template>
   <section class="ai-page">
-    <div class="demo-banner" role="status">
-      <span>演示模式</span>
-      本页交互仅保存在当前页面，尚未接入 AI 生成与后台保存接口。
-    </div>
-
-    <header class="page-heading">
-      <div>
-        <p class="eyebrow">AI QUESTION BANK</p>
-        <h1>AI 题库助手 <span aria-hidden="true">♡</span></h1>
-        <p>{{ step === 1 ? '填写题型信息，确认方案后生成可审核题库' : step === 2 ? 'AI 正在生成题库，完成后进入人工审核' : step === 3 ? '逐项审核题目、选项、计分维度和结果规则' : '题型草稿已经提交到题型库' }}</p>
-      </div>
-      <span class="draft-chip">AI 草稿</span>
+    <header class="ai-heading">
+      <div><h1>AI题库助手 <span>♡</span></h1><p>{{ step === 1 ? '填写题型信息，由 DeepSeek 生成可审核题库' : step === 2 ? (generationFailed ? 'DeepSeek 生成失败，请查看失败原因并重试' : generationComplete ? 'DeepSeek 已完成题库生成，可进入人工审核' : 'DeepSeek 正在生成题库，页面会自动刷新真实进度') : step === 3 ? '逐题审核题目、选项、计分维度和分值' : '题库已提交，可继续在题型管理中编辑和发布' }}</p></div>
+      <span class="preview-chip">DeepSeek</span>
     </header>
 
-    <section class="steps" aria-label="创建进度">
-      <div v-for="(label, index) in stepLabels" :key="label" class="step-item" :class="{ active: step === index + 1, done: step > index + 1 }">
-        <span class="step-number">{{ step > index + 1 ? '✓' : index + 1 }}</span>
-        <span>{{ label }}</span>
-      </div>
+    <p class="integration-note"><b>真实生成</b> 模型调用和 API Key 仅在服务端执行；任务失败后可从当前批次继续重试。</p>
+    <p v-if="notice" class="review-notice" role="status">{{ notice }}</p>
+
+    <template v-if="step === 1">
+    <section class="task-history">
+      <header><h2>最近任务</h2><select v-model="historyStatus" @change="historyPage = 1; loadTaskHistory()"><option value="">全部状态</option><option v-for="(label, key) in taskStatusLabels" :key="key" :value="key">{{ label }}</option></select></header>
+      <div v-for="item in taskHistory" :key="item.id" class="task-row"><span><b>{{ item.testName }}</b><small>{{ item.taskNo }} · {{ new Date(item.createDate).toLocaleString() }}</small></span><strong :class="`status-${item.taskStatus}`">{{ taskStatusLabels[item.taskStatus] }}</strong><span>{{ item.generatedQuestionCount }} / {{ item.targetQuestionCount }} 题</span><button type="button" @click="resumeTask(item.id)">{{ item.taskStatus === 5 ? '查看' : '继续处理' }}</button></div>
+      <p v-if="!taskHistory.length" class="empty-tip">暂无生成任务</p>
+      <footer><span>共 {{ historyTotal }} 条</span><div><button :disabled="historyPage <= 1" @click="changeHistoryPage(-1)">上一页</button><button :disabled="historyPage * historySize >= historyTotal" @click="changeHistoryPage(1)">下一页</button></div></footer>
     </section>
-
-    <section v-if="step === 1" class="stage-grid form-stage">
-      <form class="panel form-panel" @submit.prevent="startGeneration">
-        <div class="panel-title">
-          <div>
-            <span class="section-icon">✎</span>
-            <h2>填写题型信息</h2>
-          </div>
-          <span>第 1 步</span>
-        </div>
-
-        <label>
-          <span>题型名称</span>
-          <input v-model="form.name" type="text" maxlength="40" placeholder="例如：情侣沟通方式测试" />
-        </label>
-        <label>
-          <span>测试类型</span>
-          <select v-model="form.type">
-            <option>双人测试</option>
-            <option>单人测试</option>
-          </select>
-        </label>
-        <label>
-          <span>生成要求</span>
-          <textarea v-model="form.prompt" rows="5" maxlength="300" placeholder="描述测试主题、语气和需要避免的内容"></textarea>
-          <small>{{ form.prompt.length }}/300</small>
-        </label>
-        <div class="number-grid">
-          <label>
-            <span>题库题数</span>
-            <input v-model.number="form.bankCount" type="number" min="10" max="500" />
-          </label>
-          <label>
-            <span>单次答题</span>
-            <input v-model.number="form.drawCount" type="number" min="1" :max="form.bankCount" />
-          </label>
-        </div>
-        <p v-if="formTouched && formError" class="form-error" role="alert">{{ formError }}</p>
-      </form>
-
-      <aside class="panel proposal-panel">
-        <div class="panel-title">
-          <div>
-            <span class="section-icon">✦</span>
-            <h2>生成方案预览</h2>
-          </div>
-          <span>方案 V{{ proposalVersion }}</span>
-        </div>
-        <div class="proposal-card">
-          <span class="status-chip waiting">待确认</span>
-          <h3>{{ form.name || '未命名题型' }}</h3>
-          <p>{{ form.prompt || '填写生成要求后，这里会显示方案摘要。' }}</p>
-          <div class="dimension-tags">
-            <span v-for="dimension in dimensions" :key="dimension.name">{{ dimension.name }}</span>
-          </div>
-          <dl>
-            <div><dt>测试类型</dt><dd>{{ form.type }}</dd></div>
-            <div><dt>题库题数</dt><dd>{{ form.bankCount }} 题</dd></div>
-            <div><dt>单次答题</dt><dd>{{ form.drawCount }} 题</dd></div>
-            <div><dt>题型构成</dt><dd>单选 + 多选</dd></div>
-          </dl>
-        </div>
-        <div class="actions">
-          <button class="secondary-button" type="button" @click="refreshProposal">↻ 刷新方案</button>
-          <button class="primary-button" type="button" @click="startGeneration">✦ 确认并开始生成</button>
-        </div>
-      </aside>
+    <section class="ai-form-card">
+      <label><span>题型名称</span><input v-model="form.name" maxlength="100" placeholder="输入题型名称" /></label>
+      <label class="short-field"><span>测试类型</span><select v-model.number="form.type"><option :value="1">单人测试</option><option :value="2">双人测试</option></select></label>
+      <label class="short-field"><span>分类标签</span><select v-model.number="form.categoryId"><option :value="0" disabled>请选择分类</option><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.categoryName }}</option></select></label>
+      <label><span>封面图片</span><div class="cover-input"><input v-model="form.coverUrl" maxlength="500" placeholder="填写图片 URL，或点击上传" /><label class="upload-button"><input type="file" accept="image/png,image/jpeg,image/webp" :disabled="readOnly || uploading" @change="uploadCover" />{{ uploading ? '上传中…' : '上传图片' }}</label><img v-if="form.coverUrl" :src="assetUrl(form.coverUrl)" alt="题型封面预览" /></div></label>
+      <label><span>题型说明</span><textarea v-model="form.description" rows="3" maxlength="2000" placeholder="选填，说明题型用途和适用人群"></textarea></label>
+      <label><span>生成要求</span><textarea v-model="form.prompt" rows="4" maxlength="500" placeholder="描述主题、语气和需要避免的内容"></textarea></label>
+      <label class="short-field"><span>预计用时</span><input v-model.number="form.estimatedMinutes" type="number" min="1" max="120" /></label>
+      <label class="short-field"><span>题库题数</span><input v-model.number="form.bankCount" type="number" min="10" max="500" /></label>
+      <label class="short-field"><span>单次答题</span><input v-model.number="form.drawCount" type="number" min="1" :max="form.bankCount" /></label>
+      <p v-if="touched && formError" class="form-error" role="alert">{{ formError }}</p>
+      <button class="generate-button" type="button" :disabled="readOnly || creating || uploading" @click="startGeneration">{{ creating ? '正在创建任务…' : '✧ 开始真实生成' }}</button>
     </section>
+    </template>
 
-    <section v-else-if="step === 2" class="stage-grid generation-stage">
-      <div class="panel generation-panel">
-        <div class="panel-title">
-          <div><span class="section-icon">✦</span><h2>正在生成题库</h2></div>
-          <span>{{ progress === 100 ? '已完成' : '生成中' }}</span>
-        </div>
-        <div class="generation-card">
-          <div class="generation-head">
-            <h3>{{ form.name }}</h3>
-            <span class="status-chip">{{ progress === 100 ? '等待审核' : '生成中' }}</span>
-          </div>
+    <section v-else-if="step === 2" class="generation-layout">
+      <article class="generation-card">
+        <h2>{{ generationFailed ? '生成失败 ✦' : generationComplete ? '题库生成完成 ✦' : '正在生成题库 ✦' }}</h2>
+        <div class="generation-main">
+          <div class="generation-title"><h3>{{ form.name }}</h3><span>{{ generationFailed ? '生成失败' : generationComplete ? '已完成' : '生成中' }}</span></div>
           <strong>{{ generatedCount }} <small>/ {{ form.bankCount }} 题</small></strong>
-          <div class="progress-track" :aria-label="`生成进度 ${progress}%`">
-            <span :style="{ width: `${progress}%` }">{{ progress }}%</span>
-          </div>
-          <p>当前批次　第 {{ Math.max(1, Math.ceil(progress / 20)) }} 批 / 共 5 批</p>
-          <div class="generation-note">♡ {{ progress === 100 ? '题库生成完成，请进入审核。' : 'AI 正在生成题目，你可以查看右侧当前内容。' }}</div>
+          <div class="progress-track"><i :style="{ width: `${progress}%` }">{{ progress }}%</i></div>
+          <p>◷ 当前批次　第 {{ task?.currentBatchNo || 0 }} 批 / 共 {{ task?.totalBatchCount || 0 }} 批</p>
+          <aside :class="{ failed: generationFailed }" :role="generationFailed ? 'alert' : 'status'">♡ {{ generationFailed ? (task?.errorMessage || '生成失败') : generationComplete ? '题库生成完成，请进入审核。' : 'DeepSeek 正在生成并写入草稿，请稍候。' }}</aside>
         </div>
-        <div class="stat-grid">
-          <div><span>▣</span><p>已生成<strong>{{ generatedCount }}</strong></p></div>
-          <div><span>◎</span><p>单选题<strong>{{ generatedSingleCount }}</strong></p></div>
-          <div><span>☑</span><p>多选题<strong>{{ generatedMultipleCount }}</strong></p></div>
-        </div>
-      </div>
-
-      <aside class="panel preview-panel">
-        <div class="panel-title">
-          <div><span class="section-icon">⌁</span><h2>当前生成内容</h2></div>
-          <span>第 {{ Math.max(1, generatedCount) }} 题</span>
-        </div>
-        <div class="question-tags">
-          <span>{{ currentPreview.type }}</span>
-          <span>{{ currentPreview.dimension }}</span>
-        </div>
-        <h3>{{ currentPreview.content }}</h3>
-        <ol class="preview-options">
-          <li v-for="(option, index) in currentPreview.options" :key="option"><span>{{ String.fromCharCode(65 + index) }}</span>{{ option }}</li>
-        </ol>
-        <ul class="quality-list">
-          <li><span>♢ 维度覆盖</span><strong>通过</strong></li>
-          <li><span>▤ 计分规则</span><strong>通过</strong></li>
-          <li><span>⌕ 重复题目</span><em>未发现</em></li>
-        </ul>
-        <button class="primary-button full-button" type="button" :disabled="progress < 100" @click="enterReview">
-          {{ progress < 100 ? `生成中 ${progress}%` : '进入人工审核 →' }}
-        </button>
-      </aside>
+        <div class="stat-row"><div>▣ <span>已生成<strong>{{ generatedCount }}</strong></span></div><div>◎ <span>单选题<strong>{{ generationComplete ? singleCount : '—' }}</strong></span></div><div>☑ <span>多选题<strong>{{ generationComplete ? multipleCount : '—' }}</strong></span></div></div>
+      </article>
+      <article class="current-card">
+        <h2>当前生成内容 ✦</h2>
+        <template v-if="latestQuestion"><div class="question-meta"><b>第 {{ latestQuestion.questionNo }} 题</b><span>{{ latestQuestion.type === 1 ? '单选题' : '多选题' }}</span><span>{{ dimensionName(latestQuestion.dimensionId) }}</span></div><h3>{{ latestQuestion.text }}</h3><ol><li v-for="(option, index) in latestQuestion.options" :key="option.id || index"><b>{{ String.fromCharCode(65 + index) }}</b>{{ option.text }}</li></ol><ul><li>♢ 维度覆盖 <strong>通过</strong></li><li>▤ 计分规则 <strong>通过</strong></li><li>⌕ 数据来源 <em>服务端草稿</em></li></ul></template>
+        <p v-else class="generation-placeholder">题目按批次写入服务端，生成完成后在此展示最后一道真实题目。</p>
+        <button v-if="generationFailed" type="button" :disabled="readOnly" @click="retryGeneration">重试当前批次</button><button v-else type="button" :disabled="!generationComplete" @click="enterReview">{{ generationComplete ? '进入人工审核' : '生成中，请稍候' }}</button>
+      </article>
     </section>
 
     <section v-else-if="step === 3" class="review-stage">
-      <div class="panel test-summary">
-        <div>
-          <span class="section-icon">▣</span>
-          <div><h2>{{ form.name }}</h2><span class="status-chip">AI 草稿</span></div>
-        </div>
-        <dl>
-          <div><dt>题库</dt><dd>{{ form.bankCount }}<small> 题</small></dd></div>
-          <div><dt>单次答题</dt><dd>{{ form.drawCount }}<small> 题</small></dd></div>
-          <div><dt>计分维度</dt><dd>{{ dimensions.length }}<small> 个</small></dd></div>
-        </dl>
-      </div>
+      <article class="review-summary">
+        <div><span>▣</span><h2>{{ form.name }}</h2><i>AI 草稿</i></div>
+        <dl><div><dt>题库</dt><dd>{{ questions.length }}<small> 题</small></dd></div><div><dt>单次答题</dt><dd>{{ form.drawCount }}<small> 题</small></dd></div><div><dt>计分维度</dt><dd>{{ dimensions.length }}<small> 个</small></dd></div></dl>
+      </article>
+      <div class="review-tabs"><button :class="{ active: reviewTab === 'questions' }" @click="reviewTab = 'questions'">题目与选项</button><button :class="{ active: reviewTab === 'results' }" @click="reviewTab = 'results'">结果规则 <b>{{ ruleCount }}</b></button></div>
 
-      <div class="review-tabs" role="tablist">
-        <button id="questions-tab" :class="{ active: reviewTab === 'questions' }" type="button" role="tab" aria-controls="questions-panel" :aria-selected="reviewTab === 'questions'" @click="reviewTab = 'questions'">
-          题目与选项 <span>{{ questions.length }}</span>
-        </button>
-        <button id="results-tab" :class="{ active: reviewTab === 'results' }" type="button" role="tab" aria-controls="results-panel" :aria-selected="reviewTab === 'results'" @click="reviewTab = 'results'">
-          结果规则 <span>{{ dimensions.reduce((total, item) => total + item.rules.length, 0) }}</span>
-        </button>
-      </div>
-
-      <div v-if="reviewTab === 'questions'" id="questions-panel" class="review-grid" role="tabpanel" aria-labelledby="questions-tab">
-        <aside class="panel review-list-panel">
-          <div class="panel-title">
-            <div><h2>题目列表</h2></div>
-            <button class="text-button" type="button" @click="setAllQuestionReview('passed')">全部通过</button>
+      <div v-if="reviewTab === 'questions'" class="question-review-grid">
+        <aside class="question-list">
+          <h2>题目列表</h2>
+          <input v-model="questionQuery" placeholder="⌕ 搜索题目" aria-label="搜索题目" />
+          <div class="filter-row"><button :class="{ active: questionFilter === 'all' }" @click="questionFilter = 'all'">全部 {{ questions.length }}</button><button :class="{ active: questionFilter === 'single' }" @click="questionFilter = 'single'">单选题 {{ questions.filter((item) => item.type === 1).length }}</button><button :class="{ active: questionFilter === 'multiple' }" @click="questionFilter = 'multiple'">多选题 {{ questions.filter((item) => item.type === 2).length }}</button></div>
+          <div class="question-list-scroll">
+            <div v-for="item in filteredQuestions" :key="item.question.id" class="question-item" :class="{ active: questionIndex === item.index }"><button class="question-select" type="button" @click="questionIndex = item.index"><b>{{ item.question.questionNo }}</b><span><strong>{{ item.question.text }}</strong><small>✎ 编辑</small></span></button><button class="question-delete" type="button" :disabled="readOnly" :aria-label="`删除第 ${item.question.questionNo} 题`" @click="removeQuestion(item.index)">删除</button></div>
+            <p v-if="filteredQuestions.length === 0" class="empty-tip">没有匹配的题目</p>
           </div>
-          <div class="filter-row">
-            <span>全部 {{ questions.length }}</span>
-            <span class="passed">已通过 {{ passedQuestionCount }}</span>
-            <span class="returned">已退回 {{ returnedQuestionCount }}</span>
-          </div>
-          <button
-            v-for="(question, index) in questions"
-            :key="question.content"
-            class="question-list-item"
-            :class="{ active: currentQuestionIndex === index }"
-            type="button"
-            @click="currentQuestionIndex = index"
-          >
-            <span class="question-index">{{ index + 1 }}</span>
-            <span><strong>{{ question.content }}</strong><small>{{ question.type }} · {{ question.dimension }}</small></span>
-            <em :class="question.review">{{ question.review === 'passed' ? '已通过' : question.review === 'returned' ? '已退回' : '待审核' }}</em>
-          </button>
         </aside>
-
-        <div class="panel question-editor">
-          <div class="panel-title">
-            <div><h2>题目与选项</h2></div>
-            <span>第 {{ currentQuestionIndex + 1 }} / {{ questions.length }} 题</span>
-          </div>
-          <label>
-            <span>题目内容</span>
-            <input v-model="currentQuestion.content" type="text" maxlength="80" />
-          </label>
-          <div class="number-grid">
-            <label><span>题型</span><select v-model="currentQuestion.type"><option>单选题</option><option>多选题</option></select></label>
-            <label><span>计分维度</span><select v-model="currentQuestion.dimension"><option v-for="dimension in dimensions" :key="dimension.name">{{ dimension.name }}</option></select></label>
-          </div>
-          <div class="option-editor">
-            <span>选项</span>
-            <label v-for="(option, index) in currentQuestion.options" :key="index">
-              <b>{{ String.fromCharCode(65 + index) }}</b>
-              <input v-model="currentQuestion.options[index]" type="text" maxlength="50" />
-              <em>分值 {{ currentQuestion.options.length - index }}</em>
-            </label>
-          </div>
-          <div class="editor-actions">
-            <button class="secondary-button return-button" type="button" @click="setQuestionReview('returned')">↩ 退回修改</button>
-            <button class="secondary-button" type="button" :disabled="currentQuestionIndex === 0" @click="currentQuestionIndex--">← 上一题</button>
-            <button class="secondary-button" type="button" :disabled="currentQuestionIndex === questions.length - 1" @click="currentQuestionIndex++">下一题 →</button>
-            <button class="approve-button" type="button" @click="setQuestionReview('passed')">✓ 通过题目</button>
-          </div>
-        </div>
+        <article class="question-editor">
+          <h2>题目与选项</h2>
+          <label><span>题目内容</span><input v-model="currentQuestion.text" maxlength="500" @input="markQuestionDirty" /></label>
+          <div class="editor-fields"><label><span>题型</span><select v-model.number="currentQuestion.type" @change="markQuestionDirty"><option :value="1">单选题</option><option :value="2">多选题</option></select></label><label><span>计分维度</span><select v-model.number="currentQuestion.dimensionId" @change="markQuestionDirty"><option v-for="item in dimensions" :key="item.id" :value="item.id">{{ item.name }}</option></select></label></div>
+          <div v-if="currentQuestion.type === 2" class="selection-range"><label><span>最少选择</span><input v-model.number="currentQuestion.minSelect" type="number" min="1" :max="currentQuestion.options.length" @input="markQuestionDirty" /></label><label><span>最多选择</span><input v-model.number="currentQuestion.maxSelect" type="number" :min="currentQuestion.minSelect" :max="currentQuestion.options.length" @input="markQuestionDirty" /></label></div>
+          <div class="options-table"><header><span>选项</span><span>答案内容</span><span>计分维度</span><span>分值</span><span>操作</span></header><div v-for="(option, index) in currentQuestion.options" :key="index"><b>{{ String.fromCharCode(65 + index) }}</b><input v-model="option.text" @input="markQuestionDirty" /><select v-model.number="option.dimensionId" aria-label="计分维度" @change="markQuestionDirty"><option v-for="item in dimensions" :key="item.id" :value="item.id">{{ item.name }}</option></select><input v-model.number="option.score" type="number" @input="markQuestionDirty" /><button :disabled="readOnly" @click="removeOption(index)">删除</button></div></div>
+          <footer><button class="outline-button" :disabled="readOnly" @click="addOption">＋ 添加选项</button><button class="save-button" :disabled="readOnly" @click="saveQuestion">保存题目</button></footer>
+        </article>
       </div>
 
-      <div v-else id="results-panel" class="result-grid" role="tabpanel" aria-labelledby="results-tab">
-        <aside class="panel dimension-list">
-          <div class="panel-title"><div><h2>计分维度</h2></div><span>{{ dimensions.length }} 个</span></div>
-          <button
-            v-for="(dimension, index) in dimensions"
-            :key="dimension.name"
-            :class="{ active: currentDimensionIndex === index }"
-            type="button"
-            @click="currentDimensionIndex = index"
-          >
-            <span>{{ dimension.icon }}</span>
-            <span><strong>{{ dimension.name }}</strong><small>{{ dimension.rules.length }} 条规则</small></span>
-            <em :class="dimension.review">{{ dimension.review === 'passed' ? '✓' : dimension.review === 'returned' ? '↩' : '·' }}</em>
-          </button>
-        </aside>
-
-        <div class="panel rule-panel">
-          <div class="panel-title">
-            <div><h2>{{ currentDimension.name }} · 结果规则</h2></div>
-            <span>0—100 已完整覆盖</span>
-          </div>
-          <article v-for="rule in currentDimension.rules" :key="rule.range" class="rule-card">
-            <span>{{ rule.range }}</span>
-            <label><small>结果名称</small><input v-model="rule.title" type="text" maxlength="20" /></label>
-            <label><small>基础结果文案</small><textarea v-model="rule.description" rows="2" maxlength="120"></textarea></label>
-          </article>
-          <div class="editor-actions">
-            <button class="secondary-button return-button" type="button" @click="setDimensionReview('returned')">↩ 退回修改</button>
-            <button class="approve-button" type="button" @click="setDimensionReview('passed')">✓ 通过本维度</button>
-          </div>
-        </div>
+      <div v-else class="result-review-grid">
+        <aside class="dimension-list"><h2>计分维度</h2><button v-for="(item, index) in dimensions" :key="item.name" :class="{ active: dimensionIndex === index }" @click="selectDimension(index)"><b>{{ item.icon }}</b><span><strong>{{ item.name }}</strong><small>{{ item.rules.length }} 条规则</small></span></button></aside>
+        <article class="rules-list"><h2>{{ currentDimension.name }} · 结果规则 <span :class="{ invalid: !rulesCovered }">{{ rulesCovered ? '✓ 0—100 已完整覆盖' : '! 区间存在空档或重叠' }}</span></h2><section v-for="(rule, index) in currentDimension.rules" :key="`${rule.min}-${rule.max}`" :class="{ active: ruleIndex === index }"><div><b>{{ rule.min }} ≤ 分数 {{ rule.max === 100 ? '≤' : '<' }} {{ rule.max }}</b></div><div><strong>{{ rule.name }}</strong><p>{{ rule.content }}</p></div><button type="button" @click="editRule(index)">✎ 编辑</button></section><button class="outline-button" type="button" :disabled="readOnly" @click="addRule">＋ 添加结果规则</button></article>
+        <aside class="rule-editor"><h2>编辑结果规则</h2><label><span>计分维度</span><input :value="currentDimension.name" readonly /></label><label><span>分数区间</span><div><input v-model.number="ruleDraft.min" type="number" min="0" max="99" @input="ruleDirty = true" /><i>至</i><input v-model.number="ruleDraft.max" type="number" min="1" max="100" @input="ruleDirty = true" /></div></label><label><span>结果名称</span><input v-model="ruleDraft.name" @input="ruleDirty = true" /></label><label><span>基础结果文案</span><textarea v-model="ruleDraft.content" rows="4" @input="ruleDirty = true"></textarea></label><details><summary>深度解读文案</summary><textarea v-model="ruleDraft.deepContent" rows="3" placeholder="输入深度解读文案" @input="ruleDirty = true"></textarea></details><details><summary>分享文案</summary><textarea v-model="ruleDraft.shareText" rows="3" placeholder="输入分享文案" @input="ruleDirty = true"></textarea></details><footer><button class="outline-button" type="button" @click="cancelRuleEdit">取消</button><button class="save-button" type="button" :disabled="readOnly" @click="saveRule">保存规则</button></footer></aside>
       </div>
-
-      <p v-if="reviewMessage" class="review-message" role="status">{{ reviewMessage }}</p>
-      <div class="submit-bar">
-        <p><strong>题目 {{ questionReviewDone ? '已完成' : '待审核' }}</strong><span>结果规则 {{ resultReviewDone ? '已完成' : '待审核' }}</span></p>
-        <button class="primary-button" type="button" @click="submitLibrary">完成审核并提交 →</button>
-      </div>
+      <button class="submit-button" type="button" :disabled="readOnly" @click="submitLibrary">完成审核并提交</button>
     </section>
 
-    <section v-else class="success-stage">
-      <div class="success-banner">✓ 已提交题型库，当前首页展示状态为“未展示”</div>
-      <div class="panel success-card">
-        <span class="success-icon">✓</span>
-        <p class="eyebrow">SUBMITTED</p>
-        <h2>{{ form.name }}</h2>
-        <p>题型草稿已进入题型库。发布、版本控制和首页展示仍需在题型管理中完成。</p>
-        <dl>
-          <div><dt>题库</dt><dd>{{ form.bankCount }} 题</dd></div>
-          <div><dt>单次答题</dt><dd>{{ form.drawCount }} 题</dd></div>
-          <div><dt>审核结果</dt><dd>{{ passedQuestionCount }} 题通过 / {{ returnedQuestionCount }} 题退回</dd></div>
-          <div><dt>首页状态</dt><dd>未展示</dd></div>
-        </dl>
-        <button class="primary-button" type="button" @click="goToTypeLibrary">返回题型列表 →</button>
-      </div>
-    </section>
+    <section v-else class="submitted-card"><b>✓</b><h2>题库已提交</h2><p>题型和版本已保存为草稿，没有自动发布，也没有自动加入首页。</p><button type="button" @click="router.push('/types')">返回题型管理</button></section>
+
+    <nav class="ai-steps" aria-label="AI 题库创建步骤">
+      <div v-for="(label, index) in ['填写题型信息', '生成题库', '审核题目与结果', '提交题型库']" :key="label" :class="{ active: step === index + 1, done: step > index + 1 }"><b>{{ step > index + 1 ? '✓' : index + 1 }}</b><span>{{ label }}<small>{{ step > index + 1 ? '已完成' : step === index + 1 ? (step === 4 && task?.taskStatus === 5 ? '已完成' : step === 2 ? (generationFailed ? '生成失败' : generationComplete ? '已完成' : '生成中') : '进行中') : '待开始' }}</small></span></div>
+    </nav>
   </section>
 </template>
 
 <style scoped>
-.ai-page {
-  --ink: #16151a;
-  --muted: #6f7280;
-  --line: #d9d9df;
-  --purple: #7656df;
-  --purple-soft: #f3edff;
-  --coral: #ff5838;
-  --green: #24915d;
-  color: var(--ink);
-  max-width: 1420px;
-  margin: 0 auto;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.demo-banner,
-.success-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-  padding: 11px 16px;
-  border: 1px solid #e2b84b;
-  border-radius: 10px;
-  background: #fff8dc;
-  color: #6f5510;
-  font-size: 14px;
-}
-
-.demo-banner span {
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: #ffdf7e;
-  color: #443000;
-  font-weight: 800;
-}
-
-.page-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  color: var(--purple);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-}
-
-.page-heading h1 {
-  margin: 0;
-  font-size: clamp(30px, 4vw, 46px);
-  letter-spacing: 0.03em;
-}
-
-.page-heading h1 span {
-  color: var(--purple);
-  font-family: cursive;
-}
-
-.page-heading p:not(.eyebrow) {
-  margin: 8px 0 0;
-  color: var(--muted);
-}
-
-.draft-chip,
-.status-chip,
-.question-tags span,
-.dimension-tags span {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  padding: 5px 11px;
-  border-radius: 999px;
-  background: var(--purple-soft);
-  color: var(--purple);
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 700;
-}
-
-.steps {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 20px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.76);
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 62px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  color: #777984;
-  font-weight: 700;
-}
-
-.step-item.active {
-  border-color: #b99cff;
-  background: linear-gradient(135deg, #fbf8ff, #f0e8ff);
-  color: var(--purple);
-}
-
-.step-item.done {
-  color: #477b62;
-}
-
-.step-number {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid #d7d7dd;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--ink);
-}
-
-.active .step-number {
-  border-color: var(--purple);
-  background: var(--purple);
-  color: #fff;
-}
-
-.done .step-number {
-  border-color: #b8e2c6;
-  background: #edf9f0;
-  color: var(--green);
-}
-
-.stage-grid,
-.review-grid,
-.result-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(390px, 0.85fr);
-  gap: 16px;
-}
-
-.panel {
-  border: 1.5px solid var(--ink);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 3px 0 rgba(30, 22, 52, 0.05);
-}
-
-.form-panel,
-.proposal-panel,
-.generation-panel,
-.preview-panel,
-.review-list-panel,
-.question-editor,
-.dimension-list,
-.rule-panel {
-  padding: 20px;
-}
-
-.panel-title,
-.panel-title > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.panel-title {
-  margin-bottom: 18px;
-}
-
-.panel-title h2 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.panel-title > span {
-  color: var(--purple);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.section-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--purple-soft);
-  color: var(--purple);
-  font-size: 22px;
-}
-
-label {
-  display: grid;
-  gap: 7px;
-  margin-bottom: 15px;
-  color: #383741;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-input,
-select,
-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid #cfd0d8;
-  border-radius: 9px;
-  outline: none;
-  background: #fff;
-  color: var(--ink);
-}
-
-input,
-select {
-  min-height: 44px;
-  padding: 0 13px;
-}
-
-textarea {
-  resize: vertical;
-  padding: 12px 13px;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(118, 86, 223, 0.1);
-}
-
-label small {
-  justify-self: end;
-  color: #92939d;
-  font-weight: 500;
-}
-
-.number-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.form-error {
-  margin: -4px 0 0;
-  color: #d83c29;
-  font-size: 13px;
-}
-
-.proposal-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.proposal-card {
-  flex: 1;
-  padding: 22px;
-  border: 1px solid #cbb7ff;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #faf7ff, #fff 72%);
-}
-
-.proposal-card h3 {
-  margin: 12px 0 8px;
-  font-size: 24px;
-}
-
-.proposal-card > p {
-  min-height: 42px;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.dimension-tags,
-.question-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.proposal-card dl,
-.success-card dl {
-  margin: 18px 0 0;
-}
-
-.proposal-card dl div,
-.success-card dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 0;
-  border-bottom: 1px solid #e7e3ef;
-}
-
-dt {
-  color: var(--muted);
-}
-
-dd {
-  margin: 0;
-  font-weight: 700;
-}
-
-.actions,
-.editor-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.primary-button,
-.secondary-button,
-.approve-button {
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 10px;
-  font-weight: 800;
-}
-
-.primary-button {
-  flex: 1;
-  border: 1.5px solid var(--ink);
-  background: linear-gradient(135deg, #ff744f, var(--coral));
-  color: #fff;
-  box-shadow: 0 2px 0 #bc351f;
-}
-
-.secondary-button {
-  border: 1px solid #aeb0ba;
-  background: #fff;
-  color: var(--ink);
-}
-
-.approve-button {
-  border: 1px solid #79c99c;
-  background: #ecf9f0;
-  color: #18774a;
-}
-
-.return-button {
-  border-color: #ef9a87;
-  color: #c63e28;
-}
-
-.full-button {
-  width: 100%;
-  margin-top: auto;
-}
-
-.generation-card {
-  padding: 22px;
-  border: 1px solid #ccb8ff;
-  border-radius: 13px;
-  background: linear-gradient(145deg, #f8f4ff, #fff);
-}
-
-.generation-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.generation-head h3 {
-  margin: 0;
-  font-size: 22px;
-}
-
-.generation-card > strong {
-  display: block;
-  margin: 22px 0 12px;
-  color: var(--coral);
-  font-size: 44px;
-  text-align: center;
-}
-
-.generation-card > strong small {
-  color: #40414b;
-  font-size: 20px;
-}
-
-.progress-track {
-  overflow: hidden;
-  height: 20px;
-  border-radius: 999px;
-  background: #e7ddff;
-}
-
-.progress-track span {
-  display: block;
-  min-width: 42px;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #ff4d2d, #ff754b);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 20px;
-  text-align: center;
-  transition: width 0.2s ease;
-}
-
-.generation-card > p {
-  color: #555762;
-}
-
-.generation-note {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--purple-soft);
-  color: var(--purple);
-  font-size: 13px;
-}
-
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.stat-grid > div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-
-.stat-grid > div > span {
-  color: var(--purple);
-  font-size: 24px;
-}
-
-.stat-grid p {
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.stat-grid strong {
-  color: var(--ink);
-  font-size: 22px;
-}
-
-.preview-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.preview-panel > h3 {
-  margin: 16px 0;
-  font-size: 19px;
-}
-
-.preview-options {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.preview-options li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
-  border: 1px solid #d3d3da;
-  border-radius: 8px;
-}
-
-.preview-options li span {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border: 1px solid var(--ink);
-  border-radius: 50%;
-  background: #ffda72;
-  font-weight: 800;
-}
-
-.preview-options li:nth-child(2) span { background: #a9e7cb; }
-.preview-options li:nth-child(3) span { background: #cbb4ff; }
-.preview-options li:nth-child(4) span { background: #ffaaa0; }
-
-.quality-list {
-  margin: 14px 0;
-  padding: 12px 0 0;
-  border-top: 1px dashed #cfd0d8;
-  list-style: none;
-}
-
-.quality-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-}
-
-.quality-list strong { color: var(--green); }
-.quality-list em { color: #555762; font-style: normal; }
-
-.test-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 16px 22px;
-}
-
-.test-summary > div,
-.test-summary > div > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.test-summary h2 {
-  margin: 0;
-  font-size: 24px;
-}
-
-.test-summary dl {
-  display: flex;
-  margin: 0;
-}
-
-.test-summary dl div {
-  min-width: 130px;
-  padding: 4px 22px;
-  border-left: 1px solid #dddde3;
-  text-align: center;
-}
-
-.test-summary dd {
-  margin-top: 6px;
-  font-size: 25px;
-}
-
-.test-summary dd small {
-  font-size: 12px;
-}
-
-.review-tabs {
-  display: flex;
-  margin: 14px 0 10px;
-}
-
-.review-tabs button {
-  min-width: 210px;
-  padding: 11px 18px;
-  border: 1px solid #cfd0d8;
-  background: #fff;
-  color: #373740;
-}
-
-.review-tabs button:first-child { border-radius: 9px 0 0 9px; }
-.review-tabs button:last-child { border-radius: 0 9px 9px 0; }
-.review-tabs button.active { border-color: var(--purple); background: var(--purple-soft); color: var(--purple); font-weight: 800; }
-.review-tabs button span { margin-left: 5px; color: inherit; }
-
-.review-grid {
-  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
-}
-
-.filter-row {
-  display: flex;
-  gap: 7px;
-  margin-bottom: 10px;
-  font-size: 12px;
-}
-
-.filter-row span {
-  padding: 5px 8px;
-  border-radius: 999px;
-  background: #f2f2f5;
-}
-
-.filter-row .passed { background: #eaf8ef; color: var(--green); }
-.filter-row .returned { background: #fff0ed; color: #cb462f; }
-
-.text-button {
-  border: 0;
-  background: transparent;
-  color: var(--purple);
-  font-weight: 700;
-}
-
-.question-list-item,
-.dimension-list > button {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 9px;
-  padding: 12px;
-  border: 1px solid #dddde3;
-  border-radius: 10px;
-  background: #fff;
-  color: var(--ink);
-  text-align: left;
-}
-
-.question-list-item.active,
-.dimension-list > button.active {
-  border-color: #b99cff;
-  background: #f9f6ff;
-}
-
-.question-index {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--purple-soft);
-  color: var(--purple);
-  font-weight: 800;
-}
-
-.question-list-item > span:nth-child(2),
-.dimension-list > button > span:nth-child(2) {
-  display: grid;
-  gap: 5px;
-}
-
-.question-list-item small,
-.dimension-list small {
-  color: var(--muted);
-}
-
-.question-list-item em,
-.dimension-list em {
-  font-size: 12px;
-  font-style: normal;
-}
-
-em.passed { color: var(--green); }
-em.returned { color: #cb462f; }
-em.pending { color: #a46c00; }
-
-.option-editor > span {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.option-editor label {
-  display: grid;
-  grid-template-columns: 30px 1fr auto;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.option-editor b {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 1px solid #b8b9c0;
-  border-radius: 7px;
-}
-
-.option-editor em {
-  color: var(--muted);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.editor-actions {
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-
-.result-grid {
-  grid-template-columns: minmax(250px, 0.42fr) minmax(0, 1fr);
-}
-
-.dimension-list > button > span:first-child {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--purple-soft);
-  font-size: 22px;
-}
-
-.rule-card {
-  display: grid;
-  grid-template-columns: 165px minmax(150px, 0.45fr) minmax(230px, 1fr);
-  align-items: start;
-  gap: 12px;
-  margin-bottom: 10px;
-  padding: 14px;
-  border: 1px solid #d4d4dc;
-  border-radius: 11px;
-}
-
-.rule-card > span {
-  width: fit-content;
-  padding: 6px 10px;
-  border-radius: 7px;
-  background: var(--purple-soft);
-  color: var(--purple);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.rule-card label {
-  margin: 0;
-}
-
-.rule-card small {
-  justify-self: start;
-}
-
-.review-message {
-  margin: 12px 0 0;
-  color: var(--purple);
-  font-size: 13px;
-  text-align: right;
-}
-
-.submit-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-top: 12px;
-  padding: 14px 18px;
-  border: 1px solid #dddde3;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.submit-bar p {
-  display: flex;
-  gap: 18px;
-  margin: 0;
-}
-
-.submit-bar p span {
-  color: var(--muted);
-}
-
-.submit-bar .primary-button {
-  flex: 0 0 auto;
-}
-
-.success-banner {
-  border-color: #86ce96;
-  background: #effbef;
-  color: #287a42;
-}
-
-.success-card {
-  max-width: 650px;
-  margin: 30px auto 0;
-  padding: 38px;
-  text-align: center;
-}
-
-.success-icon {
-  display: grid;
-  width: 76px;
-  height: 76px;
-  margin: 0 auto 18px;
-  place-items: center;
-  border: 2px solid #7fc792;
-  border-radius: 50%;
-  background: #ebf9ee;
-  color: var(--green);
-  font-size: 38px;
-  font-weight: 900;
-}
-
-.success-card h2 {
-  margin: 0 0 8px;
-  font-size: 30px;
-}
-
-.success-card > p:not(.eyebrow) {
-  color: var(--muted);
-  line-height: 1.7;
-}
-
-.success-card dl {
-  text-align: left;
-}
-
-.success-card .primary-button {
-  margin-top: 22px;
-}
-
-@media (max-width: 1050px) {
-  .stage-grid,
-  .review-grid,
-  .result-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .test-summary {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .test-summary dl {
-    width: 100%;
-  }
-
-  .test-summary dl div {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .rule-card {
-    grid-template-columns: 150px 1fr;
-  }
-
-  .rule-card label:last-child {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 720px) {
-  .page-heading,
-  .submit-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .steps {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .step-item {
-    justify-content: flex-start;
-    padding: 0 10px;
-    font-size: 13px;
-  }
-
-  .number-grid,
-  .stat-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .actions,
-  .editor-actions {
-    flex-direction: column;
-  }
-
-  .review-tabs button {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .test-summary dl {
-    flex-direction: column;
-  }
-
-  .test-summary dl div {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-top: 1px solid #dddde3;
-    border-left: 0;
-    text-align: left;
-  }
-
-  .rule-card {
-    grid-template-columns: 1fr;
-  }
-
-  .rule-card label:last-child {
-    grid-column: auto;
-  }
-
-  .submit-bar p {
-    flex-direction: column;
-    gap: 5px;
-  }
-}
+.ai-page { max-width: 1420px; margin: 0 auto; color: #171419; }
+.ai-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+.ai-heading h1 { margin: 0; font: 700 clamp(38px, 4vw, 52px) "STKaiti", "KaiTi", serif; letter-spacing: .04em; }
+.ai-heading h1 span { color: #b27bef; }.ai-heading p { margin: 10px 0 0; color: #7e7781; }.preview-chip { padding: 6px 12px; border-radius: 999px; background: #eee2ff; color: #7449a5; font-weight: 800; font-size: 12px; }
+.task-history{display:grid;gap:0;margin-bottom:16px;border:var(--line);border-radius:17px;background:rgb(255 255 255 / 88%);overflow:hidden}.task-history>header,.task-row,.task-history>footer{display:flex;align-items:center;gap:14px;padding:13px 18px}.task-history>header{justify-content:space-between;background:#f5effe}.task-history h2{margin:0;font:700 22px "STKaiti","KaiTi",serif}.task-history select{padding:7px 10px;border:1px solid #cfc6ce;border-radius:8px;background:#fff}.task-row{border-top:1px solid #e2dbe1}.task-row>span:first-child{display:grid;flex:1;min-width:0}.task-row small{overflow:hidden;text-overflow:ellipsis;color:#837b83;white-space:nowrap}.task-row strong{min-width:82px;padding:4px 8px;border-radius:99px;background:#eee2ff;color:#7548aa;text-align:center;font-size:12px}.task-row .status-4{background:#fff0ed;color:#b33524}.task-row .status-5{background:#ecf8e9;color:#3d9448}.task-row button,.task-history footer button{padding:7px 11px;border:1px solid #8e57e1;border-radius:8px;background:#fff;color:#7545b7}.task-history>footer{justify-content:space-between;border-top:1px solid #e2dbe1}.task-history footer div{display:flex;gap:8px}.task-history button:disabled{opacity:.4}
+.integration-note { margin: 0 0 18px; padding: 11px 14px; border: 1px solid #87c9a3; border-radius: 10px; background: #effaf3; color: #2e6f4d; font-size: 13px; }.integration-note b { margin-right: 8px; }
+.ai-form-card,.generation-card,.current-card,.review-summary,.question-list,.question-editor,.dimension-list,.rules-list { border: var(--line); border-radius: 17px; background: rgb(255 255 255 / 88%); }
+.ai-form-card { display: grid; gap: 17px; padding: 38px 34px 28px; }.ai-form-card > label,.question-editor label { display: grid; grid-template-columns: 145px 1fr; align-items: start; gap: 20px; font-weight: 800; }.ai-form-card > label > span::before { content: '•'; margin-right: 14px; color: #b997ff; }.ai-form-card input,.ai-form-card select,.ai-form-card textarea,.question-editor input,.question-editor select,.rules-list input,.rules-list textarea,.question-list > input { width: 100%; padding: 12px 14px; border: 1px solid #ccc4cc; border-radius: 9px; background: white; }.ai-form-card textarea { min-height: 90px; }.short-field input,.short-field select { max-width: 375px; }.cover-input { display:grid; grid-template-columns:1fr auto; gap:9px }.cover-input .upload-button { display:grid; place-items:center; padding:10px 16px; border:1px solid #8e57e1; border-radius:9px; color:#7545b7; cursor:pointer }.cover-input .upload-button input { display:none }.cover-input img { grid-column:1/-1; width:180px; height:105px; border:1px solid #ddd; border-radius:10px; object-fit:cover }.form-error { margin: 0 0 0 165px; color: #c44837; }.generate-button,.submit-button,.save-button,.current-card > button,.submitted-card button { justify-self: center; min-width: 405px; padding: 14px 28px; border: var(--line); border-radius: 10px; background: #ff654a; color: white; box-shadow: 2px 3px 0 #211d22; font-weight: 900; font-size: 17px; }.generate-button:disabled,.current-card > button:disabled { opacity:.5; cursor:not-allowed }.generation-placeholder { display:grid; place-items:center; min-height:260px; padding:30px; border:1px dashed #c9b9d6; border-radius:12px; color:#817486; text-align:center }.submitted-card { display:grid; justify-items:center; gap:12px; padding:70px 30px; border:var(--line); border-radius:18px; background:#fff; text-align:center }.submitted-card > b { display:grid; place-items:center; width:74px; height:74px; border:2px solid #65aa82; border-radius:50%; color:#4b946a; font-size:38px }.submitted-card h2 { margin:0; font-size:30px }.submitted-card p { color:#777 }
+.generation-layout { display: grid; grid-template-columns: 1.05fr .95fr; gap: 18px; }.generation-card,.current-card { padding: 24px; }.generation-card h2,.current-card h2,.question-list h2,.question-editor h2,.dimension-list h2,.rules-list h2 { margin: 0 0 18px; font: 700 23px "STKaiti", "KaiTi", serif; }.generation-main { padding: 22px; border: 1px solid #c4a8ff; border-radius: 12px; background: linear-gradient(140deg,#faf7ff,#fff); }.generation-title { display: flex; justify-content: space-between; align-items: center; }.generation-title h3 { margin: 0; font-size: 24px; }.generation-title span,.question-meta span { padding: 5px 11px; border-radius: 999px; background: #eee2ff; color: #784cb0; font-size: 12px; font-weight: 800; }.generation-main > strong { display: block; margin: 24px 0 12px; color: #ff4e25; font-size: 45px; text-align: center; }.generation-main small { color: #37323a; font-size: 20px; }.progress-track { overflow: hidden; height: 19px; border-radius: 999px; background: #e8dcff; }.progress-track i { display: block; height: 100%; border-radius: inherit; background: #ff552d; color: white; font-size: 12px; font-style: normal; font-weight: 900; line-height: 19px; text-align: center; transition: width .18s ease; }.generation-main aside { padding: 11px 13px; border-radius: 8px; background: #f4efff; color: #7854bd; }.generation-main aside.failed { border: 1px solid #f0a092; background: #fff0ed; color: #b33524; font-weight: 800; }.stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 15px; }.stat-row > div { display: flex; align-items: center; gap: 12px; padding: 15px; border: 1px solid #ddd4dc; border-radius: 10px; color: #8057c4; font-size: 23px; }.stat-row span,.stat-row strong { display: block; color: #211d22; font-size: 12px; }.stat-row strong { margin-top: 3px; font-size: 22px; }.question-meta { display: flex; align-items: center; gap: 8px; }.question-meta b { margin-right: auto; padding: 7px 13px; border: 1px solid #a77cf0; border-radius: 8px; }.current-card h3 { margin: 18px 0 14px; }.current-card ol,.current-card ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }.current-card ol li { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border: 1px solid #d8d0d7; border-radius: 9px; }.current-card ol b { display: grid; place-items: center; width: 29px; height: 29px; border: 1px solid #211d22; border-radius: 50%; background: #ffd66b; }.current-card ol li:nth-child(2) b { background:#a7dec9 }.current-card ol li:nth-child(3) b { background:#c9a7ff }.current-card ol li:nth-child(4) b { background:#ffaaa0 }.current-card ul { margin: 14px 0; padding-top: 12px; border-top: 1px dashed #d2c8d0; }.current-card ul li { display: flex; justify-content: space-between; }.current-card ul strong { color: #238357; }.current-card ul em { font-style: normal; }.current-card > button { width: 100%; min-width: 0; background: white; color: #211d22; box-shadow: none; }
+.review-summary { display: flex; align-items: center; justify-content: space-between; padding: 17px 24px; }.review-summary > div { display: flex; align-items: center; gap: 12px; }.review-summary > div > span { display:grid; place-items:center; width:52px; height:52px; border-radius:50%; background:#eee2ff; font-size:27px }.review-summary h2 { margin:0; font-size:26px }.review-summary i { padding:5px 10px; border-radius:999px; background:#eee2ff; color:#7548aa; font-style:normal; font-size:12px }.review-summary dl { display:flex; margin:0 }.review-summary dl div { min-width:145px; padding:0 28px; border-left:1px solid #d9d0d8; text-align:center }.review-summary dt { font-size:13px }.review-summary dd { margin:7px 0 0; font-size:28px; font-weight:900 }.review-summary dd small { font-size:12px }.review-tabs { display:flex; margin-top:14px }.review-tabs button { min-width:190px; padding:10px 20px; border:1px solid #cfc6ce; background:white }.review-tabs button:first-child { border-radius:9px 0 0 9px }.review-tabs button:last-child { border-radius:0 9px 9px 0 }.review-tabs button.active { border-color:#9259e7; background:#f5efff; color:#7443b0; font-weight:900 }.review-tabs b { margin-left:5px; padding:2px 7px; border-radius:999px; background:#eee2ff }.question-review-grid,.result-review-grid { display:grid; grid-template-columns: .72fr 1.28fr; gap:14px; margin-top:10px }.question-list,.question-editor,.dimension-list,.rules-list { padding:17px }.filter-row { display:flex; gap:7px; margin:11px 0 }.filter-row span { padding:5px 9px; border-radius:999px; background:#f1edf2; font-size:12px }.question-list > button,.dimension-list > button { display:grid; grid-template-columns:auto 1fr; gap:11px; width:100%; margin-top:9px; padding:12px; border:1px solid #ded5dc; border-radius:10px; background:white; text-align:left }.question-list > button.active,.dimension-list > button.active { border-color:#b58cf3; background:#faf6ff }.question-list > button > b { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#eee2ff; color:#784db0 }.question-list > button span { display:grid; gap:7px }.question-list small { color:#746d75 }.question-list small i { color:#ff4d34; font-style:normal }.question-editor > label { grid-template-columns:1fr; gap:7px }.editor-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px }.editor-fields label { display:grid; grid-template-columns:1fr; gap:7px }.options-table { overflow-x:auto; margin-top:5px }.options-table header,.options-table > div { display:grid; grid-template-columns:50px minmax(190px,1fr) 130px 75px 55px; align-items:center; gap:9px; min-width:620px; padding:8px; border-bottom:1px solid #e4dbe2 }.options-table header { background:#faf4f7; font-size:12px; font-weight:800 }.options-table > div > b { display:grid; place-items:center; width:31px; height:31px; border:1px solid #c7bdc5; border-radius:7px }.options-table button { border:0; background:transparent; color:#ff4b35 }.dimension-value { padding:11px 9px; border-radius:7px; background:#f6f2f6; color:#665e66; font-size:12px }.question-editor footer { display:flex; justify-content:space-between; margin-top:12px }.outline-button { padding:10px 14px; border:1px solid #8e57e1; border-radius:9px; background:white; color:#7545b7; font-weight:800 }.save-button { justify-self:auto; min-width:135px; padding:10px 18px; font-size:14px }.result-review-grid { grid-template-columns:245px minmax(360px,1fr) 330px }.dimension-list > button > b { display:grid; place-items:center; width:45px; height:45px; border:1px solid #211d22; border-radius:50%; background:#eee2ff; font-size:22px }.dimension-list > button span { display:grid; gap:5px }.dimension-list small { color:#766f77 }.rules-list h2 span { float:right; padding:5px 9px; border-radius:999px; background:#ecf8e9; color:#3d9448; font:700 12px sans-serif }.rules-list section { display:grid; grid-template-columns:145px 1fr auto; gap:12px; margin-bottom:10px; padding:13px; border:1px solid #d9d0d8; border-radius:10px }.rules-list section.active { border-color:#b58cf3; background:#fcf9ff }.rules-list section > div { align-self:center }.rules-list section > div b { padding:6px 10px; border-radius:7px; background:#f0e7ff; color:#65419b; font-size:12px }.rules-list section p { margin:5px 0 0; color:#746d75; font-size:12px; line-height:1.5 }.rules-list section > button { align-self:start; border:0; background:transparent; color:#7443b0; font-weight:800 }.rule-editor { padding:17px; border:1px solid #d8cfd7; border-radius:14px; background:#fff }.rule-editor h2 { margin:0 0 15px; font:700 22px "STKaiti","KaiTi",serif }.rule-editor label { display:grid; gap:6px; margin-bottom:12px; font-weight:800; font-size:13px }.rule-editor input,.rule-editor textarea { width:100%; padding:10px 11px; border:1px solid #d0c7cf; border-radius:8px; background:white }.rule-editor label > div { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:7px }.rule-editor i { font-style:normal }.rule-editor details { padding:10px 0; border-top:1px solid #e1d9e0 }.rule-editor details p { color:#7e747e; font-size:12px }.rule-editor footer { display:flex; gap:8px; margin-top:10px }.rule-editor footer button { flex:1; min-width:0 }.review-notice { margin:12px 0 0; color:#b54736; text-align:right }.submit-button { display:block; min-width:0; margin:14px 0 0 auto; }
+.filter-row button { padding:5px 9px; border:0; border-radius:999px; background:#f1edf2; font-size:12px }.filter-row button.active { background:#e8d9ff; color:#7141af; font-weight:800 }.question-list { display:flex; flex-direction:column; max-height:560px; overflow:hidden }.question-list-scroll { min-height:0; overflow-y:auto; padding-right:4px; scrollbar-gutter:stable }.question-item { display:grid; grid-template-columns:1fr auto; align-items:center; gap:6px; width:100%; margin-top:9px; padding:7px; border:1px solid #ded5dc; border-radius:10px; background:white }.question-item.active { border-color:#b58cf3; background:#faf6ff }.question-select { display:grid; grid-template-columns:auto 1fr; gap:11px; min-width:0; padding:5px; border:0; background:transparent; text-align:left }.question-select > b { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#eee2ff; color:#784db0 }.question-select span { display:grid; gap:7px; min-width:0 }.question-select strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }.question-delete { padding:7px; border:0; background:transparent; color:#ff4d34 }.empty-tip { color:#847d85; text-align:center }.selection-range { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:9px }.selection-range label { display:grid; grid-template-columns:1fr; gap:7px }.rules-list h2 span.invalid { background:#fff0e7; color:#bd4c31 }.rule-editor details textarea { margin-top:9px }
+.ai-steps { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; padding:12px; border:1px solid #d8cfd7; border-radius:13px; background:rgb(255 255 255 / 78%) }.ai-steps > div { display:flex; align-items:center; justify-content:center; gap:12px; min-height:68px; border:1px solid transparent; border-radius:10px; color:#878087 }.ai-steps > div.active { border-color:#b690f0; background:#faf5ff; color:#7141af }.ai-steps > div.done { color:#3c8b60 }.ai-steps b { display:grid; place-items:center; width:40px; height:40px; border:1px solid #d5ccd3; border-radius:50%; background:white; color:#211d22; font-size:20px }.ai-steps .active b { border-color:#8050c4; background:#8050c4; color:white }.ai-steps .done b { border-color:#75c59a; color:#278056 }.ai-steps span { font-weight:800 }.ai-steps small { display:block; margin-top:3px; color:#948d95; font-weight:500 }
+@media (max-width:1250px) { .result-review-grid { grid-template-columns:245px 1fr }.rule-editor { grid-column:1/-1 } }
+@media (max-width:1100px) { .generation-layout,.question-review-grid,.result-review-grid { grid-template-columns:1fr }.review-summary { align-items:flex-start; flex-direction:column; gap:18px }.review-summary dl { width:100% }.review-summary dl div { flex:1 }.rules-list section { grid-template-columns:150px 1fr }.rules-list section > button { grid-column:1/-1 }.rule-editor { grid-column:auto } }
+@media (max-width:720px) { .ai-heading { align-items:flex-start; flex-direction:column }.task-row{align-items:flex-start;flex-direction:column}.ai-form-card { padding:22px 16px }.ai-form-card > label { grid-template-columns:1fr; gap:7px }.cover-input { grid-template-columns:1fr }.cover-input img { grid-column:auto }.form-error { margin-left:0 }.generate-button,.submitted-card button { width:100%; min-width:0 }.stat-row,.ai-steps { grid-template-columns:1fr 1fr }.review-summary dl { flex-direction:column }.review-summary dl div { display:flex; justify-content:space-between; border-top:1px solid #ddd; border-left:0; padding:9px }.editor-fields { grid-template-columns:1fr }.rules-list section { grid-template-columns:1fr }.rules-list section textarea { grid-column:auto }.submit-button { width:100% } }
 </style>

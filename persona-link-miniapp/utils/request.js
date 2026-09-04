@@ -28,7 +28,7 @@ function handleUnauthorized() {
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1];
   if (currentPage && currentPage.route !== 'pages/home/index') {
-    wx.switchTab({ url: '/pages/home/index' });
+    getApp().returnToHome();
   }
 }
 
@@ -62,7 +62,11 @@ function request(options) {
           return;
         }
         if (response.statusCode === 401) {
-          handleUnauthorized();
+          if (options.silentUnauthorized) {
+            clearSession();
+          } else {
+            handleUnauthorized();
+          }
         }
         const responseData = response.data;
         const message = responseData && responseData.message
@@ -80,7 +84,78 @@ function request(options) {
   });
 }
 
+function requestData(options) {
+  return request(options).then((response) => {
+    if (!response || response.code !== 0) {
+      throw createRequestError(
+        response && response.message ? response.message : '服务响应异常',
+        undefined,
+        response
+      );
+    }
+    return response.data;
+  });
+}
+
+function login() {
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success(result) {
+        if (!result.code) {
+          reject(createRequestError('微信登录凭证获取失败'));
+          return;
+        }
+        resolve(result.code);
+      },
+      fail(error) {
+        reject(createRequestError(error.errMsg || '微信登录失败'));
+      }
+    });
+  });
+}
+
+async function createSession() {
+  const code = await login();
+  const session = await requestData({
+    url: '/api/miniapp/auth/wechat',
+    method: 'POST',
+    data: { code },
+    silentUnauthorized: true
+  });
+  if (!session || !session.token) {
+    throw createRequestError('登录服务未返回业务会话');
+  }
+  wx.setStorageSync(TOKEN_STORAGE_KEY, session.token);
+  return session.token;
+}
+
+function ensureSession() {
+  const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
+  return token ? Promise.resolve(token) : createSession();
+}
+
+async function authenticatedRequestData(options) {
+  await ensureSession();
+  try {
+    return await requestData(Object.assign({}, options, { silentUnauthorized: true }));
+  } catch (error) {
+    if (error.statusCode !== 401) {
+      throw error;
+    }
+    await createSession();
+    return requestData(Object.assign({}, options, { silentUnauthorized: true }));
+  }
+}
+
+function createIdempotencyKey(prefix) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`.slice(0, 64);
+}
+
 module.exports = {
   request,
+  requestData,
+  authenticatedRequestData,
+  ensureSession,
+  createIdempotencyKey,
   TOKEN_STORAGE_KEY
 };

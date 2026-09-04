@@ -1,5 +1,6 @@
 package com.personalink.server.controller;
 
+import com.personalink.server.dto.ApiResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,7 +15,7 @@ public class HealthController {
      * @return 服务状态
      */
     @GetMapping
-    public String health() {
-        return "UP";
+    public ApiResponse<String> health() {
+        return ApiResponse.success("UP");
     }
 }

@@ -66,11 +66,17 @@ App({
     });
   },
 
+  returnToHome() {
+    this.globalData.resetHomeDetail = true;
+    wx.switchTab({ url: '/pages/home/index' });
+  },
+
   globalData: {
     consentStorageKey: CONSENT_STORAGE_KEY,
     consentVersion: CONSENT_VERSION,
     hasConsent: false,
     pendingLaunchUrl: '',
-    consentRedirecting: false
+    consentRedirecting: false,
+    resetHomeDetail: false
   }
 });

@@ -35,6 +35,12 @@
       ]
     }
   ],
+  "preloadRule": {
+    "pages/home/index": {
+      "network": "all",
+      "packages": ["subpackages/test", "subpackages/pair"]
+    }
+  },
   "window": {
     "navigationStyle": "custom",
     "backgroundColor": "#fffaf1",

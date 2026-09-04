@@ -1,6 +1,9 @@
-<app-nav-bar title="配对进度"></app-nav-bar>
+<app-nav-bar title="配对进度" show-back="{{true}}"></app-nav-bar>
 
 <view class="paper-page wait-page">
+  <page-state wx:if="{{state === 'loading'}}" type="loading" title="配对状态正在加载"></page-state>
+  <page-state wx:elif="{{state === 'error'}}" type="error" title="配对状态加载失败" description="{{errorDescription}}" action-text="重新加载" bind:action="refreshStatus"></page-state>
+  <block wx:else>
   <view class="paper-card wait-status-card">
     <view class="wait-person wait-person--self">
       <text class="wait-person__name">我</text>
@@ -13,11 +16,11 @@
     </view>
     <view class="wait-person {{partnerCompleted ? 'wait-person--complete' : 'wait-person--pending'}}">
       <text class="wait-person__name">TA</text>
-      <text class="wait-person__status">{{partnerCompleted ? '已完成' : '待完成'}}</text>
+      <text class="wait-person__status">{{partnerStatusText}}</text>
     </view>
   </view>
 
-  <text class="wait-title">{{partnerCompleted ? '双方已完成' : '等待对方完成'}}</text>
+  <text class="wait-title">{{waitTitle}}</text>
 
   <view class="paper-card wait-note-card">
     <text class="wait-note-card__title">双方独立作答，不展示彼此答案</text>
@@ -26,7 +29,7 @@
 
   <view class="wait-actions">
     <button
-      wx:if="{{!partnerCompleted}}"
+      wx:if="{{!reportReady}}"
       class="paper-button paper-button--primary"
       bindtap="refreshStatus"
     >刷新状态</button>
@@ -35,6 +38,7 @@
       class="paper-button paper-button--primary"
       bindtap="viewResult"
     >查看双人报告</button>
-    <button class="paper-button wait-cancel" bindtap="cancelPair">取消本次配对</button>
+    <button wx:if="{{canCancel}}" class="paper-button wait-cancel" bindtap="cancelPair">取消本次配对</button>
   </view>
+  </block>
 </view>

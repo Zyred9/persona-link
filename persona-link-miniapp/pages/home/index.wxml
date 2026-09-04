@@ -2,50 +2,59 @@
 
 <view class="paper-page home-page">
   <block wx:if="{{state === 'ready'}}">
+    <view wx:if="{{currentAssessment}}" class="paper-card continue-card">
+      <view><text class="continue-card__title">继续上次测试</text><text class="continue-card__meta">{{currentAssessment.title}} · 已完成 {{currentAssessment.completedCount}}/{{currentAssessment.totalCount}}</text></view>
+      <button class="paper-button paper-button--primary" bindtap="continueAssessment">继续</button>
+      <button class="paper-button" bindtap="restartAssessment">重新开始</button>
+    </view>
     <view class="home-hero">
-      <view class="home-title">
-        <text>把此刻的你，</text>
-        <text>收进一张小卡片。</text>
-      </view>
-      <view class="home-heart">♥</view>
-      <view class="home-star">✦</view>
+      <image class="home-title-image" src="/assets/images/home-title.png" mode="widthFix"></image>
     </view>
 
-    <view class="pair-card" bindtap="openPairTest">
-      <view class="pair-mascot"><text>♥</text></view>
-      <view class="pair-copy">
-        <view class="pair-title">
-          <text>你和 TA，</text>
-          <text>是哪种相处搭子？</text>
-        </view>
-        <button class="pair-action">和 TA 一起测 ›</button>
-      </view>
-      <text class="pair-spark pair-spark--one">✦</text>
-      <text class="pair-spark pair-spark--two">♡</text>
+    <view
+      wx:if="{{focusTest}}"
+      class="home-test-card home-test-card--focus"
+      data-id="{{focusTest.testId}}"
+      data-type="{{focusTest.testType}}"
+      bindtap="openTest"
+    >
+      <image class="home-test-card__image" src="{{focusTest.imageUrl}}" mode="widthFix"></image>
     </view>
 
-    <view class="test-grid">
+    <view wx:if="{{recommendedTests.length > 0}}" class="test-grid">
       <button
-        wx:for="{{tests}}"
-        wx:key="id"
-        class="test-card test-card--{{item.tone}}"
-        data-id="{{item.id}}"
-        bindtap="openSingleTest"
+        wx:for="{{recommendedTests}}"
+        wx:key="testId"
+        class="home-test-card"
+        data-id="{{item.testId}}"
+        data-type="{{item.testType}}"
+        bindtap="openTest"
       >
-        <text class="test-card__title">{{item.title}}</text>
-        <view class="test-card__visual">{{item.icon}}</view>
-        <text class="test-card__meta">{{item.meta}}</text>
+        <image class="home-test-card__image" src="{{item.imageUrl}}" mode="widthFix"></image>
       </button>
     </view>
 
     <view class="category-list">
       <button
         wx:for="{{categories}}"
-        wx:key="*this"
-        class="category {{selectedCategory === item ? 'category--active' : ''}}"
-        data-category="{{item}}"
+        wx:key="categoryId"
+        class="category {{selectedCategoryId === item.categoryId ? 'category--active' : ''}}"
+        data-category-id="{{item.categoryId}}"
         bindtap="selectCategory"
-      >{{item}}</button>
+      >{{item.categoryName}}</button>
+    </view>
+
+    <view wx:if="{{tests.length > 0}}" class="test-grid all-test-grid">
+      <button
+        wx:for="{{tests}}"
+        wx:key="testId"
+        class="home-test-card"
+        data-id="{{item.testId}}"
+        data-type="{{item.testType}}"
+        bindtap="openTest"
+      >
+        <image class="home-test-card__image" src="{{item.imageUrl}}" mode="widthFix"></image>
+      </button>
     </view>
 
     <view wx:if="{{tests.length === 0}}" class="category-empty">这个分类还在准备中</view>
@@ -54,10 +63,7 @@
   <block wx:elif="{{state === 'loading'}}">
     <view class="home-intro">
       <text class="home-kicker">今日刚好适合认识自己</text>
-      <view class="home-title home-title--loading">
-        <text>把此刻的你，</text>
-        <text>收进一张小卡片。</text>
-      </view>
+      <image class="home-title-image home-title-image--loading" src="/assets/images/home-title.png" mode="widthFix"></image>
     </view>
     <page-state type="loading" title="内容正在加载"></page-state>
   </block>
@@ -80,3 +86,38 @@
     bind:action="loadHome"
   ></page-state>
 </view>
+
+<page-container
+  show="{{containerVisible}}"
+  duration="{{containerMode === 'quiz' ? 80 : 180}}"
+  position="right"
+  overlay="{{false}}"
+  custom-style="width: 100%; height: 100%; background: #fffaf1;"
+  bind:beforeleave="deactivateContainer"
+  bind:afterleave="clearContainer"
+>
+  <scroll-view class="{{containerMode === 'quiz' ? 'home-quiz-scroll' : 'home-detail-scroll'}}" scroll-y>
+    <block wx:if="{{containerMode === 'quiz'}}">
+      <app-nav-bar
+        title="单人测试"
+        show-back="{{true}}"
+        custom-back="{{true}}"
+        bind:back="closeQuiz"
+      ></app-nav-bar>
+      <quiz-runner
+        id="home-quiz-runner"
+        bind:back="closeQuiz"
+        bind:finish="finishQuiz"
+      ></quiz-runner>
+    </block>
+    <block wx:else>
+      <app-nav-bar
+        title="测试详情"
+        show-back="{{true}}"
+        custom-back="{{true}}"
+        bind:back="closeTestDetail"
+      ></app-nav-bar>
+      <test-detail id="home-test-detail" test-id="{{activeTestId}}" test-type="{{activeTestType}}"></test-detail>
+    </block>
+  </scroll-view>
+</page-container>

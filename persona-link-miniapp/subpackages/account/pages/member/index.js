@@ -1,4 +1,4 @@
-const DEMO_LOGIN_KEY = 'persona_link_demo_logged_in';
+const { ensureSession, TOKEN_STORAGE_KEY } = require('../../../../utils/request');
 
 Page({
   data: {
@@ -8,7 +8,7 @@ Page({
   },
 
   onLoad() {
-    this.setData({ loggedIn: Boolean(wx.getStorageSync(DEMO_LOGIN_KEY)) });
+    this.setData({ loggedIn: Boolean(wx.getStorageSync(TOKEN_STORAGE_KEY)) });
   },
 
   selectPlan(event) {
@@ -24,17 +24,13 @@ Page({
     wx.showToast({ title: '演示环境不实际开通', icon: 'none' });
   },
 
-  continueLogin() {
-    wx.login({
-      success: () => {
-        wx.setStorageSync(DEMO_LOGIN_KEY, true);
-        this.setData({ loggedIn: true, showLoginGate: false });
-        wx.showToast({ title: '已完成演示授权', icon: 'none' });
-      },
-      fail: () => {
-        wx.showToast({ title: '登录失败，请重试', icon: 'none' });
-      }
-    });
+  async continueLogin() {
+    try {
+      await ensureSession();
+      this.setData({ loggedIn: true, showLoginGate: false });
+    } catch (error) {
+      wx.showToast({ title: error.message || '登录失败，请重试', icon: 'none' });
+    }
   },
 
   stayGuest() {

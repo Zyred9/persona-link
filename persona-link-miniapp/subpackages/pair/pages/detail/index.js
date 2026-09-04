@@ -1,9 +1,9 @@
 Page({
-  startPair() {
-    wx.navigateTo({ url: '/subpackages/test/pages/quiz/index?mode=pair&next=invite' });
+  data: {
+    testId: ''
   },
 
-  joinPair() {
-    wx.navigateTo({ url: '/subpackages/pair/pages/join/index' });
+  onLoad(options) {
+    this.setData({ testId: options.id || '' });
   }
 });

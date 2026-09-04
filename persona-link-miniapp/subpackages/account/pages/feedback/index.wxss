@@ -40,7 +40,7 @@
 .feedback-submit {
   position: fixed;
   right: 60rpx;
-  bottom: calc(44rpx + env(safe-area-inset-bottom));
+  bottom: calc(200rpx + env(safe-area-inset-bottom));
   left: 60rpx;
   width: auto;
 }

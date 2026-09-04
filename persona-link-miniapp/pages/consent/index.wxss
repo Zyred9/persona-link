@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 76rpx;
+  padding-top: 24rpx;
 }
 
 .consent-kicker {
@@ -91,7 +91,19 @@
   right: 20rpx;
 }
 
+.heart-mascot__smile {
+  position: absolute;
+  bottom: 24rpx;
+  left: 50%;
+  width: 44rpx;
+  height: 22rpx;
+  border-bottom: 5rpx solid #201b22;
+  border-radius: 0 0 40rpx 40rpx;
+  transform: translateX(-50%);
+}
+
 .consent-card {
+  min-height: 258rpx;
   margin-top: 108rpx;
   padding: 34rpx 28rpx 38rpx;
 }
@@ -126,6 +138,7 @@
 
 .consent-actions {
   margin-top: auto;
+  margin-bottom: 116rpx;
   padding-top: 70rpx;
 }
 

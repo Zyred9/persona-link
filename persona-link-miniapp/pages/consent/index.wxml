@@ -13,6 +13,7 @@
       <view class="heart-mascot__heart"></view>
       <view class="heart-mascot__cheek heart-mascot__cheek--left"></view>
       <view class="heart-mascot__cheek heart-mascot__cheek--right"></view>
+      <view class="heart-mascot__smile"></view>
     </view>
   </view>
 

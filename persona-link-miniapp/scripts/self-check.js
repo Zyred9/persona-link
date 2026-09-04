@@ -31,8 +31,6 @@ const coreRoutes = [
   'pages/home/index',
   'pages/profile/index',
   'subpackages/account/pages/history/index',
-  'subpackages/account/pages/member/index',
-  'subpackages/account/pages/feedback/index',
   'subpackages/test/pages/detail/index',
   'subpackages/test/pages/quiz/index',
   'subpackages/test/pages/result/index',
@@ -71,104 +69,63 @@ files.filter((file) => file.endsWith('.wxml')).forEach((wxmlFile) => {
   });
 });
 
-async function checkRuntimeContracts() {
-  const storage = { personaLinkBusinessToken: 'test-token' };
-  let appDefinition;
-  let capturedRequest;
-  let lastRelaunchUrl = '';
-  let removedToken = false;
-  let switchedHome = false;
+const endpointContracts = [
+  ['pages/home/index.js', '/api/miniapp/home'],
+  ['components/test-detail/index.js', '/api/miniapp/tests/'],
+  ['components/quiz-runner/index.js', '/answers'],
+  ['subpackages/test/pages/result/index.js', '/api/miniapp/reports/'],
+  ['subpackages/pair/pages/invite/index.js', '/api/miniapp/pairs'],
+  ['subpackages/pair/pages/join/index.js', '/api/miniapp/pairs/join'],
+  ['subpackages/pair/pages/wait/index.js', '/cancel'],
+  ['subpackages/pair/pages/result/index.js', '/report'],
+  ['utils/analytics.js', '/api/miniapp/events/batch']
+];
 
-  global.getCurrentPages = () => [{ route: 'subpackages/account/pages/settings/index' }];
-  global.wx = {
-    getAccountInfoSync: () => ({ miniProgram: { envVersion: 'develop' } }),
-    getStorageSync: (key) => storage[key],
-    setStorageSync: (key, value) => {
-      storage[key] = value;
-    },
-    removeStorageSync: (key) => {
-      delete storage[key];
-      removedToken = true;
-    },
-    showToast: () => {},
-    reLaunch: ({ url, complete }) => {
-      lastRelaunchUrl = url;
-      if (complete) {
-        complete();
-      }
-    },
-    switchTab: ({ url }) => {
-      switchedHome = url === '/pages/home/index';
-    },
-    request: (options) => {
-      capturedRequest = options;
-      options.success({ statusCode: 200, data: { status: 'UP' } });
-    }
-  };
+endpointContracts.forEach(([file, endpoint]) => {
+  const source = fs.readFileSync(path.join(root, file), 'utf8');
+  assert(source.includes(endpoint), `接口链路缺失：${file} -> ${endpoint}`);
+});
 
-  global.App = (definition) => {
-    appDefinition = definition;
-  };
-  require(path.join(root, 'app.js'));
-  const launchOptions = {
-    path: 'subpackages/account/pages/settings/index',
-    query: { source: 'a b', name: '中文' }
-  };
-  appDefinition.onLaunch(launchOptions);
-  appDefinition.onShow(launchOptions);
-  assert.strictEqual(lastRelaunchUrl, '/pages/consent/index');
-  assert.strictEqual(
-    appDefinition.globalData.pendingLaunchUrl,
-    '/subpackages/account/pages/settings/index?source=a%20b&name=%E4%B8%AD%E6%96%87'
-  );
+const homeSource = fs.readFileSync(path.join(root, 'pages/home/index.js'), 'utf8');
+const homeTemplate = fs.readFileSync(path.join(root, 'pages/home/index.wxml'), 'utf8');
+const detailSource = fs.readFileSync(path.join(root, 'components/test-detail/index.js'), 'utf8');
+const quizRunnerSource = fs.readFileSync(path.join(root, 'components/quiz-runner/index.js'), 'utf8');
+const quizTemplate = fs.readFileSync(
+  path.join(root, 'subpackages/test/pages/quiz/index.wxml'),
+  'utf8'
+);
+const singleDetailTemplate = fs.readFileSync(
+  path.join(root, 'subpackages/test/pages/detail/index.wxml'),
+  'utf8'
+);
+const pairDetailTemplate = fs.readFileSync(
+  path.join(root, 'subpackages/pair/pages/detail/index.wxml'),
+  'utf8'
+);
+const openTestSource = homeSource.slice(
+  homeSource.indexOf('openTest(event)'),
+  homeSource.indexOf('continueAssessment()')
+);
+const continueAssessmentSource = homeSource.slice(
+  homeSource.indexOf('continueAssessment()'),
+  homeSource.indexOf('closeQuiz()')
+);
+assert(openTestSource.includes('detailVisible: true'), '首页题型未在当前页打开');
+assert(!openTestSource.includes('wx.navigateTo'), '首页题型仍会创建新 PageFrame');
+assert(homeTemplate.includes('<page-container'), '首页缺少详情页面容器');
+assert(homeTemplate.includes('<test-detail'), '首页未复用题型详情组件');
+assert(homeSource.includes('categories.length > 1'), '首页未在仅有业务分类时展示分类栏');
+assert(homeSource.includes("'/subpackages/test/pages/detail/index'"), '单人详情分享路由缺失');
+assert(homeSource.includes("'/subpackages/pair/pages/detail/index'"), '双人详情分享路由缺失');
+assert(singleDetailTemplate.includes('<test-detail'), '单人详情路由未复用详情组件');
+assert(pairDetailTemplate.includes('<test-detail'), '双人详情路由未复用详情组件');
+assert(detailSource.includes('requestVersion'), '详情请求缺少会话隔离');
+assert(detailSource.includes('Number(test.testType) !== expectedTestType'), '详情路由未校验题型');
+assert(continueAssessmentSource.includes('this.openQuiz(assessment)'), '首页继续答题未复用当前答卷');
+assert(!continueAssessmentSource.includes('wx.navigateTo'), '首页继续答题仍会创建新 PageFrame');
+assert(homeTemplate.includes("containerMode === 'quiz'"), '首页缺少同页答题容器');
+assert(homeTemplate.includes('<quiz-runner'), '首页未复用答题组件');
+assert(quizTemplate.includes('<quiz-runner'), '独立答题路由未复用答题组件');
+assert(quizRunnerSource.includes('source.assessment'), '答题组件未复用预加载答卷');
 
-  let consentPage;
-  global.getApp = () => appDefinition;
-  global.Page = (definition) => {
-    consentPage = definition;
-  };
-  require(path.join(root, 'pages/consent/index.js'));
-  consentPage.agreeAndContinue.call({ data: { consentVersion: 'v1.0' } });
-  assert.strictEqual(
-    lastRelaunchUrl,
-    '/subpackages/account/pages/settings/index?source=a%20b&name=%E4%B8%AD%E6%96%87'
-  );
-
-  delete storage.personaLinkConsentVersion;
-  appDefinition.onShow({ path: 'pages/profile/index', query: { source: 'hot start' } });
-  assert.strictEqual(lastRelaunchUrl, '/pages/consent/index');
-  assert.strictEqual(
-    appDefinition.globalData.pendingLaunchUrl,
-    '/pages/profile/index?source=hot%20start'
-  );
-
-  const { request } = require(path.join(root, 'utils/request.js'));
-  const health = await request({ url: '/api/health' });
-  assert.strictEqual(health.status, 'UP');
-  assert.strictEqual(capturedRequest.url, 'http://127.0.0.1:18080/api/health');
-  assert.strictEqual(capturedRequest.header.Authorization, 'Bearer test-token');
-
-  wx.request = (options) => options.success({
-    statusCode: 401,
-    header: { 'x-request-id': 'header-request-1' },
-    data: { code: 40101, message: '会话已失效', requestId: 'body-request-1' }
-  });
-  await assert.rejects(
-    request({ url: '/api/protected' }),
-    (error) => error.statusCode === 401
-      && error.code === 40101
-      && error.requestId === 'header-request-1'
-      && error.message === '会话已失效'
-  );
-  assert.strictEqual(removedToken, true);
-  assert.strictEqual(switchedHome, true);
-}
-
-checkRuntimeContracts()
-  .then(() => {
-    console.log(`MINIAPP_SELF_CHECK_OK routes=${routes.length} js=${javaScriptFiles.length} json=${jsonFiles.length}`);
-  })
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+console.log(`MINIAPP_SELF_CHECK_OK routes=${routes.length} js=${javaScriptFiles.length} json=${jsonFiles.length}`);

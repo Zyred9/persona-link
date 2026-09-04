@@ -6,7 +6,7 @@ page {
     linear-gradient(rgba(62, 53, 63, 0.055) 1rpx, transparent 1rpx),
     linear-gradient(90deg, rgba(62, 53, 63, 0.055) 1rpx, transparent 1rpx);
   background-size: 28rpx 28rpx;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 button {

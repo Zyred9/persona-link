@@ -18,6 +18,18 @@
   background: #bd8cf4;
 }
 
+.pair-mascot::after {
+  position: absolute;
+  bottom: 19rpx;
+  left: 50%;
+  width: 42rpx;
+  height: 20rpx;
+  content: '';
+  border-bottom: 5rpx solid #201b22;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
 .pair-mascot__heart {
   position: absolute;
   top: 44rpx;

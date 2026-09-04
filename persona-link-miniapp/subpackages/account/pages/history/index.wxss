@@ -47,14 +47,19 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 134rpx;
-  margin-bottom: 28rpx;
+  min-height: 160rpx;
+  margin-bottom: 52rpx;
   padding: 26rpx 28rpx;
   text-align: left;
 }
 
 .history-record--single {
-  padding-left: 156rpx;
+  padding-left: 192rpx;
+}
+
+.history-record--pair {
+  min-height: 166rpx;
+  padding: 32rpx 28rpx;
 }
 
 .history-record__copy {
@@ -62,6 +67,15 @@
   min-width: 0;
   flex: 1;
   flex-direction: column;
+}
+
+.history-record__more {
+  position: absolute;
+  top: 26rpx;
+  right: 22rpx;
+  font-size: 30rpx;
+  font-weight: 900;
+  letter-spacing: 5rpx;
 }
 
 .history-record__title {
@@ -90,10 +104,10 @@
 
 .history-face {
   position: absolute;
-  bottom: -18rpx;
+  bottom: -36rpx;
   left: 36rpx;
-  width: 112rpx;
-  height: 112rpx;
+  width: 140rpx;
+  height: 140rpx;
   background: #ffd866;
   border: 5rpx solid #201b22;
   border-radius: 50%;
@@ -101,27 +115,44 @@
 
 .history-face__eye {
   position: absolute;
-  top: 46rpx;
-  width: 15rpx;
-  height: 15rpx;
+  top: 58rpx;
+  width: 17rpx;
+  height: 17rpx;
   background: #201b22;
   border-radius: 50%;
 }
 
 .history-face__eye--left {
-  left: 30rpx;
+  left: 38rpx;
 }
 
 .history-face__eye--right {
-  right: 30rpx;
+  right: 38rpx;
+}
+
+.history-face__cheek {
+  position: absolute;
+  top: 83rpx;
+  width: 20rpx;
+  height: 20rpx;
+  background: #f5b1c5;
+  border-radius: 50%;
+}
+
+.history-face__cheek--left {
+  left: 17rpx;
+}
+
+.history-face__cheek--right {
+  right: 17rpx;
 }
 
 .history-face__smile {
   position: absolute;
-  bottom: 25rpx;
+  bottom: 29rpx;
   left: 50%;
-  width: 38rpx;
-  height: 19rpx;
+  width: 46rpx;
+  height: 22rpx;
   border-bottom: 5rpx solid #201b22;
   border-radius: 0 0 30rpx 30rpx;
   transform: translateX(-50%);

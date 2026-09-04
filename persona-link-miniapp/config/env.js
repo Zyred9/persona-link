@@ -1,5 +1,5 @@
 const API_BASE_URLS = {
-  develop: 'http://127.0.0.1:18080',
+  develop: 'http://127.0.0.1:8080',
   trial: '',
   release: ''
 };

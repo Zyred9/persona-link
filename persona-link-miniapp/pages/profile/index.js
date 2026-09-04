@@ -19,5 +19,9 @@ Page({
 
   goSettings() {
     wx.navigateTo({ url: '/subpackages/account/pages/settings/index' });
+  },
+
+  goHome() {
+    wx.switchTab({ url: '/pages/home/index' });
   }
 });

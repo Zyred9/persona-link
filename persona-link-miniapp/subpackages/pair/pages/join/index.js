@@ -1,9 +1,12 @@
+const { authenticatedRequestData, createIdempotencyKey } = require('../../../../utils/request');
+
 const PAIR_SESSION_KEY = 'personaPairSession';
 
 Page({
   data: {
     pairCode: '',
-    errorMessage: ''
+    errorMessage: '',
+    joining: false
   },
 
   onLoad(options) {
@@ -21,17 +24,31 @@ Page({
     this.setData({ pairCode: '', errorMessage: '' });
   },
 
-  confirmJoin() {
+  async confirmJoin() {
+    if (this.data.joining) return;
     if (!/^[A-Z0-9]{5}$/.test(this.data.pairCode)) {
       this.setData({ errorMessage: '请输入 5 位字母或数字配对码' });
       return;
     }
-
-    wx.setStorageSync(PAIR_SESSION_KEY, {
-      pairCode: this.data.pairCode,
-      selfCompleted: false,
-      partnerCompleted: false
-    });
-    wx.navigateTo({ url: '/subpackages/test/pages/quiz/index?mode=pair&next=wait' });
+    this.setData({ joining: true, errorMessage: '' });
+    this.createRequestId = this.createRequestId || createIdempotencyKey('pair-join');
+    try {
+      const pair = await authenticatedRequestData({
+        url: '/api/miniapp/pairs/join',
+        method: 'POST',
+        data: { inviteToken: this.data.pairCode, createRequestId: this.createRequestId }
+      });
+      wx.setStorageSync(PAIR_SESSION_KEY, {
+        pairSessionId: pair.pairSessionId,
+        pairCode: this.data.pairCode,
+        myRole: pair.myRole
+      });
+      wx.navigateTo({
+        url: `/subpackages/test/pages/quiz/index?answerSessionId=${encodeURIComponent(pair.partnerAnswerSessionId)}&flow=pair-partner&pairSessionId=${encodeURIComponent(pair.pairSessionId)}`,
+        complete: () => this.setData({ joining: false })
+      });
+    } catch (error) {
+      this.setData({ joining: false, errorMessage: error.message || '加入配对失败' });
+    }
   }
 });

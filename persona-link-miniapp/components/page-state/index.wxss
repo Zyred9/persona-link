@@ -45,10 +45,29 @@
 
 .state--message {
   display: flex;
-  min-height: 940rpx;
+  min-height: calc(100vh - 120rpx);
   flex-direction: column;
   align-items: center;
   padding: 118rpx 0 180rpx;
+}
+
+.state--error {
+  padding-top: 28rpx;
+}
+
+.state__visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.state__visual--error {
+  width: 100%;
+  min-height: 274rpx;
+  box-sizing: border-box;
+  background: #e7d8ff;
+  border: 4rpx solid #201b22;
+  border-radius: 32rpx;
 }
 
 .state__face {
@@ -81,6 +100,23 @@
   right: 38rpx;
 }
 
+.state__cheek {
+  position: absolute;
+  top: 79rpx;
+  width: 20rpx;
+  height: 20rpx;
+  background: #f5b1c5;
+  border-radius: 50%;
+}
+
+.state__cheek--left {
+  left: 17rpx;
+}
+
+.state__cheek--right {
+  right: 17rpx;
+}
+
 .state__smile {
   position: absolute;
   bottom: 34rpx;
@@ -99,6 +135,10 @@
   text-align: center;
 }
 
+.state--error .state__title {
+  margin-top: 72rpx;
+}
+
 .state__description {
   max-width: 540rpx;
   margin-top: 20rpx;
@@ -111,8 +151,12 @@
 }
 
 .state__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   min-height: 82rpx;
+  box-sizing: border-box;
   margin-top: auto;
   font-size: 30rpx;
   font-weight: 800;

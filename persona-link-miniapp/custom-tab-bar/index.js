@@ -1,6 +1,7 @@
 Component({
   data: {
     selected: 0,
+    hidden: false,
     tabs: [
       { pagePath: '/pages/home/index', text: '首页', icon: 'home' },
       { pagePath: '/pages/profile/index', text: '我的', icon: 'profile' }

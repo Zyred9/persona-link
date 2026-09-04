@@ -23,6 +23,6 @@
   <text class="paper-section-title settings-about">关于</text>
   <view class="paper-card settings-row">
     <text>版本信息</text>
-    <text class="settings-row__value">V1.0 原型</text>
+    <text class="settings-row__value">{{versionLabel}}</text>
   </view>
 </view>

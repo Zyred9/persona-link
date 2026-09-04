@@ -1,33 +1,6 @@
 <app-nav-bar title="{{pageTitle}}" show-back="{{true}}"></app-nav-bar>
-
-<view class="paper-page quiz-page">
-  <view class="quiz-progress__meta">
-    <text class="quiz-progress__count">{{questionNumber}} / {{total}}</text>
-    <text class="quiz-progress__type">单选题</text>
-  </view>
-  <view class="quiz-progress">
-    <view class="quiz-progress__bar" style="width: {{progress}}%;"></view>
-  </view>
-
-  <text class="quiz-question">{{question}}</text>
-
-  <view class="quiz-options">
-    <button
-      wx:for="{{options}}"
-      wx:key="value"
-      class="{{item.value === selected ? 'quiz-option quiz-option--selected' : 'quiz-option'}}"
-      data-value="{{item.value}}"
-      bindtap="chooseOption"
-    >
-      <text>{{item.value}}. {{item.text}}</text>
-      <text wx:if="{{item.value === selected}}" class="quiz-option__check">✓</text>
-    </button>
-  </view>
-
-  <view class="quiz-actions">
-    <button class="paper-button quiz-actions__button" bindtap="goPrevious">上一题</button>
-    <button class="paper-button paper-button--primary quiz-actions__button" bindtap="continueTest">
-      {{isLast ? '查看结果' : '继续'}}
-    </button>
-  </view>
-</view>
+<quiz-runner
+  id="quiz-runner"
+  bind:back="handleBack"
+  bind:finish="handleFinish"
+></quiz-runner>

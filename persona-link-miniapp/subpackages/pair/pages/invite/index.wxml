@@ -1,6 +1,9 @@
-<app-nav-bar title="邀请 TA" show-back="{{true}}"></app-nav-bar>
+<app-nav-bar title="邀请 TA"></app-nav-bar>
 
 <view class="paper-page invite-page">
+  <page-state wx:if="{{state === 'loading'}}" type="loading" title="邀请正在创建"></page-state>
+  <page-state wx:elif="{{state === 'error'}}" type="error" title="邀请创建失败" description="{{errorDescription}}" action-text="重新创建" bind:action="retry"></page-state>
+  <block wx:else>
   <view class="paper-card invite-card">
     <view class="pair-mascots invite-mascots">
       <view class="pair-mascot">
@@ -24,6 +27,6 @@
     <button class="paper-button paper-button--primary invite-share-button" open-type="share">发送给微信好友</button>
   </view>
 
-  <button class="pair-link-button invite-progress" bindtap="openProgress">查看配对进度</button>
   <text class="invite-note">邀请不作为解锁或奖励条件</text>
+  </block>
 </view>

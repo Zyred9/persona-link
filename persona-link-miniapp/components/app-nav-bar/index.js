@@ -11,6 +11,10 @@ Component({
     showBack: {
       type: Boolean,
       value: false
+    },
+    customBack: {
+      type: Boolean,
+      value: false
     }
   },
 
@@ -36,6 +40,10 @@ Component({
 
   methods: {
     goBack() {
+      if (this.data.customBack) {
+        this.triggerEvent('back');
+        return;
+      }
       if (getCurrentPages().length > 1) {
         wx.navigateBack();
         return;
