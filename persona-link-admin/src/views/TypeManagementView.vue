@@ -9,7 +9,7 @@ import { isReadOnly } from '../auth'
 
 type TestType = '单人测试' | '双人测试'
 type TestStatus = '启用' | '停用'
-interface TestItem { id: number; name: string; icon: string; type: TestType; version: string; status: TestStatus; home: '推荐位' | '焦点位' | '未展示'; updatedAt: string }
+interface TestItem { id: number; name: string; icon: string; type: TestType; version: string; status: TestStatus; home: '推荐位' | '焦点位' | '普通列表'; updatedAt: string }
 interface EditableDimension { id?: number; dimensionCode?: string; dimensionName: string; sortNo: number }
 interface TestForm {
   name: string
@@ -46,7 +46,7 @@ const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const allSelected = computed(() => items.value.length > 0 && items.value.every((item) => selectedIds.value.includes(item.id)))
 
 function toView(item: TestDto): TestItem {
-  return { id: item.id, name: item.testName, icon: item.iconUrl ?? '', type: item.testType === 2 ? '双人测试' : '单人测试', version: item.currentVersionNo ? `V${item.currentVersionNo}` : '暂无', status: item.status === 1 ? '启用' : '停用', home: item.homeDisplay === 1 ? '焦点位' : item.homeDisplay === 2 ? '推荐位' : '未展示', updatedAt: item.updateDate?.replace('T', ' ').slice(0, 16) ?? '—' }
+  return { id: item.id, name: item.testName, icon: item.iconUrl ?? '', type: item.testType === 2 ? '双人测试' : '单人测试', version: item.currentVersionNo ? `V${item.currentVersionNo}` : '暂无', status: item.status === 1 ? '启用' : '停用', home: item.homeDisplay === 1 ? '焦点位' : item.homeDisplay === 2 ? '推荐位' : '普通列表', updatedAt: item.updateDate?.replace('T', ' ').slice(0, 16) ?? '—' }
 }
 
 function showFeedback(message: string) { feedback.value = message; window.setTimeout(() => { feedback.value = '' }, 2600) }
@@ -236,7 +236,7 @@ onMounted(async () => {
         <span>{{ item.type }}</span>
         <span>{{ item.version }}</span>
         <button class="status-pill" :class="{ disabled: item.status === '停用' }" type="button" :disabled="readOnly" @click="toggleStatus(item)">{{ item.status }}</button>
-        <button class="home-pill" :class="item.home === '焦点位' ? 'focus' : item.home === '未展示' ? 'hidden' : ''" type="button" @click="configureHome(item)">{{ item.home }}</button>
+        <button class="home-pill" :class="item.home === '焦点位' ? 'focus' : item.home === '普通列表' ? 'regular' : ''" type="button" @click="configureHome(item)">{{ item.home }}</button>
         <span>{{ item.updatedAt }}</span>
         <div class="row-actions">
           <button type="button" :disabled="readOnly" @click="openEdit(item)">编辑</button>
@@ -320,7 +320,7 @@ select, .drawer-body input { min-height: 44px; padding: 0 14px; border: 1px soli
 .status-pill { justify-self: start; padding: 5px 9px; border: 1px solid #bde7a9; border-radius: 8px; background: #ecfbe5; color: #3c9a39; }
 .status-pill.disabled { border-color: #d1ccd3; background: #f3f0f3; color: #777078; }
 .home-pill { justify-self: start; padding: 5px 9px; border: 1px solid #ffd076; border-radius: 8px; background: #fff8e5; color: #e98b00; }
-.home-pill.focus { border-color: #d6c1ff; background: #f2ebff; color: #8a5cdd; }.home-pill.hidden { border-color: transparent; background: transparent; color: #858087; }
+.home-pill.focus { border-color: #d6c1ff; background: #f2ebff; color: #8a5cdd; }.home-pill.regular { border-color: #ddd; background: #fff; color: #666; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 5px; }.row-actions button { padding: 5px 7px; border: 0; background: transparent; color: #3c3540; font-weight: 700; }.row-actions button:hover { color: #ff543d; }
 .empty-result { min-width: 1080px; padding: 46px; text-align: center; color: #878087; }
 .table-footer { display: flex; justify-content: flex-end; align-items: center; gap: 10px; min-width: 1120px; padding: 18px 6px 2px; color: #756e77; font-size: 13px; }.table-footer button, .table-footer b, .page-size { min-width: 38px; padding: 8px 10px; border: 1px solid #d3ccd4; border-radius: 8px; background: white; text-align: center; }.table-footer b { border-color: #211d22; background: #d7b4ff; color: #211d22; }

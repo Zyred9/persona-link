@@ -48,13 +48,6 @@ Page({
     errorDescription: '暂时无法连接服务，\n请稍后重试。'
   },
 
-  onLoad() {
-    if (!getApp().globalData.hasConsent) {
-      return;
-    }
-    this.loadHome();
-  },
-
   onShow() {
     const app = getApp();
     if (app.globalData.resetHomeDetail) {
@@ -63,6 +56,9 @@ Page({
     }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 });
+    }
+    if (app.globalData.hasConsent) {
+      this.loadHome();
     }
     if (getApp().globalData.hasConsent && wx.getStorageSync(TOKEN_STORAGE_KEY)) {
       this.loadCurrentAssessment();

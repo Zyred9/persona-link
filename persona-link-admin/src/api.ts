@@ -57,7 +57,21 @@ export interface TestItem {
   currentVersionNo?: number
   currentVersionStatus?: number
   homeDisplay?: number
+  homeSort?: number
   updateDate?: string
+}
+
+export interface MiniappHomeTest {
+  testId: string
+  title: string
+  coverUrl: string
+}
+
+export interface MiniappHome {
+  categories: Array<{ categoryId: string; categoryName: string }>
+  focusTests: MiniappHomeTest[]
+  recommendedTests: MiniappHomeTest[]
+  allTests: MiniappHomeTest[]
 }
 
 export interface ScoreDimension {
@@ -180,17 +194,6 @@ export interface AiGenerationCreatePayload {
   drawQuestionCount: number
 }
 
-export interface HomeConfig {
-  id: number
-  versionNo: number
-  configStatus: number
-  versionNote?: string
-  publishedBy?: number
-  publishedAt?: string
-  slots: Array<{ id?: number; slotType: number; testId: number; sortNo?: number }>
-  categories: Array<{ id?: number; categoryId: number; sortNo?: number }>
-}
-
 export interface AuditLog {
   id: number
   bizType: number
@@ -284,6 +287,8 @@ export function getTests(params: Record<string, unknown> = {}): Promise<PageResp
 export function getTest(id: number): Promise<TestItem> { return request(`/api/admin/tests/${id}`) }
 export function saveTest(item: Pick<TestItem, 'testName' | 'testType' | 'categoryId' | 'iconUrl' | 'status'>, id?: number): Promise<TestItem> { return request(id ? `/api/admin/tests/${id}` : '/api/admin/tests', { method: id ? 'PUT' : 'POST', body: JSON.stringify(item) }) }
 export function updateTestStatus(id: number, status: number): Promise<TestItem> { return request(`/api/admin/tests/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }) }
+export function updateTestHomeDisplay(id: number, homeDisplay: number, homeSort: number): Promise<TestItem> { return request(`/api/admin/tests/${id}/home-display`, { method: 'PUT', body: JSON.stringify({ homeDisplay, homeSort }) }) }
+export function getMiniappHome(): Promise<MiniappHome> { return request('/api/miniapp/home') }
 export function deleteTests(ids: number[]): Promise<void> { return request('/api/admin/tests/deletes', { method: 'POST', body: JSON.stringify(ids) }) }
 export function getTestVersions(testId: number): Promise<TestVersion[]> { return request(`/api/admin/tests/${testId}/versions`) }
 export function getVersion(versionId: number): Promise<TestVersion> { return request(`/api/admin/test-versions/${versionId}`) }
@@ -305,9 +310,6 @@ export function scheduleVersion(versionId: number, scheduledAt: string): Promise
 export function cancelVersionSchedule(versionId: number): Promise<TestVersion> { return request(`/api/admin/test-versions/${versionId}/schedule/cancel`, { method: 'POST' }) }
 export function offlineVersion(versionId: number, reason = ''): Promise<TestVersion> { return request(`/api/admin/test-versions/${versionId}/offline${queryString({ reason })}`, { method: 'POST' }) }
 export function archiveVersion(versionId: number): Promise<TestVersion> { return request(`/api/admin/test-versions/${versionId}/archive`, { method: 'POST' }) }
-export function getHomeDraft(): Promise<HomeConfig | null> { return request('/api/admin/home-config/draft') }
-export function saveHomeDraft(payload: Pick<HomeConfig, 'versionNote' | 'slots' | 'categories'>): Promise<HomeConfig> { return request('/api/admin/home-config/draft', { method: 'PUT', body: JSON.stringify(payload) }) }
-export function publishHome(): Promise<HomeConfig> { return request('/api/admin/home-config/publish', { method: 'POST' }) }
 export function getContentAudits(params: Record<string, unknown> = {}): Promise<PageResponse<AuditLog>> { return request(`/api/admin/content-audits${queryString({ page: 1, size: 20, ...params })}`) }
 export function getAdminAccounts(params: Record<string, unknown> = {}): Promise<PageResponse<AdminAccount>> { return request(`/api/admin/accounts${queryString({ page: 1, size: 20, ...params })}`) }
 export function createAdminAccount(payload: { username: string; password: string; displayName: string; roleType: number; status: number }): Promise<AdminAccount> { return request('/api/admin/accounts', { method: 'POST', body: JSON.stringify(payload) }) }

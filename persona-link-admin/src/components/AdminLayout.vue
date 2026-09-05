@@ -13,6 +13,7 @@ const roleType = ref(getProfile()?.roleType ?? 3)
 const navigation = [
   { icon: '⌁', label: '运营总览', to: '/' },
   { icon: '▤', label: '题型管理', to: '/types' },
+  { icon: '⌂', label: '首页配置', to: '/home-config' },
   { icon: '✦', label: 'AI题库助手', to: '/ai-question-bank' },
   { icon: '◇', label: '分类标签', to: '/categories' },
   { icon: '▧', label: '素材库', to: '/materials' },

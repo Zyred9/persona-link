@@ -98,7 +98,7 @@ onMounted(async () => {
         <div class="task-list">
           <RouterLink to="/types"><span class="task-icon coral">▤</span><div><strong>题型管理</strong><small>维护题型、题目和结果规则</small></div><b>›</b></RouterLink>
           <RouterLink to="/releases"><span class="task-icon purple">□</span><div><strong>发布排期</strong><small>检查并发布题型版本</small></div><b>›</b></RouterLink>
-          <RouterLink to="/home-config"><span class="task-icon yellow">⌂</span><div><strong>首页配置</strong><small>维护首页展示内容</small></div><b>›</b></RouterLink>
+          <RouterLink to="/home-config"><span class="task-icon yellow">⌂</span><div><strong>首页题型</strong><small>设置题型首页位置与顺序</small></div><b>›</b></RouterLink>
         </div>
       </article>
 
