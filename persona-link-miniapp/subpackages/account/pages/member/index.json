@@ -1,6 +1,0 @@
-{
-  "navigationBarTitleText": "会员中心",
-  "usingComponents": {
-    "app-nav-bar": "/components/app-nav-bar/index"
-  }
-}

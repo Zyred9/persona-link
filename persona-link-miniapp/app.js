@@ -7,7 +7,6 @@ const MINIAPP_ROUTES = new Set([
   'subpackages/account/pages/settings/index',
   'subpackages/account/pages/privacy/index',
   'subpackages/account/pages/history/index',
-  'subpackages/account/pages/member/index',
   'subpackages/account/pages/feedback/index',
   'subpackages/test/pages/detail/index',
   'subpackages/test/pages/quiz/index',

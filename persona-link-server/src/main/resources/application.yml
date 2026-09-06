@@ -4,12 +4,32 @@ server:
 spring:
   application:
     name: persona-link-server
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/persona_link?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
 app:
+  # 1=阿里千问，2=火山即梦。只影响新任务，旧任务使用已持久化的路由。
+  image-generation:
+    provider: ${IMAGE_GENERATION_PROVIDER:1}
+    qwen-base-url: ${QWEN_IMAGE_BASE_URL:https://dashscope.aliyuncs.com}
+    qwen-api-key: ${QWEN_IMAGE_API_KEY:}
+    qwen-model: ${QWEN_IMAGE_MODEL:qwen-image-3.0}
+    volc-base-url: ${VOLC_IMAGE_BASE_URL:https://visual.volcengineapi.com}
+    volc-access-key: ${VOLC_IMAGE_ACCESS_KEY:}
+    volc-secret-key: ${VOLC_IMAGE_SECRET_KEY:}
+    volc-model: ${VOLC_IMAGE_MODEL:jimeng_t2i_v40}
+    volc-region: ${VOLC_IMAGE_REGION:cn-north-1}
+    connect-timeout-millis: 10000
+    read-timeout-millis: 30000
+    poll-interval-millis: 5000
+    task-timeout-seconds: 1200
+    download-host-suffixes: ${IMAGE_DOWNLOAD_HOST_SUFFIXES:aliyuncs.com,volces.com,volccdn.com,volcengineapi.com}
   analytics:
     event-retention-days: ${PERSONA_LINK_ANALYTICS_RETENTION_DAYS:30}
   deepseek:
@@ -32,3 +52,9 @@ mybatis-plus:
 logging:
   level:
     com.personalink.server.mapper: DEBUG
+oss:
+  domain: ${OSS_DOMAIN:https://pgcloud.aitici.com}
+  endpoint: ${OSS_ENDPOINT:https://oss-cn-shanghai.aliyuncs.com}
+  keyId: ${OSS_ACCESS_KEY_ID:}
+  keySecret: ${OSS_ACCESS_KEY_SECRET:}
+  bucketName: ${OSS_BUCKET_NAME:pangu-pro}

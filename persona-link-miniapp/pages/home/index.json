@@ -1,7 +1,9 @@
 {
   "navigationBarTitleText": "心动测测",
+  "enablePullDownRefresh": true,
   "usingComponents": {
     "app-nav-bar": "/components/app-nav-bar/index",
+    "account-center": "/components/account-center/index",
     "page-state": "/components/page-state/index",
     "test-detail": "/components/test-detail/index",
     "quiz-runner": "/components/quiz-runner/index"

@@ -1,7 +1,8 @@
 :root {
   color: #211d22;
   background: #fffaf2;
-  font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-ui: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font-family: var(--font-ui);
   font-synthesis: none;
   --ink: #211d22;
   --paper: #fffdf8;
@@ -35,6 +36,106 @@ textarea { resize: vertical; }
 a { color: inherit; text-decoration: none; }
 :focus-visible { outline: 3px solid rgb(155 107 211 / 35%); outline-offset: 2px; }
 
+.admin-modal-backdrop {
+  --modal-gap: 24px;
+  position: fixed;
+  z-index: 55;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--modal-gap);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: rgb(33 29 34 / 38%);
+}
+.admin-modal-backdrop > :first-child {
+  min-width: 0;
+  min-height: 0;
+  max-height: calc(100vh - 2 * var(--modal-gap));
+  max-height: calc(100dvh - 2 * var(--modal-gap));
+  overflow: auto;
+}
+.admin-modal-backdrop > .admin-editor-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(var(--editor-width, 800px), 100%);
+  height: auto;
+  overflow: hidden;
+  border: var(--line);
+  border-radius: 18px;
+  background: #fffdf9;
+  box-shadow: 0 18px 60px rgb(33 29 34 / 20%);
+}
+.admin-editor-dialog > .drawer-body {
+  min-height: 0;
+  padding: 24px 28px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.admin-dialog-header, .admin-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 28px;
+}
+.admin-dialog-header { border-bottom: 1px solid #e4dde5; }
+.admin-dialog-header h2 { margin: 0; font: 700 22px/1.4 var(--font-ui); }
+.admin-dialog-header p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.admin-modal-backdrop .admin-editor-dialog > .admin-dialog-header > button {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #e4dde5;
+  border-radius: 9px;
+  background: white;
+  font-size: 24px;
+  line-height: 1;
+}
+.admin-dialog-footer { border-top: 1px solid #e4dde5; background: #faf7fb; }
+.admin-footer-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.admin-footer-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-left: auto; }
+.admin-footer-actions > button { min-width: 96px; }
+.admin-dialog-footer > .danger-action {
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid #e4bbb8;
+  border-radius: 9px;
+  background: #fff3f0;
+  color: #b63f32;
+  font-size: 13px;
+}
+.admin-form-section + .admin-form-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid #e4dde5; }
+.admin-form-section h3 { margin: 0 0 16px; font-size: 15px; line-height: 1.5; }
+.admin-form-section > p { margin: -8px 0 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 22px; }
+.admin-field { display: grid; align-content: start; gap: 8px; min-width: 0; font-size: 13px; font-weight: 700; }
+.admin-field-wide { grid-column: 1 / -1; }
+.admin-editor-dialog .admin-field input, .admin-editor-dialog .admin-field select, .admin-editor-dialog .admin-field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d4ccd6;
+  border-radius: 8px;
+  background: white;
+  font: 400 14px/1.5 var(--font-ui);
+}
+.admin-field textarea { resize: vertical; }
+.admin-field input:disabled, .admin-field select:disabled, .admin-field textarea:disabled { background: #f3f0f4; color: var(--muted); }
+.admin-field-hint { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.6; }
+@media (max-width: 640px) {
+  .admin-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-editor-dialog > .drawer-body { padding: 20px 16px; }
+  .admin-dialog-header, .admin-dialog-footer { padding: 16px; gap: 12px; }
+  .admin-dialog-footer { flex-wrap: wrap; }
+  .admin-footer-note { flex-basis: 100%; }
+}
+@media (max-width: 600px) {
+  .admin-modal-backdrop { --modal-gap: 12px; }
+}
+
 .admin-shell {
   min-height: 100vh;
   display: grid;
@@ -53,7 +154,7 @@ a { color: inherit; text-decoration: none; }
   border-bottom: var(--line);
   background: rgb(255 253 248 / 96%);
 }
-.brand { font: 700 27px "STKaiti", "KaiTi", serif; letter-spacing: .04em; white-space: nowrap; }
+.brand { font: 700 27px var(--font-ui); letter-spacing: .04em; white-space: nowrap; }
 .brand span { color: #ff7c72; text-shadow: 1px 1px 0 var(--ink); }
 .brand b { color: #ff553d; }
 .operator { display: flex; align-items: center; gap: 10px; font-size: 15px; }
@@ -140,7 +241,7 @@ a { color: inherit; text-decoration: none; }
 
 .page-stack { display: grid; gap: 20px; }
 .page-header { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
-.page-header h1, .welcome-row h1 { margin: 0; font: 700 clamp(31px, 4vw, 45px) "STKaiti", "KaiTi", serif; }
+.page-header h1, .welcome-row h1 { margin: 0; font: 700 clamp(31px, 4vw, 45px) var(--font-ui); }
 .page-header p:not(.eyebrow), .welcome-row > div > p:last-child { margin: 14px 0 0; color: var(--muted); }
 .page-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .eyebrow { margin: 0 0 8px; color: #8f6fc3; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
@@ -153,7 +254,7 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 3px 4px 0 rgb(33 29 34 / 6%);
 }
 .panel-title { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.panel-title h2 { margin: 0; font: 700 23px "STKaiti", "KaiTi", serif; }
+.panel-title h2 { margin: 0; font: 700 23px var(--font-ui); }
 .panel-title > span { color: #8c848d; font-size: 13px; }
 .primary-button, .secondary-button, .ghost-button, .danger-button {
   min-height: 40px;
@@ -258,7 +359,7 @@ a { color: inherit; text-decoration: none; }
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
 .login-card { width: min(430px, 100%); padding: 40px; border: 2px solid var(--ink); border-radius: 28px; background: var(--paper); box-shadow: 9px 10px 0 var(--purple-soft); text-align: center; }
 .brand-heart { width: 68px; height: 68px; margin: 0 auto 20px; display: grid; place-items: center; border: var(--line); border-radius: 46% 54% 50% 50%; background: var(--purple); color: white; font-size: 34px; transform: rotate(-4deg); }
-.login-card h1 { margin: 0; font: 700 42px "STKaiti", "KaiTi", serif; }
+.login-card h1 { margin: 0; font: 700 42px var(--font-ui); }
 .login-subtitle { margin: 5px 0 20px; color: #ff5c46; font-weight: 800; }
 .login-card form { display: grid; gap: 16px; text-align: left; }
 .login-card label { display: grid; gap: 8px; font-weight: 700; }

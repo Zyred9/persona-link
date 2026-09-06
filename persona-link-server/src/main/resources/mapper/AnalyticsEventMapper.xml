@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.AnalyticsEventMapper">
+
+    <insert id="insertIgnoreBatch">
+        INSERT IGNORE INTO t_analytics_event
+            (event_id, open_id, session_id, event_type, page_path, business_id,
+             source_scene, channel, app_version, client_time, received_time)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.eventId}, #{item.openId}, #{item.sessionId}, #{item.eventType},
+             #{item.pagePath}, #{item.businessId}, #{item.sourceScene}, #{item.channel},
+             #{item.appVersion}, #{item.clientTime}, #{item.receivedTime})
+        </foreach>
+    </insert>
+
+    <insert id="upsertVisitor">
+        INSERT INTO t_analytics_visitor (open_id, first_visit_at, last_visit_at)
+        VALUES (#{openId}, #{visitTime}, #{visitTime})
+        ON DUPLICATE KEY UPDATE last_visit_at = VALUES(last_visit_at)
+    </insert>
+
+    <insert id="upsertVisitorDay">
+        INSERT INTO t_analytics_visitor_day
+            (stat_date, open_id, first_visit_at, last_visit_at, pv_count)
+        VALUES
+            (#{statDate}, #{openId}, #{visitTime}, #{visitTime}, #{pvIncrement})
+        ON DUPLICATE KEY UPDATE
+            last_visit_at = VALUES(last_visit_at),
+            pv_count = pv_count + VALUES(pv_count)
+    </insert>
+
+    <select id="selectMetrics" resultType="com.personalink.server.dto.AnalyticsMetricsResponse">
+        SELECT
+            COUNT(DISTINCT e.open_id) AS uv,
+            COALESCE(SUM(CASE WHEN e.event_type = 2 THEN 1 ELSE 0 END), 0) AS pv,
+            COALESCE(SUM(CASE WHEN e.event_type = 3 THEN 1 ELSE 0 END), 0) AS started_count,
+            COALESCE(SUM(CASE WHEN e.event_type = 4 THEN 1 ELSE 0 END), 0) AS completed_count,
+            COALESCE(SUM(CASE WHEN e.event_type = 5 THEN 1 ELSE 0 END), 0) AS share_count,
+            (SELECT COUNT(1) FROM t_report r WHERE r.deleted = 0 AND r.generated_at &gt;= #{since})
+            + (SELECT COUNT(1) FROM t_pair_report pr WHERE pr.deleted = 0 AND pr.generated_at &gt;= #{since})
+            AS report_count
+        FROM t_analytics_event e
+        WHERE e.received_time &gt;= #{since}
+    </select>
+
+    <select id="selectTrend" resultType="com.personalink.server.dto.AnalyticsTrendResponse">
+        SELECT
+            DATE(received_time) AS stat_date,
+            COUNT(DISTINCT open_id) AS uv,
+            SUM(CASE WHEN event_type = 2 THEN 1 ELSE 0 END) AS pv,
+            SUM(CASE WHEN event_type = 3 THEN 1 ELSE 0 END) AS started_count,
+            SUM(CASE WHEN event_type = 4 THEN 1 ELSE 0 END) AS completed_count
+        FROM t_analytics_event
+        WHERE received_time &gt;= #{since}
+        GROUP BY DATE(received_time)
+        ORDER BY stat_date ASC
+    </select>
+
+    <select id="selectTestUsage" resultType="com.personalink.server.dto.TestUsageResponse">
+        SELECT
+            t.id AS test_id,
+            t.test_name,
+            COUNT(a.id) AS started_count,
+            SUM(CASE WHEN a.answer_status IN (2, 3) THEN 1 ELSE 0 END) AS completed_count,
+            CASE
+                WHEN COUNT(a.id) = 0 THEN 0
+                ELSE ROUND(
+                    SUM(CASE WHEN a.answer_status IN (2, 3) THEN 1 ELSE 0 END) * 100.0
+                    / COUNT(a.id), 2)
+            END AS completion_rate
+        FROM t_test t
+        LEFT JOIN t_test_version v
+            ON v.test_id = t.id
+            AND v.deleted = 0
+        LEFT JOIN t_answer_session a
+            ON a.version_id = v.id
+            AND a.deleted = 0
+            AND a.create_date &gt;= #{since}
+        WHERE t.deleted = 0
+        GROUP BY t.id, t.test_name
+        ORDER BY started_count DESC, t.id DESC
+    </select>
+
+</mapper>

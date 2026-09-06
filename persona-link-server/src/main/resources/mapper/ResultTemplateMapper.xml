@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.ResultTemplateMapper">
+    <insert id="insertBatch">
+        INSERT INTO t_result_template
+            (version_id, dimension_id, result_code, result_name, score_min, score_max,
+             basic_result_json, deep_result_json, share_copy_json, sort_no, deleted)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.versionId}, #{item.dimensionId}, #{item.resultCode}, #{item.resultName},
+             #{item.scoreMin}, #{item.scoreMax}, #{item.basicResultJson}, #{item.deepResultJson},
+             #{item.shareCopyJson}, #{item.sortNo}, 0)
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            dimension_id = VALUES(dimension_id), result_name = VALUES(result_name),
+            score_min = VALUES(score_min), score_max = VALUES(score_max),
+            basic_result_json = VALUES(basic_result_json), deep_result_json = VALUES(deep_result_json),
+            share_copy_json = VALUES(share_copy_json), sort_no = VALUES(sort_no), deleted = 0
+    </insert>
+</mapper>

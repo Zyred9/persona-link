@@ -1,0 +1,71 @@
+<view class="paper-page detail-page {{testType === 2 ? 'detail-page--pair' : ''}}">
+  <page-state
+    wx:if="{{state === 'loading'}}"
+    type="loading"
+    title="题型详情正在加载"
+  ></page-state>
+
+  <page-state
+    wx:elif="{{state === 'error'}}"
+    type="error"
+    title="{{testType === 2 ? '题型详情加载失败' : '题型暂不可用'}}"
+    description="{{errorDescription}}"
+    action-text="重新加载"
+    bind:action="retry"
+  ></page-state>
+
+  <block wx:elif="{{testType === 2}}">
+    <image class="pair-detail-hero" src="{{test.imageUrl}}" mode="widthFix"></image>
+
+    <view class="pair-detail-tags">
+      <text class="pair-detail-tag pair-detail-tag--yellow">双人独立作答</text>
+      <text class="pair-detail-tag pair-detail-tag--mint">每人{{test.questionCount}}题</text>
+      <text class="pair-detail-tag pair-detail-tag--purple">每人约{{test.estimatedMinutes}}分钟</text>
+    </view>
+
+    <text class="pair-detail-title">{{test.title}}</text>
+    <text class="pair-detail-copy">{{test.description}}</text>
+
+    <view class="paper-card pair-detail-steps">
+      <text>1 你先作答</text>
+      <text>2 邀请 TA</text>
+      <text>3 一起查看</text>
+      <text class="pair-detail-steps__note">默认不展示彼此单题答案</text>
+    </view>
+
+    <view class="pair-detail-actions">
+      <button
+        class="paper-button paper-button--primary"
+        loading="{{starting}}"
+        disabled="{{starting}}"
+        bindtap="startAssessment"
+      >和 TA 一起测</button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <image class="single-detail-hero" src="{{test.imageUrl}}" mode="widthFix"></image>
+
+    <view class="detail-tags">
+      <text class="detail-tag detail-tag--yellow">{{test.categoryName}}</text>
+      <text class="detail-tag detail-tag--purple">{{test.questionCount}}题</text>
+      <text class="detail-tag detail-tag--mint">约{{test.estimatedMinutes}}分钟</text>
+    </view>
+
+    <text class="detail-title">{{test.title}}</text>
+    <text class="detail-description">{{test.description}}</text>
+
+    <view class="detail-rules paper-card">
+      <text>1 一题一屏，选择后自动下一题</text>
+      <text>2 全部测试与报告免费</text>
+      <text>3 随时退出，可暂存或放弃本次作答</text>
+    </view>
+
+    <button
+      class="paper-button paper-button--primary detail-action"
+      loading="{{starting}}"
+      disabled="{{starting}}"
+      bindtap="startAssessment"
+    >{{starting ? '正在创建答卷' : '开始测试'}}</button>
+  </block>
+</view>

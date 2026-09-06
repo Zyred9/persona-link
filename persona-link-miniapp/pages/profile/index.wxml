@@ -1,36 +1,18 @@
-<app-nav-bar title="我的" show-back="{{true}}" custom-back="{{true}}" bind:back="goHome"></app-nav-bar>
-
-<view class="paper-page profile-page">
-  <view class="paper-card profile-card">
-    <view class="profile-face">
-      <view class="profile-heart"></view>
-      <view class="profile-cheek profile-cheek--left"></view>
-      <view class="profile-cheek profile-cheek--right"></view>
-      <view class="profile-smile"></view>
-    </view>
-    <view class="profile-copy">
-      <text class="profile-badge">游客</text>
-      <text class="profile-title">先从一题开始</text>
-      <text class="profile-description">基础测试和双人配对可直接体验</text>
-    </view>
-  </view>
-
-  <view class="profile-menu">
-    <button class="paper-card profile-row" bindtap="goHistory">
-      <text>测试记录</text>
-      <text class="profile-row__hint">单人 / 双人</text>
-    </button>
-    <button class="paper-card profile-row" bindtap="goMember">
-      <text>会员中心</text>
-      <text class="profile-row__hint">解锁深度解析</text>
-    </button>
-    <button class="paper-card profile-row" bindtap="goFeedback">
-      <text>反馈与举报</text>
-      <text class="profile-row__arrow">›</text>
-    </button>
-    <button class="paper-card profile-row" bindtap="goSettings">
-      <text>设置</text>
-      <text class="profile-row__arrow">›</text>
-    </button>
-  </view>
-</view>
+<page-container
+  show="{{accountVisible}}"
+  duration="80"
+  position="right"
+  overlay="{{false}}"
+  custom-style="width: 100%; height: 100%; background: #fffaf1;"
+  bind:beforeleave="deactivateAccount"
+  bind:afterleave="clearAccount"
+>
+  <scroll-view class="profile-account-scroll" scroll-y>
+    <account-center
+      id="profile-account-center"
+      embedded="{{true}}"
+      bind:close="closeAccount"
+      bind:viewchange="handleAccountViewChange"
+    ></account-center>
+  </scroll-view>
+</page-container>

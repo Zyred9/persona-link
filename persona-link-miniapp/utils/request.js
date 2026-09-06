@@ -1,6 +1,7 @@
 const { getApiBaseUrl } = require('../config/env');
 
 const TOKEN_STORAGE_KEY = 'personaLinkBusinessToken';
+let pendingSession = null;
 
 function createRequestError(message, statusCode, responseData, responseRequestId) {
   const error = new Error(message);
@@ -14,12 +15,15 @@ function createRequestError(message, statusCode, responseData, responseRequestId
   return error;
 }
 
-function clearSession() {
+function clearSession(expectedToken) {
+  // 并发旧请求的 401 不能删除其他请求刚刷新的会话。
+  if (wx.getStorageSync(TOKEN_STORAGE_KEY) !== expectedToken) return false;
   wx.removeStorageSync(TOKEN_STORAGE_KEY);
+  return true;
 }
 
-function handleUnauthorized() {
-  clearSession();
+function handleUnauthorized(expectedToken) {
+  if (!clearSession(expectedToken)) return;
   wx.showToast({
     title: '登录状态已失效',
     icon: 'none'
@@ -63,9 +67,9 @@ function request(options) {
         }
         if (response.statusCode === 401) {
           if (options.silentUnauthorized) {
-            clearSession();
+            clearSession(token);
           } else {
-            handleUnauthorized();
+            handleUnauthorized(token);
           }
         }
         const responseData = response.data;
@@ -114,7 +118,7 @@ function login() {
   });
 }
 
-async function createSession() {
+async function requestSession() {
   const code = await login();
   const session = await requestData({
     url: '/api/miniapp/auth/wechat',
@@ -127,6 +131,14 @@ async function createSession() {
   }
   wx.setStorageSync(TOKEN_STORAGE_KEY, session.token);
   return session.token;
+}
+
+function createSession() {
+  // 首页统计与开始测试可能同时登录，共用请求避免重复创建会话。
+  if (!pendingSession) {
+    pendingSession = requestSession().finally(() => { pendingSession = null; });
+  }
+  return pendingSession;
 }
 
 function ensureSession() {
@@ -142,7 +154,7 @@ async function authenticatedRequestData(options) {
     if (error.statusCode !== 401) {
       throw error;
     }
-    await createSession();
+    await ensureSession();
     return requestData(Object.assign({}, options, { silentUnauthorized: true }));
   }
 }

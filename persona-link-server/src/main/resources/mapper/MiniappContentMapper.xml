@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.MiniappContentMapper">
+
+    <sql id="currentPublishedVersionJoin">
+        JOIN t_test_version tv ON tv.id = (
+            SELECT current_tv.id
+            FROM t_test_version current_tv
+            WHERE current_tv.test_id = t.id
+              AND current_tv.version_status = 4
+              AND current_tv.deleted = 0
+            ORDER BY current_tv.published_at DESC, current_tv.id DESC
+            LIMIT 1
+        )
+    </sql>
+
+    <sql id="miniappTestColumns">
+        CAST(t.id AS CHAR) AS test_id,
+        CAST(tv.id AS CHAR) AS version_id,
+        t.test_type,
+        CAST(c.id AS CHAR) AS category_id,
+        c.category_name,
+        tv.title,
+        tv.cover_url,
+        tv.draw_question_count AS question_count,
+        tv.estimated_minutes
+    </sql>
+
+    <select id="selectHomeCategories"
+            resultType="com.personalink.server.dto.MiniappHomeCategoryResponse">
+        SELECT
+            CAST(c.id AS CHAR) AS category_id,
+            c.category_name
+        FROM t_category c
+        WHERE c.status = 1
+          AND c.deleted = 0
+        ORDER BY c.sort_no DESC, c.id DESC
+    </select>
+
+    <select id="selectHomeTests"
+            resultType="com.personalink.server.dto.MiniappHomeTestResponse">
+        SELECT
+            <include refid="miniappTestColumns"/>
+        FROM t_test t
+        JOIN t_category c ON c.id = t.category_id
+        <include refid="currentPublishedVersionJoin"/>
+        WHERE t.home_display = #{homeDisplay}
+          AND t.status = 1
+          AND t.deleted = 0
+          AND c.status = 1
+          AND c.deleted = 0
+        ORDER BY t.home_sort DESC, t.id DESC
+    </select>
+
+    <select id="selectPublishedTestDetail"
+            resultType="com.personalink.server.dto.MiniappTestDetailResponse">
+        SELECT
+            CAST(t.id AS CHAR) AS test_id,
+            CAST(tv.id AS CHAR) AS version_id,
+            t.test_type,
+            CAST(c.id AS CHAR) AS category_id,
+            c.category_name,
+            tv.title,
+            tv.cover_url,
+            tv.detail_image_url,
+            tv.draw_question_count AS question_count,
+            tv.estimated_minutes,
+            tv.description
+        FROM t_test t
+        JOIN t_category c ON c.id = t.category_id
+        <include refid="currentPublishedVersionJoin"/>
+        WHERE t.id = #{testId}
+          AND t.status = 1
+          AND t.deleted = 0
+          AND c.status = 1
+          AND c.deleted = 0
+        LIMIT 1
+    </select>
+
+</mapper>

@@ -78,27 +78,44 @@ onMounted(load)
     </div>
     <footer><span>第 {{ page }} / {{ Math.max(1, Math.ceil(total / size)) }} 页</span><div><button :disabled="page <= 1" @click="changePage(-1)">上一页</button><button :disabled="page * size >= total" @click="changePage(1)">下一页</button></div></footer>
 
-    <div v-if="showCreate || editing" class="modal" @click.self="showCreate = false; editing = null">
-      <form @submit.prevent="editing ? saveAccount() : createAccount()">
-        <header><h2>{{ editing ? '编辑账号' : '新增账号' }}</h2><button type="button" @click="showCreate = false; editing = null">×</button></header>
-        <label v-if="!editing">登录账号<input v-model="createForm.username" required maxlength="64" /></label>
-        <label v-if="!editing">初始密码<input v-model="createForm.password" required minlength="8" maxlength="72" type="password" /></label>
-        <template v-if="editing">
-          <label>显示名称<input v-model="editing.displayName" required maxlength="64" /></label>
-          <label>角色<select v-model="editing.roleType"><option :value="1">管理员</option><option :value="2">内容运营</option><option :value="3">只读查看</option></select></label>
-          <label>状态<select v-model="editing.status"><option :value="1">启用</option><option :value="0">禁用</option></select></label>
-        </template>
-        <template v-else>
-          <label>显示名称<input v-model="createForm.displayName" required maxlength="64" /></label>
-          <label>角色<select v-model="createForm.roleType"><option :value="1">管理员</option><option :value="2">内容运营</option><option :value="3">只读查看</option></select></label>
-          <label>状态<select v-model="createForm.status"><option :value="1">启用</option><option :value="0">禁用</option></select></label>
-        </template>
-        <button class="primary" type="submit">保存</button>
+    <div v-if="showCreate || editing" class="modal admin-modal-backdrop" @click.self="showCreate = false; editing = null">
+      <form class="admin-editor-dialog account-editor-dialog" role="dialog" aria-modal="true" aria-label="账号编辑弹窗" @submit.prevent="editing ? saveAccount() : createAccount()">
+        <header class="admin-dialog-header"><div><h2>{{ editing ? '编辑账号' : '新增账号' }}</h2><p>设置登录信息、显示名称和后台访问权限。</p></div><button type="button" aria-label="关闭" @click="showCreate = false; editing = null">×</button></header>
+        <div class="drawer-body">
+          <section class="admin-form-section">
+            <h3>登录信息</h3><p>{{ editing ? '登录账号不可修改；如需更换密码，请在账号列表重置。' : '请填写登录账号，并设置至少 8 位的初始密码。' }}</p>
+            <div class="admin-form-grid">
+              <template v-if="editing">
+                <div class="admin-field"><span>登录账号</span><strong class="account-username">{{ editing.username }}</strong></div>
+                <label class="admin-field"><span>显示名称</span><input v-model="editing.displayName" required maxlength="64" placeholder="请输入显示名称" /></label>
+              </template>
+              <template v-else>
+                <label class="admin-field"><span>登录账号</span><input v-model="createForm.username" required maxlength="64" placeholder="请输入登录账号" /></label>
+                <label class="admin-field"><span>初始密码</span><input v-model="createForm.password" required minlength="8" maxlength="72" type="password" autocomplete="new-password" placeholder="至少 8 位" /></label>
+                <label class="admin-field admin-field-wide"><span>显示名称</span><input v-model="createForm.displayName" required maxlength="64" placeholder="请输入显示名称" /></label>
+              </template>
+            </div>
+          </section>
+          <section class="admin-form-section">
+            <h3>访问权限</h3><p>按实际职责选择角色，并设置账号是否启用。</p>
+            <div class="admin-form-grid">
+              <template v-if="editing">
+                <label class="admin-field"><span>角色</span><select v-model="editing.roleType"><option :value="1">管理员</option><option :value="2">内容运营</option><option :value="3">只读查看</option></select></label>
+                <label class="admin-field"><span>状态</span><select v-model="editing.status"><option :value="1">启用</option><option :value="0">禁用</option></select></label>
+              </template>
+              <template v-else>
+                <label class="admin-field"><span>角色</span><select v-model="createForm.roleType"><option :value="1">管理员</option><option :value="2">内容运营</option><option :value="3">只读查看</option></select></label>
+                <label class="admin-field"><span>状态</span><select v-model="createForm.status"><option :value="1">启用</option><option :value="0">禁用</option></select></label>
+              </template>
+            </div>
+          </section>
+        </div>
+        <footer class="admin-dialog-footer"><span class="admin-footer-note">请确认角色与账号状态。</span><div class="admin-footer-actions"><button class="secondary-action" type="button" @click="showCreate = false; editing = null">取消</button><button class="primary" type="submit">保存账号</button></div></footer>
       </form>
     </div>
   </section>
 </template>
 
 <style scoped>
-.settings-view{display:grid;gap:18px}.settings-view>header{display:flex;align-items:center;justify-content:space-between}.settings-view h1{margin:0;font-size:38px}.settings-view p{margin:6px 0;color:#777}.settings-view button{border:1.5px solid #222;border-radius:9px;background:#fff;padding:8px 14px;cursor:pointer}.settings-view>header button,.primary{background:#ff6652!important;color:#fff}.filters{display:flex;gap:10px;padding:16px;border:1.5px solid #aaa;border-radius:14px;background:#fff}.filters input,.filters select,.modal input,.modal select{border:1px solid #bbb;border-radius:9px;padding:9px;font:inherit}.filters input{min-width:240px}.table-card{overflow:auto;border:1.5px solid #aaa;border-radius:14px;background:#fff}.table-head,.table-row{display:grid;grid-template-columns:150px 150px 110px 90px minmax(170px,1fr) 190px;align-items:center;gap:12px;min-width:900px;padding:14px 18px}.table-head{background:#f5effe;font-weight:800}.table-row{border-top:1px solid #ddd}.table-row>div{display:flex;gap:8px}.enabled{color:#348533}.disabled{color:#aa4435}footer{display:flex;justify-content:space-between}footer div{display:flex;gap:8px}button:disabled{opacity:.4}.modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:#0006;padding:24px}.modal form{display:grid;gap:14px;width:min(440px,100%);border:2px solid #222;border-radius:16px;background:#fff;padding:22px}.modal form header{display:flex;align-items:center;justify-content:space-between}.modal h2{margin:0}.modal label{display:grid;gap:6px;font-weight:700}@media(max-width:720px){.settings-view>header,.filters{align-items:stretch;flex-direction:column}.filters input{min-width:0}.settings-view h1{font-size:30px}}
+.settings-view{display:grid;gap:18px}.settings-view>header{display:flex;align-items:center;justify-content:space-between}.settings-view h1{margin:0;font-size:38px}.settings-view>header p{margin:6px 0;color:#777}.settings-view button{border:1.5px solid #222;border-radius:9px;background:#fff;padding:8px 14px;cursor:pointer}.settings-view>header button,.primary{background:#ff6652!important;color:#fff}.filters{display:flex;gap:10px;padding:16px;border:1.5px solid #aaa;border-radius:14px;background:#fff}.filters input,.filters select{border:1px solid #bbb;border-radius:9px;padding:9px;font:inherit}.filters input{min-width:240px}.table-card{overflow:auto;border:1.5px solid #aaa;border-radius:14px;background:#fff}.table-head,.table-row{display:grid;grid-template-columns:150px 150px 110px 90px minmax(170px,1fr) 190px;align-items:center;gap:12px;min-width:900px;padding:14px 18px}.table-head{background:#f5effe;font-weight:800}.table-row{border-top:1px solid #ddd}.table-row>div{display:flex;gap:8px}.enabled{color:#348533}.disabled{color:#aa4435}.settings-view>footer{display:flex;justify-content:space-between}.settings-view>footer div{display:flex;gap:8px}button:disabled{opacity:.4}.account-editor-dialog{--editor-width:640px}.account-username{display:flex;align-items:center;min-height:44px;padding:10px 12px;border:1px solid #e3ddd5;border-radius:9px;background:#f7f3ed;overflow-wrap:anywhere}@media(max-width:720px){.settings-view>header,.filters{align-items:stretch;flex-direction:column}.filters input{min-width:0}.settings-view h1{font-size:30px}}
 </style>

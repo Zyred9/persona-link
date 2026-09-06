@@ -1,0 +1,24 @@
+package com.personalink.server.dto;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+import java.time.LocalDateTime;
+
+/**
+ * 单个小程序事件。
+ */
+public record AnalyticsEventRequest(
+        @NotBlank @Size(max = 64) String eventId,
+        @NotNull @Min(1) @Max(5) Integer eventType,
+        @Size(max = 255) String pagePath,
+        @Pattern(regexp = "^\\d{1,19}$") String businessId,
+        Integer sourceScene,
+        @Size(max = 32) String channel,
+        @Size(max = 32) String appVersion,
+        @NotNull LocalDateTime clientTime) {
+}

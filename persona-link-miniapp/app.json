@@ -12,7 +12,6 @@
         "pages/settings/index",
         "pages/privacy/index",
         "pages/history/index",
-        "pages/member/index",
         "pages/feedback/index"
       ]
     },
@@ -38,7 +37,11 @@
   "preloadRule": {
     "pages/home/index": {
       "network": "all",
-      "packages": ["subpackages/test", "subpackages/pair"]
+      "packages": ["subpackages/account", "subpackages/test", "subpackages/pair"]
+    },
+    "pages/profile/index": {
+      "network": "all",
+      "packages": ["subpackages/account"]
     }
   },
   "window": {

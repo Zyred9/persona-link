@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.TestMapper">
+    <sql id="testColumns">
+        t.id, t.test_name, t.test_type, t.category_id, c.category_name,
+        display_version.cover_url, display_version.draw_question_count, display_version.estimated_minutes,
+        t.status,
+        display_version.version_no AS current_version_no,
+        display_version.version_status AS current_version_status,
+        t.home_display,
+        t.home_sort,
+        t.update_date
+    </sql>
+
+    <!-- 后台编辑视图：图片、答题设置与版本信息取同一版本，草稿优先，其次已发布。 -->
+    <sql id="displayVersionJoin">
+        LEFT JOIN t_test_version display_version ON display_version.id = (
+         SELECT v.id FROM t_test_version v
+         WHERE v.test_id = t.id AND v.deleted = 0
+         ORDER BY CASE
+                      WHEN v.version_status = 1 THEN 0
+                      WHEN v.version_status = 4 THEN 1
+                      ELSE 2
+                  END,
+                  v.version_no DESC
+         LIMIT 1)
+    </sql>
+
+    <select id="selectTestPage" resultType="com.personalink.server.dto.TestResponse">
+        SELECT <include refid="testColumns"/>
+        FROM t_test t
+        JOIN t_category c ON c.id = t.category_id AND c.deleted = 0
+        <include refid="displayVersionJoin"/>
+        WHERE t.deleted = 0
+        AND NOT EXISTS (
+            SELECT 1
+            FROM t_ai_generation_task ai_task
+            JOIN t_test_version ai_version ON ai_version.id = ai_task.version_id
+            WHERE ai_version.test_id = t.id
+              AND ai_task.deleted = 0
+              AND ai_task.task_status != 5
+        )
+        <if test="query.keyword != null and query.keyword != ''">
+            AND t.test_name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.testType != null">AND t.test_type = #{query.testType}</if>
+        <if test="query.categoryId != null">AND t.category_id = #{query.categoryId}</if>
+        <if test="query.status != null">AND t.status = #{query.status}</if>
+        ORDER BY t.update_date DESC, t.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countTestPage" resultType="long">
+        SELECT COUNT(1)
+        FROM t_test t
+        JOIN t_category c ON c.id = t.category_id AND c.deleted = 0
+        WHERE t.deleted = 0
+        AND NOT EXISTS (
+            SELECT 1
+            FROM t_ai_generation_task ai_task
+            JOIN t_test_version ai_version ON ai_version.id = ai_task.version_id
+            WHERE ai_version.test_id = t.id
+              AND ai_task.deleted = 0
+              AND ai_task.task_status != 5
+        )
+        <if test="query.keyword != null and query.keyword != ''">
+            AND t.test_name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.testType != null">AND t.test_type = #{query.testType}</if>
+        <if test="query.categoryId != null">AND t.category_id = #{query.categoryId}</if>
+        <if test="query.status != null">AND t.status = #{query.status}</if>
+    </select>
+
+    <select id="selectTestDetail" resultType="com.personalink.server.dto.TestResponse">
+        SELECT <include refid="testColumns"/>
+        FROM t_test t
+        JOIN t_category c ON c.id = t.category_id AND c.deleted = 0
+        <include refid="displayVersionJoin"/>
+        WHERE t.id = #{id} AND t.deleted = 0
+    </select>
+
+</mapper>

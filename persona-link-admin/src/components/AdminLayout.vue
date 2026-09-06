@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { getMe, logout as logoutApi } from '../api'
 import { getProfile, saveProfile } from '../auth'
+import AdminIcon from './AdminIcon.vue'
+import { confirmPendingChanges, discardPendingChanges } from '../composables/useUnsavedChanges'
 
 const router = useRouter()
 const route = useRoute()
@@ -11,16 +13,15 @@ const operatorName = ref(getProfile()?.displayName ?? '管理员')
 const roleType = ref(getProfile()?.roleType ?? 3)
 
 const navigation = [
-  { icon: '⌁', label: '运营总览', to: '/' },
-  { icon: '▤', label: '题型管理', to: '/types' },
-  { icon: '⌂', label: '首页配置', to: '/home-config' },
-  { icon: '✦', label: 'AI题库助手', to: '/ai-question-bank' },
-  { icon: '◇', label: '分类标签', to: '/categories' },
-  { icon: '▧', label: '素材库', to: '/materials' },
-  { icon: '□', label: '发布排期', to: '/releases' },
-  { icon: '▥', label: '数据看板', to: '/analytics' },
-  { icon: '≡', label: '操作审计', to: '/audits' },
-  { icon: '⚙', label: '系统设置', to: '/settings', adminOnly: true },
+  { icon: 'overview', label: '运营总览', to: '/' },
+  { icon: 'content', label: '题型管理', to: '/types' },
+  { icon: 'home', label: '首页配置', to: '/home-config' },
+  { icon: 'ai', label: 'AI题库助手', to: '/ai-question-bank' },
+  { icon: 'category', label: '分类标签', to: '/categories' },
+  { icon: 'calendar', label: '发布排期', to: '/releases' },
+  { icon: 'analytics', label: '数据看板', to: '/analytics' },
+  { icon: 'audit', label: '操作审计', to: '/audits' },
+  { icon: 'settings', label: '系统设置', to: '/settings', adminOnly: true },
 ]
 const visibleNavigation = computed(() => navigation.filter((item) => !item.adminOnly || roleType.value === 1))
 
@@ -29,6 +30,8 @@ function closeMenu() {
 }
 
 async function logout() {
+  if (!await confirmPendingChanges('当前内容尚未保存。请取消并保存草稿，或确认放弃修改并退出登录。')) return
+  discardPendingChanges()
   try { await logoutApi() } finally { await router.replace('/login') }
 }
 
@@ -63,7 +66,7 @@ onMounted(async () => {
           :to="item.to"
           @click="closeMenu"
         >
-          <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}
+          <span aria-hidden="true"><AdminIcon :name="item.icon" /></span>{{ item.label }}
         </RouterLink>
       </nav>
       <div class="sidebar-mascot" aria-hidden="true"><span>♥</span><i>✦</i></div>

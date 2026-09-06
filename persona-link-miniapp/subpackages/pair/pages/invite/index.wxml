@@ -27,6 +27,6 @@
     <button class="paper-button paper-button--primary invite-share-button" open-type="share">发送给微信好友</button>
   </view>
 
-  <text class="invite-note">邀请不作为解锁或奖励条件</text>
+  <text class="invite-note">邀请好友一起完成双人测试</text>
   </block>
 </view>

@@ -18,7 +18,7 @@
     <button class="paper-button join-clear" bindtap="clearPairCode">清空</button>
   </view>
   <text wx:if="{{errorMessage}}" class="join-error">{{errorMessage}}</text>
-  <text class="join-tip">确认加入即进入答题；答题过程不展示广告或付费弹窗。</text>
+  <text class="join-tip">确认加入即进入答题，全部测试免费。</text>
 
   <button class="paper-button paper-button--primary join-submit" loading="{{joining}}" disabled="{{joining}}" bindtap="confirmJoin">确认加入并开始答题</button>
 </view>

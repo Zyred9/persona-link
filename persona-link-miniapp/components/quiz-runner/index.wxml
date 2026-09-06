@@ -1,0 +1,52 @@
+<view class="paper-page quiz-page">
+  <page-state
+    wx:if="{{state === 'loading'}}"
+    type="loading"
+    title="答卷正在加载"
+  ></page-state>
+
+  <page-state
+    wx:elif="{{state === 'error'}}"
+    type="error"
+    title="答卷加载失败"
+    description="{{errorDescription}}"
+    action-text="重新加载"
+    bind:action="retry"
+  ></page-state>
+
+  <block wx:else>
+    <view class="quiz-progress__meta">
+      <text class="quiz-progress__count">{{questionNumber}} / {{total}}</text>
+      <text class="quiz-progress__type">{{questionTypeText}}</text>
+    </view>
+    <view class="quiz-progress">
+      <view class="quiz-progress__bar" style="width: {{progress}}%;"></view>
+    </view>
+
+    <text class="quiz-question">{{question}}</text>
+
+    <view class="quiz-options">
+      <button
+        wx:for="{{options}}"
+        wx:key="optionId"
+        class="{{item.selected ? 'quiz-option quiz-option--selected' : 'quiz-option'}}"
+        data-option-id="{{item.optionId}}"
+        disabled="{{saving}}"
+        bindtap="chooseOption"
+      >
+        <text>{{item.optionCode}}. {{item.optionText}}</text>
+        <text wx:if="{{item.selected}}" class="quiz-option__check">✓</text>
+      </button>
+    </view>
+
+    <view class="quiz-actions">
+      <button class="paper-button quiz-actions__button" disabled="{{saving}}" bindtap="goPrevious">上一题</button>
+      <button
+        class="paper-button paper-button--primary quiz-actions__button"
+        loading="{{saving}}"
+        disabled="{{saving}}"
+        bindtap="continueTest"
+      >{{saving ? '保存中' : (isLast ? '查看结果' : '继续')}}</button>
+    </view>
+  </block>
+</view>

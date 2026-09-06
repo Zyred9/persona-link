@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.QuestionOptionMapper">
+    <insert id="insertBatch">
+        INSERT INTO t_question_option
+            (question_id, option_code, option_text, dimension_id, score_value, sort_no, deleted)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.questionId}, #{item.optionCode}, #{item.optionText}, #{item.dimensionId},
+             #{item.scoreValue}, #{item.sortNo}, 0)
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            option_text = VALUES(option_text), dimension_id = VALUES(dimension_id),
+            score_value = VALUES(score_value), sort_no = VALUES(sort_no), deleted = 0
+    </insert>
+</mapper>

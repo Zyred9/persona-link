@@ -5,16 +5,9 @@ const {
   TOKEN_STORAGE_KEY
 } = require('../../utils/request');
 const { trackEvent } = require('../../utils/analytics');
-const { getApiBaseUrl } = require('../../config/env');
+const { resolveImageUrl } = require('../../utils/image');
 
 const ALL_CATEGORY_ID = 'all';
-
-function resolveImageUrl(imageUrl) {
-  if (!imageUrl || /^https?:\/\//.test(imageUrl)) {
-    return imageUrl || '';
-  }
-  return `${getApiBaseUrl()}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-}
 
 function prepareTests(tests) {
   return (Array.isArray(tests) ? tests : []).map((item) => Object.assign({}, item, {
@@ -55,14 +48,29 @@ Page({
       this.clearTestDetail();
     }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0 });
+      const accountVisible = this.data.containerVisible && this.data.containerMode === 'account';
+      this.getTabBar().setData({ selected: accountVisible ? 1 : 0 });
     }
     if (app.globalData.hasConsent) {
       this.loadHome();
+      trackEvent(2, '/pages/home/index');
     }
     if (getApp().globalData.hasConsent && wx.getStorageSync(TOKEN_STORAGE_KEY)) {
       this.loadCurrentAssessment();
-      trackEvent(2, '/pages/home/index');
+    }
+  },
+
+  async onPullDownRefresh() {
+    try {
+      if (!getApp().globalData.hasConsent || this.data.containerVisible) {
+        return;
+      }
+      await Promise.all([
+        this.loadHome(),
+        wx.getStorageSync(TOKEN_STORAGE_KEY) ? this.loadCurrentAssessment() : Promise.resolve()
+      ]);
+    } finally {
+      wx.stopPullDownRefresh();
     }
   },
 
@@ -115,6 +123,49 @@ Page({
     this.setData({
       selectedCategoryId,
       tests: filterTests(this.data.allTests, selectedCategoryId)
+    });
+  },
+
+  switchRootTab(index) {
+    if (Number(index) === 1) {
+      this.openAccount();
+      return;
+    }
+    this.closeAccount();
+  },
+
+  openAccount() {
+    this.reopenAccountAfterLeave = false;
+    const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (tabBar) {
+      tabBar.setData({ selected: 1, hidden: false });
+    }
+    this.setData({
+      containerVisible: true,
+      containerMode: 'account'
+    });
+  },
+
+  closeAccount() {
+    this.reopenAccountAfterLeave = false;
+    this.setData({ containerVisible: false });
+  },
+
+  handleAccountViewChange(event) {
+    const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (tabBar) {
+      tabBar.setData({ selected: 1, hidden: !event.detail.atRoot });
+    }
+  },
+
+  clearAccount() {
+    const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (tabBar) {
+      tabBar.setData({ selected: 0, hidden: false });
+    }
+    this.setData({
+      containerVisible: false,
+      containerMode: ''
     });
   },
 
@@ -234,6 +285,14 @@ Page({
   },
 
   deactivateContainer() {
+    if (this.data.containerMode === 'account') {
+      const account = this.selectComponent('#home-account-center');
+      if (account && account.data.currentView !== 'profile') {
+        this.reopenAccountAfterLeave = true;
+        account.handleBack();
+      }
+      return;
+    }
     if (this.data.containerMode === 'quiz') {
       this.deactivateQuiz();
       return;
@@ -242,6 +301,15 @@ Page({
   },
 
   clearContainer() {
+    if (this.data.containerMode === 'account') {
+      if (this.reopenAccountAfterLeave) {
+        this.reopenAccountAfterLeave = false;
+        this.setData({ containerVisible: true });
+        return;
+      }
+      this.clearAccount();
+      return;
+    }
     if (this.data.containerMode === 'quiz') {
       this.clearQuiz();
       return;

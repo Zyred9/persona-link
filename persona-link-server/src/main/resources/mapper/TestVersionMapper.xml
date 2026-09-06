@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.TestVersionMapper">
+    <insert id="cloneDimensions">
+        INSERT INTO t_score_dimension (version_id, dimension_code, dimension_name, sort_no, deleted)
+        SELECT #{targetVersionId}, dimension_code, dimension_name, sort_no, 0
+        FROM t_score_dimension
+        WHERE version_id = #{sourceVersionId} AND deleted = 0
+        ORDER BY sort_no, id
+    </insert>
+    <insert id="cloneQuestions">
+        INSERT INTO t_question
+            (version_id, question_type, dimension_id, min_select_count, max_select_count,
+             question_no, question_text, required_flag, sort_no, deleted)
+        SELECT #{targetVersionId}, q.question_type, target_dimension.id,
+               q.min_select_count, q.max_select_count, q.question_no, q.question_text,
+               q.required_flag, q.sort_no, 0
+        FROM t_question q
+        LEFT JOIN t_score_dimension source_dimension ON source_dimension.id = q.dimension_id
+        LEFT JOIN t_score_dimension target_dimension
+            ON target_dimension.version_id = #{targetVersionId}
+            AND target_dimension.dimension_code = source_dimension.dimension_code
+            AND target_dimension.deleted = 0
+        WHERE q.version_id = #{sourceVersionId} AND q.deleted = 0
+        ORDER BY q.question_no, q.id
+    </insert>
+    <insert id="cloneOptions">
+        INSERT INTO t_question_option
+            (question_id, option_code, option_text, dimension_id, score_value, sort_no, deleted)
+        SELECT target_question.id, option_row.option_code, option_row.option_text,
+               target_dimension.id, option_row.score_value, option_row.sort_no, 0
+        FROM t_question_option option_row
+        JOIN t_question source_question ON source_question.id = option_row.question_id
+        JOIN t_question target_question
+            ON target_question.version_id = #{targetVersionId}
+            AND target_question.question_no = source_question.question_no
+            AND target_question.deleted = 0
+        LEFT JOIN t_score_dimension source_dimension ON source_dimension.id = option_row.dimension_id
+        LEFT JOIN t_score_dimension target_dimension
+            ON target_dimension.version_id = #{targetVersionId}
+            AND target_dimension.dimension_code = source_dimension.dimension_code
+            AND target_dimension.deleted = 0
+        WHERE source_question.version_id = #{sourceVersionId}
+          AND source_question.deleted = 0
+          AND option_row.deleted = 0
+        ORDER BY source_question.question_no, option_row.sort_no, option_row.id
+    </insert>
+    <insert id="cloneResults">
+        INSERT INTO t_result_template
+            (version_id, dimension_id, result_code, result_name, score_min, score_max,
+             basic_result_json, deep_result_json, share_copy_json, sort_no, deleted)
+        SELECT #{targetVersionId}, target_dimension.id, result_row.result_code,
+               result_row.result_name, result_row.score_min, result_row.score_max,
+               result_row.basic_result_json, result_row.deep_result_json,
+               result_row.share_copy_json, result_row.sort_no, 0
+        FROM t_result_template result_row
+        JOIN t_score_dimension source_dimension ON source_dimension.id = result_row.dimension_id
+        JOIN t_score_dimension target_dimension
+            ON target_dimension.version_id = #{targetVersionId}
+            AND target_dimension.dimension_code = source_dimension.dimension_code
+            AND target_dimension.deleted = 0
+        WHERE result_row.version_id = #{sourceVersionId}
+          AND result_row.deleted = 0
+        ORDER BY result_row.sort_no, result_row.id
+    </insert>
+</mapper>

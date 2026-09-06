@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getDashboard, getHealth, type AnalyticsOverview } from '../api'
+import { niceCeiling } from '../utils/chartScale'
 
 const health = ref<'checking' | 'online' | 'offline'>('checking')
 const overview = ref<AnalyticsOverview | null>(null)
@@ -12,10 +13,10 @@ const metrics = computed(() => {
   const completedRate = value?.startedCount ? value.completedCount / value.startedCount * 100 : 0
   const shareRate = value?.completedCount ? value.shareCount / value.completedCount * 100 : 0
   return [
-    { icon: '◉', label: '首页访问', value: String(value?.pv ?? 0), note: `UV ${value?.uv ?? 0}`, tone: 'purple' },
-    { icon: '▷', label: '开始测试', value: String(value?.startedCount ?? 0), note: '已创建答卷', tone: 'coral' },
+    { icon: '◉', label: '页面浏览次数', value: formatCount(value?.pv ?? 0), note: `独立访客 UV ${formatCount(value?.uv ?? 0)}`, tone: 'purple' },
+    { icon: '▷', label: '开始测试次数', value: formatCount(value?.startedCount ?? 0), note: '已创建答卷', tone: 'coral' },
     { icon: '✓', label: '完成率', value: `${completedRate.toFixed(1)}%`, note: `完成 ${value?.completedCount ?? 0} 次`, tone: 'yellow' },
-    { icon: '⌯', label: '分享率', value: `${shareRate.toFixed(1)}%`, note: `分享 ${value?.shareCount ?? 0} 次`, tone: 'mint' },
+    { icon: '⌯', label: '分享次数', value: formatCount(value?.shareCount ?? 0), note: `分享/完成 ${shareRate.toFixed(1)}%`, tone: 'mint' },
   ]
 })
 
@@ -27,14 +28,24 @@ const usageRows = computed(() => (overview.value?.topTests ?? []).map((item) => 
 })))
 
 const chartDays = computed(() => (overview.value?.trend ?? []).map((item) => item.statDate.slice(5)))
+const hasTrend = computed(() => chartDays.value.length > 0)
+const chartMaximum = computed(() => niceCeiling(Math.max(0, ...(overview.value?.trend ?? []).flatMap((item) => [
+  item.pv,
+  item.startedCount,
+  item.completedCount,
+]))))
+const chartTicks = computed(() => Array.from({ length: 5 }, (_, index) => formatCount(chartMaximum.value * (4 - index) / 4)))
 
-function chartPoints(field: 'pv' | 'startedCount'): string {
+function chartPoints(field: 'pv' | 'startedCount' | 'completedCount'): string {
   const rows = overview.value?.trend ?? []
-  const maximum = Math.max(...rows.map((item) => item[field]), 1)
   return rows.map((item, index) => {
     const x = rows.length <= 1 ? 0 : Math.round(index * 700 / (rows.length - 1))
-    return `${x},${Math.round(180 - item[field] / maximum * 150)}`
+    return `${x},${Math.round(180 - item[field] / chartMaximum.value * 150)}`
   }).join(' ')
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 }
 
 onMounted(async () => {
@@ -53,9 +64,9 @@ onMounted(async () => {
   <div class="page-stack">
     <div class="welcome-row">
       <div>
-        <p class="eyebrow">TODAY'S OVERVIEW</p>
-        <h1>运营总览 <span>♡</span></h1>
-        <p>先看今日表现，再处理内容发布与配置。</p>
+        <p class="eyebrow">LAST 7 DAYS</p>
+        <h1>近 7 日运营总览 <span>♡</span></h1>
+        <p>集中查看近 7 日访问、开始、完成与分享表现。</p>
       </div>
       <div class="welcome-actions">
         <div class="health-chip" :class="health">
@@ -79,18 +90,21 @@ onMounted(async () => {
           <div><p class="eyebrow">WEEKLY TREND</p><h2>近 7 日趋势</h2></div>
           <RouterLink class="text-link" to="/analytics">查看完整数据 →</RouterLink>
         </div>
-        <div class="chart-wrap" aria-label="近七日访问量折线图">
-          <span class="chart-axis">4k</span><span class="chart-axis">3k</span><span class="chart-axis">2k</span><span class="chart-axis">1k</span>
+        <div v-if="hasTrend" class="chart-wrap" aria-label="近七日页面浏览与测试次数折线图">
+          <span v-for="tick in chartTicks" :key="tick" class="chart-axis">{{ tick }}</span>
           <div class="chart-canvas">
-            <i v-for="n in 4" :key="n"></i>
+            <i v-for="n in 5" :key="n"></i>
             <svg viewBox="0 0 700 190" preserveAspectRatio="none" role="img">
               <polyline :points="chartPoints('pv')" fill="none" stroke="#ff705f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
               <polyline :points="chartPoints('startedCount')" fill="none" stroke="#9b6bd3" stroke-width="4" stroke-linecap="round" stroke-dasharray="8 8" />
+              <polyline :points="chartPoints('completedCount')" fill="none" stroke="#59af8d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <div class="chart-days"><span v-for="day in chartDays" :key="day">{{ day }}</span></div>
           </div>
         </div>
-        <div class="chart-legend"><span><i class="coral-dot"></i>曝光量</span><span><i class="purple-dot"></i>开始测试</span></div>
+        <p v-else class="chart-empty">暂无近 7 日趋势数据</p>
+        <div class="chart-legend"><span><i class="coral-dot"></i>页面浏览</span><span><i class="purple-dot"></i>开始次数</span><span><i class="completed-dot"></i>完成次数</span></div>
+        <small class="chart-disclaimer">分享仅有近 7 日汇总次数，接口暂未提供逐日趋势。</small>
       </article>
 
       <article class="panel pending-panel">
@@ -103,7 +117,7 @@ onMounted(async () => {
       </article>
 
       <article class="panel usage-panel">
-        <div class="panel-title"><h2>各题型使用次数</h2><span>本周</span></div>
+        <div class="panel-title"><h2>近 7 日各题型使用次数</h2><span>7 天</span></div>
         <div class="data-table usage-table">
           <div class="data-row data-head"><span>题型</span><span>开始次数</span><span>完成次数</span><span>完成率</span></div>
           <div v-for="row in usageRows" :key="row.name" class="data-row">
@@ -119,3 +133,11 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.chart-wrap{grid-template-rows:repeat(5,1fr)}
+.chart-canvas{grid-area:1 / 2 / 6 / 3}
+.completed-dot{background:#59af8d}
+.chart-empty{display:grid;place-items:center;height:215px;margin:18px 0 0;color:#8c848d}
+.chart-disclaimer{display:block;margin-top:9px;color:#8c848d;text-align:center}
+</style>

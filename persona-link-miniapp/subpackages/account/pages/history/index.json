@@ -1,7 +1,6 @@
 {
   "navigationBarTitleText": "测试记录",
   "usingComponents": {
-    "app-nav-bar": "/components/app-nav-bar/index",
-    "page-state": "/components/page-state/index"
+    "account-center": "/components/account-center/index"
   }
 }

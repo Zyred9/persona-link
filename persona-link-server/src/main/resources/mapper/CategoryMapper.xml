@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.CategoryMapper">
+
+    <sql id="categoryColumns">
+        c.id,
+        c.category_name,
+        COUNT(t.id) AS test_count,
+        c.status,
+        c.sort_no,
+        c.update_date
+    </sql>
+
+    <select id="selectCategoryPage" resultType="com.personalink.server.dto.CategoryResponse">
+        SELECT
+        <include refid="categoryColumns"/>
+        FROM t_category c
+        LEFT JOIN t_test t ON t.category_id = c.id AND t.deleted = 0
+        WHERE c.deleted = 0
+        <if test="query.keyword != null and query.keyword != ''">
+            AND c.category_name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.status != null">
+            AND c.status = #{query.status}
+        </if>
+        GROUP BY c.id, c.category_name, c.status, c.sort_no, c.update_date
+        ORDER BY c.sort_no DESC, c.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectCategoryById" resultType="com.personalink.server.dto.CategoryResponse">
+        SELECT
+        <include refid="categoryColumns"/>
+        FROM t_category c
+        LEFT JOIN t_test t ON t.category_id = c.id AND t.deleted = 0
+        WHERE c.id = #{id}
+          AND c.deleted = 0
+        GROUP BY c.id, c.category_name, c.status, c.sort_no, c.update_date
+    </select>
+
+</mapper>

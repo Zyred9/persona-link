@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.PairSessionMapper">
+
+    <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO t_pair_session
+            (pair_no, create_request_id, invite_token_hash, version_id, initiator_open_id,
+             initiator_answer_session_id, pair_status, initiator_visible_flag,
+             partner_visible_flag, expires_at, deleted)
+        VALUES
+            (#{pairNo}, #{createRequestId}, #{inviteTokenHash}, #{versionId}, #{initiatorOpenId},
+             #{initiatorAnswerSessionId}, #{pairStatus}, #{initiatorVisibleFlag},
+             #{partnerVisibleFlag}, #{expiresAt}, #{deleted})
+    </insert>
+
+</mapper>

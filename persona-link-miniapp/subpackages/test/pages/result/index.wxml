@@ -23,51 +23,12 @@
     </view>
   </view>
 
-  <view class="unlock-card paper-card">
-    <text class="unlock-title">{{result.deepDescription ? '深度解读与成长建议' : '🔒 深度解读与成长建议'}}</text>
-    <text class="unlock-copy">{{result.deepDescription || '解锁后可查看完整分析报告'}}</text>
-    <view wx:if="{{!result.deepDescription}}" class="unlock-actions">
-      <button class="paper-button unlock-actions__button unlock-actions__button--purple" bindtap="watchVideo">观看视频解锁</button>
-      <button class="paper-button unlock-actions__button" bindtap="openMember">开通会员</button>
-    </view>
+  <view wx:if="{{result.deepDescription}}" class="deep-result-card paper-card">
+    <text class="deep-result-title">深度解读与成长建议</text>
+    <text class="deep-result-copy">{{result.deepDescription}}</text>
   </view>
 
   <button class="paper-button result-share" open-type="share">分享结果</button>
-</view>
-
-<view wx:elif="{{view === 'ad-failure'}}" class="paper-page state-page">
-  <view class="video-card paper-card"><view class="video-card__play"></view></view>
-  <text class="state-title">暂时无法加载视频</text>
-  <view class="state-description">
-    <text>深度内容仍保持锁定。你可以稍后重试，</text>
-    <text>或选择后台允许的其他合法解锁方式。</text>
-  </view>
-  <view class="state-actions">
-    <button class="paper-button paper-button--primary" bindtap="retryVideo">重新加载</button>
-    <button class="paper-button" bindtap="openMember">开通会员</button>
-    <button class="state-link" bindtap="returnResult">返回结果</button>
-  </view>
-</view>
-
-<view wx:elif="{{view === 'login-gate'}}" class="paper-page state-page">
-  <view class="login-card paper-card">
-    <view class="result-face result-face--yellow">
-      <view class="result-face__eye result-face__eye--left"></view>
-      <view class="result-face__eye result-face__eye--right"></view>
-      <view class="result-face__cheek result-face__cheek--left"></view>
-      <view class="result-face__cheek result-face__cheek--right"></view>
-      <view class="result-face__smile"></view>
-    </view>
-  </view>
-  <text class="state-title">登录后再开通会员</text>
-  <view class="state-description">
-    <text>基础测试不需要登录。为确认支付、会员和</text>
-    <text>跨设备权益，需要完成微信可恢复身份绑定。</text>
-  </view>
-  <view class="state-actions">
-    <button class="paper-button paper-button--primary" loading="{{authorizing}}" disabled="{{authorizing}}" bindtap="authorizeLogin">继续授权登录</button>
-    <button class="paper-button" disabled="{{authorizing}}" bindtap="returnResult">暂不登录</button>
-  </view>
 </view>
 
 <view wx:else class="paper-page state-page state-page--permission">

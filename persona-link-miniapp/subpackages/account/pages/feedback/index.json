@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "反馈与举报",
   "usingComponents": {
-    "app-nav-bar": "/components/app-nav-bar/index"
+    "account-center": "/components/account-center/index"
   }
 }

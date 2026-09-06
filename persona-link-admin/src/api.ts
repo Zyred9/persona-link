@@ -51,8 +51,9 @@ export interface TestItem {
   testType: number
   categoryId: number
   categoryName: string
-  iconUrl?: string
   coverUrl?: string
+  drawQuestionCount?: number | null
+  estimatedMinutes?: number | null
   status: number
   currentVersionNo?: number
   currentVersionStatus?: number
@@ -63,6 +64,7 @@ export interface TestItem {
 
 export interface MiniappHomeTest {
   testId: string
+  categoryId: string
   title: string
   coverUrl: string
 }
@@ -88,6 +90,7 @@ export interface TestVersion {
   versionNo: number
   title: string
   coverUrl: string
+  detailImageUrl?: string | null
   description?: string
   estimatedMinutes: number
   drawQuestionCount: number
@@ -151,6 +154,7 @@ export interface AiGenerationTask {
   testType: number
   categoryId: number
   coverUrl: string
+  detailImageUrl?: string | null
   description?: string
   estimatedMinutes: number
   drawQuestionCount: number
@@ -181,12 +185,39 @@ export interface AiGenerationTaskSummary {
   submittedAt?: string
 }
 
+export interface AiImageResolution {
+  coverWidth: number
+  coverHeight: number
+  detailWidth: number
+  detailHeight: number
+}
+
+export interface AiImageTask extends AiImageResolution {
+  id: number
+  testId: number
+  provider: number
+  modelName: string
+  promptText: string
+  taskStatus: number
+  coverUrl: string | null
+  detailImageUrl: string | null
+  errorMessage: string | null
+  appliedVersionId: number | null
+}
+
+export function createAiImageTask(testId: number, payload: { requestId: string; promptText: string } & AiImageResolution): Promise<AiImageTask> { return request(`/api/admin/tests/${testId}/image-tasks`, { method: 'POST', body: JSON.stringify(payload) }) }
+export function getLatestAiImageTask(testId: number, signal?: AbortSignal): Promise<AiImageTask | null> { return request(`/api/admin/tests/${testId}/image-tasks/latest`, { signal }) }
+export function getAiImageTask(id: number, signal?: AbortSignal): Promise<AiImageTask> { return request(`/api/admin/image-tasks/${id}`, { signal }) }
+export function retryAiImageTask(id: number): Promise<AiImageTask> { return request(`/api/admin/image-tasks/${id}/retry`, { method: 'POST' }) }
+export function applyAiImageTask(id: number): Promise<AiImageTask> { return request(`/api/admin/image-tasks/${id}/apply`, { method: 'POST' }) }
+
 export interface AiGenerationCreatePayload {
   requestId: string
   testName: string
   testType: number
   categoryId: number
   coverUrl: string
+  detailImageUrl?: string | null
   description?: string
   estimatedMinutes: number
   promptText: string
@@ -285,7 +316,7 @@ export function updateCategoryOrder(orderedIds: number[]): Promise<void> { retur
 export function deleteCategories(ids: number[]): Promise<void> { return request('/api/admin/categories/deletes', { method: 'POST', body: JSON.stringify(ids) }) }
 export function getTests(params: Record<string, unknown> = {}): Promise<PageResponse<TestItem>> { return request(`/api/admin/tests${queryString({ page: 1, size: 100, ...params })}`) }
 export function getTest(id: number): Promise<TestItem> { return request(`/api/admin/tests/${id}`) }
-export function saveTest(item: Pick<TestItem, 'testName' | 'testType' | 'categoryId' | 'iconUrl' | 'status'>, id?: number): Promise<TestItem> { return request(id ? `/api/admin/tests/${id}` : '/api/admin/tests', { method: id ? 'PUT' : 'POST', body: JSON.stringify(item) }) }
+export function saveTest(item: Pick<TestItem, 'testName' | 'testType' | 'categoryId' | 'status'>, id?: number): Promise<TestItem> { return request(id ? `/api/admin/tests/${id}` : '/api/admin/tests', { method: id ? 'PUT' : 'POST', body: JSON.stringify(item) }) }
 export function updateTestStatus(id: number, status: number): Promise<TestItem> { return request(`/api/admin/tests/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }) }
 export function updateTestHomeDisplay(id: number, homeDisplay: number, homeSort: number): Promise<TestItem> { return request(`/api/admin/tests/${id}/home-display`, { method: 'PUT', body: JSON.stringify({ homeDisplay, homeSort }) }) }
 export function getMiniappHome(): Promise<MiniappHome> { return request('/api/miniapp/home') }

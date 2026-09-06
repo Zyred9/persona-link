@@ -1,27 +1,46 @@
 Page({
+  data: {
+    accountVisible: true
+  },
+
   onShow() {
+    if (!this.data.accountVisible) {
+      this.setData({ accountVisible: true });
+    }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 1 });
     }
   },
 
-  goHistory() {
-    wx.navigateTo({ url: '/subpackages/account/pages/history/index' });
+  handleAccountViewChange(event) {
+    const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (tabBar) {
+      tabBar.setData({ selected: 1, hidden: !event.detail.atRoot });
+    }
   },
 
-  goMember() {
-    wx.navigateTo({ url: '/subpackages/account/pages/member/index' });
+  closeAccount() {
+    this.setData({ accountVisible: false });
   },
 
-  goFeedback() {
-    wx.navigateTo({ url: '/subpackages/account/pages/feedback/index' });
+  deactivateAccount() {
+    const account = this.selectComponent('#profile-account-center');
+    if (account && account.data.currentView !== 'profile') {
+      this.reopenAccountAfterLeave = true;
+      account.handleBack();
+    }
   },
 
-  goSettings() {
-    wx.navigateTo({ url: '/subpackages/account/pages/settings/index' });
-  },
-
-  goHome() {
+  clearAccount() {
+    if (this.reopenAccountAfterLeave) {
+      this.reopenAccountAfterLeave = false;
+      this.setData({ accountVisible: true });
+      return;
+    }
+    const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (tabBar) {
+      tabBar.setData({ selected: 0, hidden: false });
+    }
     wx.switchTab({ url: '/pages/home/index' });
   }
 });

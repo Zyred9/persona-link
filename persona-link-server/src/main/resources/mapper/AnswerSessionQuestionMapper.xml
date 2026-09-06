@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.AnswerSessionQuestionMapper">
+
+    <insert id="insertBatch">
+        INSERT INTO t_answer_session_question
+            (answer_session_id, question_id, sort_no, deleted)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.answerSessionId}, #{item.questionId}, #{item.sortNo}, 0)
+        </foreach>
+    </insert>
+
+    <insert id="copyFromSession">
+        INSERT INTO t_answer_session_question
+            (answer_session_id, question_id, sort_no, deleted)
+        SELECT #{targetSessionId}, question_id, sort_no, 0
+        FROM t_answer_session_question
+        WHERE answer_session_id = #{sourceSessionId}
+          AND deleted = 0
+        ORDER BY sort_no ASC
+    </insert>
+
+</mapper>

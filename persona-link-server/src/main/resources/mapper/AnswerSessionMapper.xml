@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.AnswerSessionMapper">
+
+    <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO t_answer_session
+            (answer_no, create_request_id, open_id, version_id, answer_type, answer_status, deleted)
+        VALUES
+            (#{answerNo}, #{createRequestId}, #{openId}, #{versionId}, #{answerType}, #{answerStatus}, #{deleted})
+    </insert>
+
+</mapper>
