@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.PageResponse;
 import com.personalink.server.dto.AuditLogQuery;
@@ -15,13 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/admin/content-audits")
+@RequiredArgsConstructor
 public class AdminContentAuditController {
 
     private final ContentService contentService;
-
-    public AdminContentAuditController(ContentService contentService) {
-        this.contentService = contentService;
-    }
 
     /**
      * 分页查询内容操作审计记录。

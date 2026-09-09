@@ -1,5 +1,7 @@
 package com.personalink.server.controller.app;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AnalyticsEventBatchRequest;
 import com.personalink.server.dto.AnalyticsEventBatchResponse;
 import com.personalink.server.dto.ApiResponse;
@@ -17,15 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/miniapp/events")
+@RequiredArgsConstructor
 public class MiniappAnalyticsController {
 
     private final AnalyticsService analyticsService;
     private final AuthService authService;
-
-    public MiniappAnalyticsController(AnalyticsService analyticsService, AuthService authService) {
-        this.analyticsService = analyticsService;
-        this.authService = authService;
-    }
 
     /**
      * 批量接收小程序行为事件。

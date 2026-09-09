@@ -22,6 +22,7 @@
     </view>
 
     <view class="profile-menu">
+      <button class="paper-card profile-row" bindtap="joinPair"><text>输入配对码</text><text class="profile-row__arrow">›</text></button>
       <button class="paper-card profile-row" data-view="history" bindtap="openAccountView">
         <text>测试记录</text>
         <text class="profile-row__hint">单人 / 双人</text>
@@ -40,38 +41,15 @@
 
 <block wx:elif="{{currentView === 'history'}}">
   <view class="paper-page history-page">
-    <page-state
-      wx:if="{{historyState === 'loading'}}"
-      type="loading"
-      title="测试记录正在加载"
-    ></page-state>
-
-    <page-state
-      wx:elif="{{historyState === 'error'}}"
-      type="error"
-      title="记录加载失败"
-      description="{{historyErrorDescription}}"
-      action-text="重新加载"
-      bind:action="retryHistory"
-    ></page-state>
-
-    <page-state
-      wx:elif="{{historyState === 'empty'}}"
-      type="empty"
-      title="还没有测试记录"
-      description="完成测试或创建配对后，记录会出现在这里。"
-      action-text="刷新一下"
-      bind:action="retryHistory"
-    ></page-state>
-
+    <view class="history-summary">
+      <view class="history-summary__item history-summary__item--active">单人测试 {{historyState === 'error' ? '加载失败' : total}}</view>
+      <view class="history-summary__item">双人配对 {{pairHistoryState === 'error' ? '加载失败' : pairTotal}}</view>
+    </view>
+    <text class="paper-section-title history-section-title">测试报告</text>
+    <page-state wx:if="{{historyState === 'loading'}}" type="loading" title="单人记录正在加载"></page-state>
+    <page-state wx:elif="{{historyState === 'error'}}" type="error" title="单人记录加载失败" description="{{historyErrorDescription}}" action-text="重新加载" bind:action="retrySingleHistory"></page-state>
+    <view wx:elif="{{historyState === 'empty'}}" class="history-pagination">还没有单人测试记录</view>
     <block wx:else>
-      <view class="history-summary" aria-label="单人测试 {{total}} 条">
-        <view class="history-summary__item history-summary__item--active">单人测试 {{total}}</view>
-        <view class="history-summary__item">双人配对 {{pairTotal}}</view>
-      </view>
-
-      <block wx:if="{{total > 0}}">
-        <text class="paper-section-title history-section-title">{{singleSectionTitle}}</text>
         <button
           wx:for="{{records}}"
           wx:key="reportId"
@@ -93,10 +71,19 @@
           </view>
           <view class="history-record__more" data-report-id="{{item.reportId}}" catchtap="deleteRecord">···</view>
         </button>
-      </block>
 
-      <block wx:if="{{pairTotal > 0}}">
-        <text class="paper-section-title history-section-title">{{pairSectionTitle}}</text>
+      <view class="history-pagination">
+        <button wx:if="{{historyMoreError}}" class="paper-button" bindtap="retrySingleHistory">{{historyMoreError}} · 点击重试</button>
+        <text wx:elif="{{historyLoadingMore}}">正在加载更多单人记录…</text>
+        <button wx:elif="{{historyHasMore}}" class="paper-button" bindtap="retrySingleHistory">加载更多单人记录</button>
+        <text wx:else>已加载全部单人记录</text>
+      </view>
+    </block>
+    <text class="paper-section-title history-section-title">双人配对</text>
+    <page-state wx:if="{{pairHistoryState === 'loading'}}" type="loading" title="双人记录正在加载"></page-state>
+    <page-state wx:elif="{{pairHistoryState === 'error'}}" type="error" title="双人记录加载失败" description="{{pairHistoryErrorDescription}}" action-text="重新加载" bind:action="retryPairHistory"></page-state>
+    <view wx:elif="{{pairHistoryState === 'empty'}}" class="history-pagination">还没有双人配对记录</view>
+    <block wx:else>
         <button
           wx:for="{{pairRecords}}"
           wx:key="pairSessionId"
@@ -111,7 +98,13 @@
             <text class="history-record__meta">{{item.meta}} · {{item.reportReady ? '查看报告' : '查看进度'}}</text>
           </view>
         </button>
-      </block>
+
+      <view class="history-pagination">
+        <button wx:if="{{pairHistoryMoreError}}" class="paper-button" bindtap="retryPairHistory">{{pairHistoryMoreError}} · 点击重试</button>
+        <text wx:elif="{{pairHistoryLoadingMore}}">正在加载更多双人记录…</text>
+        <button wx:elif="{{pairHistoryHasMore}}" class="paper-button" bindtap="retryPairHistory">加载更多双人记录</button>
+        <text wx:else>已加载全部双人记录</text>
+      </view>
     </block>
   </view>
 </block>
@@ -123,6 +116,7 @@
     <textarea
       class="paper-card feedback-input"
       value="{{feedbackContent}}"
+      disabled="{{feedbackSubmitting}}"
       maxlength="500"
       placeholder="请填写反馈内容（必填）"
       placeholder-class="feedback-input__placeholder"
@@ -133,7 +127,7 @@
       提交成功后会清空已填写内容；提交失败时保留已填写内容，可重试。
     </view>
 
-    <button class="paper-button paper-button--primary feedback-submit" bindtap="submitFeedback">提交反馈</button>
+    <button class="paper-button paper-button--primary feedback-submit" loading="{{feedbackSubmitting}}" disabled="{{feedbackSubmitting}}" bindtap="submitFeedback">{{feedbackSubmitting ? '正在提交' : '提交反馈'}}</button>
   </view>
 </block>
 

@@ -22,6 +22,10 @@ Page({
     wx.navigateBack();
   },
 
+  handleContext(event) {
+    this.setData({ pageTitle: event.detail.answerType === 2 ? '双人测试' : '单人测试' });
+  },
+
   handleFinish(event) {
     wx.redirectTo({
       url: event.detail.url,

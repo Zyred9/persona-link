@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.entity.BusinessSessionEntity;
 import com.personalink.server.exception.BusinessException;
 import com.personalink.server.dto.MiniappSessionContext;
@@ -18,6 +20,7 @@ import java.util.Objects;
  * 小程序登录与业务会话校验服务。
  */
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private static final int SESSION = 2;
@@ -26,12 +29,6 @@ public class AuthService {
 
     private final WechatCode2SessionClient wechatCode2SessionClient;
     private final BusinessSessionService businessSessionService;
-
-    public AuthService(WechatCode2SessionClient wechatCode2SessionClient,
-                       BusinessSessionService businessSessionService) {
-        this.wechatCode2SessionClient = wechatCode2SessionClient;
-        this.businessSessionService = businessSessionService;
-    }
 
     public WechatLoginResponse login(WechatLoginRequest request) {
         String openId = this.wechatCode2SessionClient.exchange(request.code());

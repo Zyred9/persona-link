@@ -1,5 +1,7 @@
 package com.personalink.server.controller.app;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.WechatLoginRequest;
 import com.personalink.server.dto.WechatLoginResponse;
@@ -15,13 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/miniapp/auth")
+@RequiredArgsConstructor
 public class MiniappAuthController {
 
     private final AuthService authService;
-
-    public MiniappAuthController(AuthService authService) {
-        this.authService = authService;
-    }
 
     /**
      * 使用微信一次性登录凭证换取业务会话。

@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.personalink.server.ai.ImageGenerationWorker;
@@ -26,6 +28,7 @@ import static com.personalink.server.enums.ImageGenerationTaskStatus.*;
 
 /** 双图任务创建、幂等重试和采用；付费请求在事务提交后的 worker 中执行。 */
 @Service
+@RequiredArgsConstructor
 public class AiImageTaskServiceImpl extends ServiceImpl<ImageGenerationTaskMapper, ImageGenerationTaskEntity>
         implements AiImageTaskService {
     private static final int NORMAL = 0;
@@ -34,15 +37,6 @@ public class AiImageTaskServiceImpl extends ServiceImpl<ImageGenerationTaskMappe
     private final ImageGenerationWorker worker;
     private final TransactionTemplate transactionTemplate;
     private final OssConfiguration ossConfiguration;
-
-    public AiImageTaskServiceImpl(ContentService contentService, ImageProviderClient providerClient,
-            ImageGenerationWorker worker, TransactionTemplate transactionTemplate, OssConfiguration ossConfiguration) {
-        this.contentService = contentService;
-        this.providerClient = providerClient;
-        this.worker = worker;
-        this.transactionTemplate = transactionTemplate;
-        this.ossConfiguration = ossConfiguration;
-    }
 
     @Override
     public ImageGenerationTaskResponse create(Long testId, ImageGenerationStartRequest request, Long operatorId) {

@@ -2,14 +2,12 @@
 
 <view class="paper-page legal-page">
   <text class="legal-title">{{document.title}}</text>
-  <text class="legal-kicker">{{document.kicker}}</text>
+  <text wx:if="{{state === 'ready'}}" class="legal-kicker">版本 V{{document.version}} · {{document.updatedAt}}</text>
 
   <view class="paper-card legal-card">
-    <text
-      wx:for="{{document.paragraphs}}"
-      wx:key="index"
-      class="legal-paragraph"
-    >{{item}}</text>
+    <rich-text wx:if="{{state === 'ready'}}" class="legal-paragraph" nodes="{{contentNodes}}" user-select="{{true}}"></rich-text>
+    <text wx:elif="{{state === 'loading'}}">正在加载协议…</text>
+    <view wx:else><text>{{error}}</text><button class="paper-button" bindtap="loadDocument">重新加载</button></view>
   </view>
 
 </view>

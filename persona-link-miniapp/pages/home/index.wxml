@@ -5,7 +5,7 @@
     <view wx:if="{{currentAssessment}}" class="paper-card continue-card">
       <view><text class="continue-card__title">继续上次测试</text><text class="continue-card__meta">{{currentAssessment.title}} · 已完成 {{currentAssessment.completedCount}}/{{currentAssessment.totalCount}}</text></view>
       <button class="paper-button paper-button--primary" bindtap="continueAssessment">继续</button>
-      <button class="paper-button" bindtap="restartAssessment">重新开始</button>
+      <button wx:if="{{currentAssessment.canRestart}}" class="paper-button" bindtap="restartAssessment">重新开始</button>
     </view>
     <view class="home-hero">
       <image class="home-title-image" src="/assets/images/home-title.png" mode="widthFix"></image>
@@ -96,7 +96,7 @@
   bind:beforeleave="deactivateContainer"
   bind:afterleave="clearContainer"
 >
-  <scroll-view class="{{containerMode === 'quiz' ? 'home-quiz-scroll' : 'home-detail-scroll'}}" scroll-y>
+  <scroll-view class="{{containerMode === 'quiz' ? 'home-quiz-scroll' : 'home-detail-scroll'}}" scroll-y bindscrolltolower="loadMoreAccountRecords">
     <account-center
       id="home-account-center"
       wx:if="{{containerMode === 'account'}}"
@@ -106,7 +106,7 @@
     ></account-center>
     <block wx:elif="{{containerMode === 'quiz'}}">
       <app-nav-bar
-        title="单人测试"
+        title="{{activeTestType === 2 ? '双人测试' : '单人测试'}}"
         show-back="{{true}}"
         custom-back="{{true}}"
         bind:back="closeQuiz"

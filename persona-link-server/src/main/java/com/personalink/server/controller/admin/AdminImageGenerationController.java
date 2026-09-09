@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AdminSessionContext;
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.ImageGenerationStartRequest;
@@ -16,10 +18,9 @@ import org.springframework.web.bind.annotation.*;
 @Validated
 @RestController
 @RequestMapping("/api/admin")
+@RequiredArgsConstructor
 public class AdminImageGenerationController {
     private final AiImageTaskService service;
-    public AdminImageGenerationController(AiImageTaskService service) { this.service = service; }
-
     /**
      * 创建异步双图任务；通过 detail 接口继续查询进度。
      * @param testId 题型 ID

@@ -12,7 +12,7 @@ const operatorId = ref('')
 const notice = ref('')
 const selected = ref<AuditLog | null>(null)
 
-const bizLabels: Record<number, string> = { 1: '题型', 2: '版本及版本内容', 3: '首页配置' }
+const bizLabels: Record<number, string> = { 1: '题型', 2: '版本及版本内容', 3: '首页配置', 4: '广告配置' }
 const actionLabels: Record<number, string> = { 1: '新增', 2: '修改', 3: '状态变更', 4: '发布', 5: '下线', 6: '删除', 7: '预约发布', 8: '取消预约', 9: '归档' }
 
 async function load() {

@@ -251,6 +251,7 @@ onMounted(load)
 .test-info small{color:#777}
 .dirty-mark{display:inline-block;margin-left:5px;padding:2px 6px;border-radius:99px;background:#fff0e8;color:#d54f3e!important;font-size:11px;font-weight:800}
 .test-row label{display:grid;gap:6px;font-size:13px;font-weight:700}
+.test-row>label,.test-row>button{align-self:end}
 .test-row select,.test-row input,.test-row button{height:38px;padding:0 10px;border:1.5px solid #222;border-radius:9px;background:#fff;font:inherit}
 .test-row button{background:#ff654d;color:#fff;cursor:pointer}
 .test-row button:disabled,.test-row select:disabled,.test-row input:disabled{opacity:.45;cursor:not-allowed}

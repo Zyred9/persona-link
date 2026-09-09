@@ -1,5 +1,7 @@
 package com.personalink.server.aspect;
 
+import lombok.RequiredArgsConstructor;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -26,16 +28,13 @@ import java.util.Map;
  */
 @Aspect
 @Component
+@RequiredArgsConstructor
 public class ControllerLogAspect {
 
     private static final Logger LOG = LoggerFactory.getLogger(ControllerLogAspect.class);
     private static final String MASKED = "***";
 
     private final ObjectMapper objectMapper;
-
-    public ControllerLogAspect(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 记录 Controller 方法调用。
@@ -47,15 +46,21 @@ public class ControllerLogAspect {
     @Around("execution(public * com.personalink.server.controller..*(..))")
     public Object logController(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        String parameters = this.serializeParameters(signature.getParameterNames(), joinPoint.getArgs());
         ServletRequestAttributes requestAttributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         HttpServletRequest request = requestAttributes == null ? null : requestAttributes.getRequest();
         String requestPath = request == null ? signature.toShortString() : request.getRequestURI();
         String requestMethod = request == null ? "UNKNOWN" : request.getMethod();
+        // 小程序请求可能携带答案、邀请信息或报告；整段排除，避免新增字段绕过脱敏。
+        String applicationPath = request == null ? requestPath
+                : requestPath.substring(request.getContextPath().length());
+        boolean privateContent = applicationPath.startsWith("/api/miniapp/")
+                || applicationPath.startsWith("/api/admin/feedbacks");
+        String parameters = privateContent ? MASKED
+                : this.serializeParameters(signature.getParameterNames(), joinPoint.getArgs());
         try {
             Object result = joinPoint.proceed();
             LOG.info("[Controller] 请求路径：{}，方式：{}，入参：{}，出参：{}",
-                    requestPath, requestMethod, parameters, this.serializeValue(result, false));
+                    requestPath, requestMethod, parameters, privateContent ? MASKED : this.serializeValue(result, false));
             return result;
         } catch (Throwable throwable) {
             LOG.error("[Controller] 请求路径：{}，方式：{}，入参：{}，出参：异常",

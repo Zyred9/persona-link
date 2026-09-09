@@ -1,5 +1,6 @@
 const { authenticatedRequestData } = require('../../../../utils/request');
 const { trackEvent } = require('../../../../utils/analytics');
+const { createReportAccess } = require('../../../../utils/report-access');
 
 Page({
   data: {
@@ -13,16 +14,18 @@ Page({
     this.loadReport();
   },
 
-  async loadReport() {
+  async loadReport(watch = false) {
     if (!this.pairSessionId) {
       this.setData({ state: 'error', errorDescription: '配对参数缺失，请从配对进度页重新进入。' });
       return;
     }
-    try {
+    if (!this.reportAccess) this.reportAccess = createReportAccess(this, `/api/miniapp/pairs/${encodeURIComponent(this.pairSessionId)}/report`);
+    return this.reportAccess.run(async (active) => {
       const [report, pair] = await Promise.all([
         authenticatedRequestData({ url: `/api/miniapp/pairs/${encodeURIComponent(this.pairSessionId)}/report` }),
         authenticatedRequestData({ url: `/api/miniapp/pairs/${encodeURIComponent(this.pairSessionId)}` })
       ]);
+      if (!active()) return;
       const snapshot = report.resultSnapshot || {};
       const mine = pair.myRole === 'INITIATOR' ? snapshot.initiatorResult : snapshot.partnerResult;
       const partner = pair.myRole === 'INITIATOR' ? snapshot.partnerResult : snapshot.initiatorResult;
@@ -43,10 +46,14 @@ Page({
           partnerName: partner?.resultName || '暂无结果'
         }
       });
-    } catch (error) {
-      this.setData({ state: 'error', errorDescription: error.message || '双人报告加载失败' });
-    }
+    }, watch);
   },
+
+  watchAd() { return this.loadReport(true); },
+
+  onUnload() { if (this.reportAccess) this.reportAccess.dispose(); },
+  onHide() { if (this.reportAccess) this.reportAccess.setHidden(true); },
+  onShow() { if (this.reportAccess) this.reportAccess.setHidden(false); },
 
   onShareAppMessage() {
     trackEvent(5, '/subpackages/pair/pages/result/index', this.pairSessionId);

@@ -31,7 +31,7 @@
         wx:key="optionId"
         class="{{item.selected ? 'quiz-option quiz-option--selected' : 'quiz-option'}}"
         data-option-id="{{item.optionId}}"
-        disabled="{{saving}}"
+        disabled="{{saving || submissionPending}}"
         bindtap="chooseOption"
       >
         <text>{{item.optionCode}}. {{item.optionText}}</text>
@@ -40,13 +40,13 @@
     </view>
 
     <view class="quiz-actions">
-      <button class="paper-button quiz-actions__button" disabled="{{saving}}" bindtap="goPrevious">上一题</button>
+      <button class="paper-button quiz-actions__button" disabled="{{saving || submissionPending}}" bindtap="goPrevious">上一题</button>
       <button
         class="paper-button paper-button--primary quiz-actions__button"
         loading="{{saving}}"
         disabled="{{saving}}"
         bindtap="continueTest"
-      >{{saving ? '保存中' : (isLast ? '查看结果' : '继续')}}</button>
+      >{{saving ? '保存中' : (submissionPending ? '重试查看结果' : (isLast ? '查看结果' : (!required && selectedOptionIds.length === 0 ? '跳过' : '继续')))}}</button>
     </view>
   </block>
 </view>

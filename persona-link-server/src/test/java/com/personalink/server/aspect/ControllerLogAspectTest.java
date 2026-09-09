@@ -19,12 +19,78 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doReturn;
 
 class ControllerLogAspectTest {
 
     private static final String MASKED_VALUE = "***";
+
+    @Test
+    void assessmentAndReportBodiesStayOutOfSuccessAndFailureLogs() throws Throwable {
+        var aspect = new ControllerLogAspect(new ObjectMapper());
+        var point = mock(ProceedingJoinPoint.class);
+        var signature = mock(MethodSignature.class);
+        when(point.getSignature()).thenReturn(signature);
+        when(signature.getParameterNames()).thenReturn(new String[]{"request"});
+        when(point.getArgs()).thenReturn(new Object[]{Map.of("optionIds", "private-choice",
+                "unrecognizedFutureField", "private-payload")});
+        var response = ApiResponse.success(Map.of("resultSnapshot", "private-report",
+                "selectedOptionIds", "private-choice"));
+        var failure = new IllegalStateException("operation failed");
+        Logger logger = (Logger) LoggerFactory.getLogger(ControllerLogAspect.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            for (String path : new String[]{"/api/miniapp/assessments/1/answers",
+                    "/api/miniapp/reports/1", "/api/miniapp/pairs/1/report"}) {
+                var request = new MockHttpServletRequest("POST", "/persona" + path);
+                request.setContextPath("/persona");
+                RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+                doReturn(response).doThrow(failure).when(point).proceed();
+                assertSame(response, aspect.logController(point));
+                assertSame(failure, assertThrows(IllegalStateException.class, () -> aspect.logController(point)));
+            }
+            String logs = appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                    .reduce("", String::concat);
+            assertFalse(logs.contains("private-choice"));
+            assertFalse(logs.contains("private-payload"));
+            assertFalse(logs.contains("private-report"));
+            assertTrue(appender.list.stream().anyMatch(event -> event.getThrowableProxy() != null));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
+    void feedbackBodyNeverAppearsInRequestOrResponseLogs() throws Throwable {
+        var aspect = new ControllerLogAspect(new ObjectMapper());
+        var point = mock(ProceedingJoinPoint.class);
+        var signature = mock(MethodSignature.class);
+        when(point.getSignature()).thenReturn(signature);
+        when(point.getArgs()).thenReturn(new Object[]{Map.of("content", "private-report-text")});
+        when(point.proceed()).thenReturn(ApiResponse.success(Map.of("content", "private-report-text")));
+        Logger logger = (Logger) LoggerFactory.getLogger(ControllerLogAspect.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            for (String path : new String[]{"/api/miniapp/feedbacks", "/api/admin/feedbacks"}) {
+                RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest("POST", path)));
+                aspect.logController(point);
+            }
+            assertFalse(appender.list.toString().contains("private-report-text"));
+            assertTrue(appender.list.stream().allMatch(event -> event.getFormattedMessage().contains("***")));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+            logger.detachAppender(appender);
+        }
+    }
 
     @Test
     void logControllerShouldMaskSensitiveRequestAndResponseValues() throws Throwable {
@@ -46,7 +112,7 @@ class ControllerLogAspectTest {
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
-        MockHttpServletRequest httpRequest = new MockHttpServletRequest("POST", "/api/miniapp/auth/wechat");
+        MockHttpServletRequest httpRequest = new MockHttpServletRequest("POST", "/api/admin/auth/login");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(httpRequest));
 
         try {
@@ -57,7 +123,7 @@ class ControllerLogAspectTest {
         }
 
         String logs = appender.list.stream().map(ILoggingEvent::getFormattedMessage).reduce("", String::concat);
-        assertTrue(logs.contains("请求路径：/api/miniapp/auth/wechat"));
+        assertTrue(logs.contains("请求路径：/api/admin/auth/login"));
         assertTrue(logs.contains("方式：POST"));
         assertTrue(logs.contains("入参："));
         assertTrue(logs.contains("出参："));

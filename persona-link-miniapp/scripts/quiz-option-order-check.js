@@ -31,6 +31,7 @@ async function main() {
       ...definition.methods,
       data: { ...definition.data },
       answerSessionId: 'session-1',
+      triggerEvent() {},
       setData(patch) { Object.assign(this.data, patch); }
     };
     instance.applyAssessment({ questions: [question, { ...question, questionId: 'question-2' }] });

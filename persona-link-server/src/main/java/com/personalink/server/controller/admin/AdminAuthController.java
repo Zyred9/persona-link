@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.AdminLoginRequest;
 import com.personalink.server.dto.AdminLoginResponse;
@@ -18,13 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/admin/auth")
+@RequiredArgsConstructor
 public class AdminAuthController {
 
     private final AdminAuthService adminAuthService;
-
-    public AdminAuthController(AdminAuthService adminAuthService) {
-        this.adminAuthService = adminAuthService;
-    }
 
     /**
      * 后台账号登录。

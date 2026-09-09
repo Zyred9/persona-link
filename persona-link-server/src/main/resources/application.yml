@@ -51,7 +51,8 @@ mybatis-plus:
 
 logging:
   level:
-    com.personalink.server.mapper: DEBUG
+    # SQL 参数包含用户答案、报告和业务身份，默认不输出参数及查询结果。
+    com.personalink.server.mapper: INFO
 oss:
   domain: ${OSS_DOMAIN:https://pgcloud.aitici.com}
   endpoint: ${OSS_ENDPOINT:https://oss-cn-shanghai.aliyuncs.com}

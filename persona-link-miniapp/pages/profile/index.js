@@ -23,6 +23,12 @@ Page({
     this.setData({ accountVisible: false });
   },
 
+  loadMoreAccountRecords() {
+    if (!this.data.accountVisible) return;
+    const account = this.selectComponent('#profile-account-center');
+    if (account) account.loadMoreRecords();
+  },
+
   deactivateAccount() {
     const account = this.selectComponent('#profile-account-center');
     if (account && account.data.currentView !== 'profile') {

@@ -1,5 +1,7 @@
 package com.personalink.server.ai;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.personalink.server.dto.AiGeneratedDimension;
 import com.personalink.server.dto.AiGeneratedOption;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 
 /** 串行生成单个 AI 题库任务的异步 Worker。 */
 @Component
+@RequiredArgsConstructor
 public class AiQuestionGenerationWorker {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AiQuestionGenerationWorker.class);
@@ -52,16 +55,6 @@ public class AiQuestionGenerationWorker {
     private final ContentService contentService;
     private final DeepSeekClient deepSeekClient;
     private final TransactionTemplate transactionTemplate;
-
-    public AiQuestionGenerationWorker(AiGenerationTaskMapper taskMapper,
-                                      ContentService contentService,
-                                      DeepSeekClient deepSeekClient,
-                                      TransactionTemplate transactionTemplate) {
-        this.taskMapper = taskMapper;
-        this.contentService = contentService;
-        this.deepSeekClient = deepSeekClient;
-        this.transactionTemplate = transactionTemplate;
-    }
 
     /**
      * 异步执行生成任务；同一任务通过数据库状态原子抢占。

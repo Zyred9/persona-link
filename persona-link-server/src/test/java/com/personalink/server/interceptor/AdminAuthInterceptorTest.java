@@ -16,6 +16,38 @@ import static org.mockito.Mockito.when;
 class AdminAuthInterceptorTest {
 
     @Test
+    void feedbackAndLegalRequireAdministratorEvenForReads() {
+        AdminAuthService auth = mock(AdminAuthService.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<AdminAuthService> provider = mock(ObjectProvider.class);
+        when(provider.getObject()).thenReturn(auth);
+        var interceptor = new AdminAuthInterceptor(provider);
+        for (String path : new String[]{"/api/admin/feedbacks", "/api/admin/legal-documents", "/api/admin/legal-documents/1"}) {
+            var request = new MockHttpServletRequest("GET", path);
+            request.addHeader("Authorization", path);
+            assertTrue(interceptor.preHandle(request, new MockHttpServletResponse(), new Object()));
+            verify(auth).requireAdminSession(path);
+        }
+        org.mockito.Mockito.verifyNoMoreInteractions(auth);
+    }
+
+    @Test
+    void adConfigReadAndWriteRequireAdministrator() {
+        AdminAuthService auth = mock(AdminAuthService.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<AdminAuthService> provider = mock(ObjectProvider.class);
+        when(provider.getObject()).thenReturn(auth);
+        AdminAuthInterceptor interceptor = new AdminAuthInterceptor(provider);
+        for (String method : new String[]{"GET", "PUT"}) {
+            MockHttpServletRequest request = new MockHttpServletRequest(method, "/api/admin/ad-config");
+            request.addHeader("Authorization", "Bearer " + method);
+            assertTrue(interceptor.preHandle(request, new MockHttpServletResponse(), new Object()));
+            verify(auth).requireAdminSession("Bearer " + method);
+        }
+        org.mockito.Mockito.verifyNoMoreInteractions(auth);
+    }
+
+    @Test
     void shouldRequireReadSessionForGetAndWritableSessionForPost() {
         AdminAuthService adminAuthService = mock(AdminAuthService.class);
         @SuppressWarnings("unchecked")

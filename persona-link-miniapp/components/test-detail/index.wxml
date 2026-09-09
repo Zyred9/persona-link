@@ -40,6 +40,7 @@
         disabled="{{starting}}"
         bindtap="startAssessment"
       >和 TA 一起测</button>
+      <button class="paper-button" bindtap="joinPair">已有配对码，加入 TA</button>
     </view>
   </block>
 
@@ -57,7 +58,7 @@
 
     <view class="detail-rules paper-card">
       <text>1 一题一屏，选择后自动下一题</text>
-      <text>2 全部测试与报告免费</text>
+      <text>2 完成测试后按页面提示查看报告</text>
       <text>3 随时退出，可暂存或放弃本次作答</text>
     </view>
 

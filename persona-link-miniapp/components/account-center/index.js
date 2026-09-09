@@ -1,6 +1,9 @@
-const { authenticatedRequestData } = require('../../utils/request');
+const { authenticatedRequestData, createIdempotencyKey } = require('../../utils/request');
 
-const PAIR_SESSION_KEY = 'personaPairSession';
+const HISTORY_SECTIONS = {
+  single: { prefix: 'history', records: 'records', total: 'total', id: 'reportId', url: 'reports' },
+  pair: { prefix: 'pairHistory', records: 'pairRecords', total: 'pairTotal', id: 'pairSessionId', url: 'pairs' }
+};
 const PROFILE_VIEW = 'profile';
 const VIEW_TITLES = {
   profile: '我的',
@@ -33,6 +36,25 @@ function formatGeneratedAt(value) {
     : `${generatedAt.getFullYear()}.${pad(generatedAt.getMonth() + 1)}.${pad(generatedAt.getDate())}`;
 }
 
+function formatHistoryRecord(record, kind) {
+  if (kind === 'single') return Object.assign({}, record, {
+    reportId: String(record.reportId),
+    resultName: record.resultName || record.resultCode || '测试结果',
+    generatedAt: formatGeneratedAt(record.generatedAt),
+    versionLabel: record.versionNo ? `V${record.versionNo}` : ''
+  });
+  const status = Number(record.pairStatus);
+  const labels = { 1: '等待对方完成', 2: '对方作答中', 3: '报告生成中', 4: '双人报告已生成', 5: '本次配对已失效', 6: '本次配对已失效' };
+  return Object.assign({}, record, {
+    pairSessionId: String(record.pairSessionId),
+    resultText: labels[status] || '查看配对进度',
+    meta: `${formatGeneratedAt(record.createdAt)}${record.versionNo ? ` · V${record.versionNo}` : ''}`,
+    reportReady: status === 4,
+    waiting: status < 4,
+    invalid: status === 5 || status === 6
+  });
+}
+
 Component({
   options: {
     styleIsolation: 'apply-shared'
@@ -58,14 +80,21 @@ Component({
     currentView: PROFILE_VIEW,
     viewTitle: VIEW_TITLES[PROFILE_VIEW],
     historyState: 'loading',
+    historyLoadingMore: false,
+    historyHasMore: false,
+    historyMoreError: '',
+    pairHistoryState: 'loading',
+    pairHistoryLoadingMore: false,
+    pairHistoryHasMore: false,
+    pairHistoryMoreError: '',
+    pairHistoryErrorDescription: '',
     records: [],
     pairRecords: [],
     total: 0,
     pairTotal: 0,
-    singleSectionTitle: '测试报告',
-    pairSectionTitle: '双人配对',
     historyErrorDescription: '暂时无法加载测试记录，请稍后重试。',
     feedbackContent: '',
+    feedbackSubmitting: false,
     versionLabel: ''
   },
 
@@ -76,8 +105,21 @@ Component({
     },
     detached() {
       this.componentAttached = false;
+      this.feedbackEpoch = (this.feedbackEpoch || 0) + 1;
       this.historyRequestVersion = (this.historyRequestVersion || 0) + 1;
       this.clearFeedbackRedirect();
+    }
+  },
+
+  pageLifetimes: {
+    hide() {
+      this.pageHidden = true;
+      this.feedbackEpoch = (this.feedbackEpoch || 0) + 1;
+      this.clearFeedbackRedirect();
+    },
+    show() {
+      this.pageHidden = false;
+      this.setData({ feedbackSubmitting: false });
     }
   },
 
@@ -88,6 +130,7 @@ Component({
         this.historyRequestVersion = (this.historyRequestVersion || 0) + 1;
       }
       if (this.data.currentView === 'feedback' && 'feedback' !== currentView) {
+        this.feedbackEpoch = (this.feedbackEpoch || 0) + 1;
         this.clearFeedbackRedirect();
       }
       this.setData({
@@ -109,7 +152,7 @@ Component({
         return;
       }
       if ('feedback' === view) {
-        this.setData({ feedbackContent: '' });
+        this.setData({ feedbackSubmitting: false });
         return;
       }
       if ('settings' === view) {
@@ -134,87 +177,75 @@ Component({
       this.setCurrentView(PROFILE_VIEW);
     },
 
-    async loadRecords() {
-      const requestVersion = (this.historyRequestVersion || 0) + 1;
-      this.historyRequestVersion = requestVersion;
-      this.setData({ historyState: 'loading' });
-      try {
-        const storedPair = wx.getStorageSync(PAIR_SESSION_KEY) || {};
-        const [page, pairRecord] = await Promise.all([
-          authenticatedRequestData({ url: '/api/miniapp/reports?page=1&size=20' }),
-          this.loadPairRecord(storedPair).catch(() => null)
-        ]);
-        if (!this.componentAttached
-          || 'history' !== this.data.currentView
-          || requestVersion !== this.historyRequestVersion) {
-          return;
-        }
-        const records = page && Array.isArray(page.records)
-          ? page.records.map((record) => Object.assign({}, record, {
-            reportId: String(record.reportId),
-            resultName: record.resultName || record.resultCode || '测试结果',
-            generatedAt: formatGeneratedAt(record.generatedAt),
-            versionLabel: record.versionNo ? `V${record.versionNo}` : ''
-          }))
-          : [];
-        const pairRecords = pairRecord ? [pairRecord] : [];
-        this.setData({
-          historyState: records.length > 0 || pairRecords.length > 0 ? 'ready' : 'empty',
-          records,
-          pairRecords,
-          total: page ? page.total : 0,
-          pairTotal: pairRecords.length,
-          singleSectionTitle: records[0] && records[0].generatedAt.startsWith('今天') ? '今天' : '测试报告',
-          pairSectionTitle: pairRecords.some((record) => record.waiting)
-            ? '进行中'
-            : (pairRecords.some((record) => record.invalid) ? '已失效' : '已完成')
-        });
-      } catch (error) {
-        if (!this.componentAttached
-          || 'history' !== this.data.currentView
-          || requestVersion !== this.historyRequestVersion) {
-          return;
-        }
-        this.setData({
-          historyState: 'error',
-          historyErrorDescription: error.message || '测试记录加载失败'
-        });
-      }
+    loadRecords() {
+      this.historyRequestVersion = (this.historyRequestVersion || 0) + 1;
+      return Promise.all([this.loadHistoryPage(true, 'single'), this.loadHistoryPage(true, 'pair')]);
     },
 
-    async loadPairRecord(storedPair) {
-      if (!storedPair.pairSessionId) return null;
-      const pairSessionId = String(storedPair.pairSessionId);
-      const pair = await authenticatedRequestData({
-        url: `/api/miniapp/pairs/${encodeURIComponent(pairSessionId)}`
-      });
-      const pairStatus = Number(pair.pairStatus);
-      let resultText = '等待对方完成';
-      if (2 === pairStatus) resultText = '对方作答中';
-      if (3 === pairStatus) resultText = '报告生成中';
-      if (4 === pairStatus) resultText = '双人报告已生成';
-      if (5 === pairStatus || 6 === pairStatus) resultText = '本次配对已失效';
-      let generatedAt = '';
-      if (4 === pairStatus) {
-        const report = await authenticatedRequestData({
-          url: `/api/miniapp/pairs/${encodeURIComponent(pairSessionId)}/report`
+    loadMoreRecords() {
+      return Promise.all(['single', 'pair'].map((kind) => {
+        const section = HISTORY_SECTIONS[kind];
+        if (this.data[section.prefix + 'State'] !== 'ready' || !this.data[section.prefix + 'HasMore']) return;
+        return this.loadHistoryPage(false, kind);
+      }));
+    },
+
+    retryPairHistory() {
+      return this.loadHistoryPage(this.data.pairHistoryState === 'error', 'pair');
+    },
+
+    retrySingleHistory() {
+      return this.loadHistoryPage(this.data.historyState === 'error', 'single');
+    },
+
+    async loadHistoryPage(reset, kind = 'single') {
+      if (!this.componentAttached || this.data.currentView !== 'history') return;
+      const section = HISTORY_SECTIONS[kind];
+      const prefix = section.prefix;
+      if (!reset && this[prefix + 'PageLoading']) return;
+      const epoch = this.historyRequestVersion;
+      const token = {};
+      this[prefix + 'Request'] = token;
+      const active = () => this.componentAttached && this.data.currentView === 'history'
+        && epoch === this.historyRequestVersion && token === this[prefix + 'Request'];
+      const pageNumber = reset ? 1 : this[prefix + 'Page'] + 1;
+      this[prefix + 'PageLoading'] = true;
+      this.setData(reset
+        ? { [prefix + 'State']: 'loading', [prefix + 'LoadingMore']: false, [prefix + 'HasMore']: false, [prefix + 'MoreError']: '' }
+        : { [prefix + 'LoadingMore']: true, [prefix + 'MoreError']: '' });
+      try {
+        const page = await authenticatedRequestData({ url: `/api/miniapp/${section.url}?page=${pageNumber}&size=20` });
+        if (!active()) return;
+        if (!page || !Array.isArray(page.records)) throw new Error('测试记录数据异常，请重试');
+        const seen = new Set(reset ? [] : this.data[section.records].map((record) => record[section.id]));
+        const additions = page.records.filter((record) => {
+          const id = String(record[section.id]);
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        }).map((record) => formatHistoryRecord(record, kind));
+        // 两个分区都保持服务端时间、ID 倒序，不按展示日期重排。
+        const records = reset ? additions : this.data[section.records].concat(additions);
+        this[prefix + 'Page'] = pageNumber;
+        this.setData({
+          [prefix + 'State']: records.length > 0 ? 'ready' : 'empty',
+          [section.records]: records,
+          [section.total]: Number(page.total) || 0,
+          [prefix + 'HasMore']: page.records.length > 0 && pageNumber * 20 < Number(page.total)
         });
-        generatedAt = formatGeneratedAt(report.generatedAt);
-        const snapshot = report.resultSnapshot || {};
-        const roleName = snapshot.roleName
-          || (snapshot.summary ? (snapshot.summary.includes('较为接近') ? '默契搭子' : '互补搭子') : '');
-        resultText = roleName ? `关系角色：${roleName}` : resultText;
+      } catch (error) {
+        if (!active()) return;
+        this.setData(reset ? {
+          [prefix + 'State']: 'error',
+          [prefix + 'ErrorDescription']: error.message || '测试记录加载失败'
+        } : { [prefix + 'MoreError']: error.message || '加载更多失败，请重试' });
+      } finally {
+        // 刷新、删除或切换页面后，旧请求不能解除新请求的加载锁。
+        if (active()) {
+          this[prefix + 'PageLoading'] = false;
+          this.setData({ [prefix + 'LoadingMore']: false });
+        }
       }
-      return {
-        pairSessionId,
-        pairCode: storedPair.pairCode || '',
-        title: '双人关系角色测试',
-        resultText,
-        meta: generatedAt || (storedPair.pairCode ? `配对码 ${storedPair.pairCode}` : '查看配对进度'),
-        reportReady: 4 === pairStatus,
-        waiting: pairStatus < 4,
-        invalid: 5 === pairStatus || 6 === pairStatus
-      };
     },
 
     handleRecordTap(event) {
@@ -260,20 +291,35 @@ Component({
       });
     },
 
-    retryHistory() {
-      this.loadRecords();
-    },
-
     handleFeedbackInput(event) {
+      if (this.data.feedbackSubmitting) return;
       this.setData({ feedbackContent: event.detail.value });
     },
 
-    submitFeedback() {
+    async submitFeedback() {
+      if (this.data.feedbackSubmitting) return;
       const content = this.data.feedbackContent.trim();
-      if (!content) {
-        wx.showToast({ title: '请填写反馈内容', icon: 'none' });
+      if (!content || content.length > 500) {
+        wx.showToast({ title: content ? '反馈不能超过500字' : '请填写反馈内容', icon: 'none' });
         return;
       }
+      if (!this.feedbackRequest || this.feedbackRequest.content !== content) {
+        this.feedbackRequest = { requestId: createIdempotencyKey('feedback'), content };
+      }
+      const epoch = this.feedbackEpoch || 0;
+      const active = () => this.componentAttached && !this.pageHidden && this.data.currentView === 'feedback'
+        && epoch === (this.feedbackEpoch || 0);
+      this.setData({ feedbackSubmitting: true });
+      try {
+        await authenticatedRequestData({ url: '/api/miniapp/feedbacks', method: 'POST', data: this.feedbackRequest });
+      } catch (error) {
+        if (active()) wx.showToast({ title: error.message || '提交失败，请重试', icon: 'none' });
+        return;
+      } finally {
+        if (active()) this.setData({ feedbackSubmitting: false });
+      }
+      if (!active()) return;
+      this.feedbackRequest = null;
       this.setData({ feedbackContent: '' });
       wx.showToast({ title: '提交成功', icon: 'success' });
       this.clearFeedbackRedirect();
@@ -306,6 +352,10 @@ Component({
 
     openPrivacy() {
       wx.navigateTo({ url: '/subpackages/account/pages/privacy/index' });
+    },
+
+    joinPair() {
+      wx.navigateTo({ url: '/subpackages/pair/pages/join/index' });
     },
 
     openLegal(event) {

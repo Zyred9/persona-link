@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AssetResponse;
 import com.personalink.server.dto.AssetItemResponse;
 import com.personalink.server.dto.ApiResponse;
@@ -20,13 +22,10 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/admin/assets")
+@RequiredArgsConstructor
 public class AdminAssetController {
 
     private final LocalAssetService localAssetService;
-
-    public AdminAssetController(LocalAssetService localAssetService) {
-        this.localAssetService = localAssetService;
-    }
 
     /**
      * 上传题型 Icon 或封面图。

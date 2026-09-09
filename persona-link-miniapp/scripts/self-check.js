@@ -198,7 +198,7 @@ assert(profileSource.includes('reopenAccountAfterLeave'), '我的页子视图未
     path.join(root, `subpackages/account/pages/${view}/index.wxml`),
     'utf8'
   );
-  assert(wrapper.includes(`<account-center initial-view="${view}">`), `账户页未复用共享组件：${view}`);
+  assert(new RegExp(`<account-center\\b[^>]*initial-view="${view}"[^>]*>`).test(wrapper), `账户页未复用共享组件：${view}`);
 });
 assert(accountSource.includes('this.setCurrentView(view)'), '账户中心未在当前 PageFrame 切换视图');
 

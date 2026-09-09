@@ -1,5 +1,7 @@
 package com.personalink.server.controller.app;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ReportHistoryResponse;
 import com.personalink.server.dto.ReportResponse;
 import com.personalink.server.dto.ApiResponse;
@@ -24,17 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/miniapp/reports")
+@RequiredArgsConstructor
 public class MiniappReportController {
 
     private final AuthService authService;
     private final AssessmentService assessmentService;
-
-    public MiniappReportController(
-            AuthService authService,
-            AssessmentService assessmentService) {
-        this.authService = authService;
-        this.assessmentService = assessmentService;
-    }
 
     /**
      * 查询当前用户的个人报告详情。

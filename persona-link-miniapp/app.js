@@ -1,5 +1,5 @@
 const CONSENT_STORAGE_KEY = 'personaLinkConsentVersion';
-const CONSENT_VERSION = 'v1.0';
+const CONSENT_VERSION = 'v2.0';
 const MINIAPP_ROUTES = new Set([
   'pages/home/index',
   'pages/profile/index',
@@ -47,7 +47,11 @@ App({
     const hasConsented = wx.getStorageSync(CONSENT_STORAGE_KEY) === CONSENT_VERSION;
     const source = options || {};
     this.globalData.hasConsent = hasConsented;
-    if (hasConsented || source.path === 'pages/consent/index') {
+    if (hasConsented) {
+      this.verifyConsent(buildLaunchUrl(source.path, source.query)).catch(() => {});
+      return;
+    }
+    if (source.path === 'pages/consent/index') {
       this.globalData.consentRedirecting = false;
       return;
     }
@@ -63,6 +67,44 @@ App({
         this.globalData.consentRedirecting = false;
       }
     });
+  },
+
+  verifyConsent(launchUrl) {
+    if (launchUrl) this.consentLaunchUrl = launchUrl;
+    if (this.consentCheck) return this.consentCheck;
+    const epoch = this.consentEpoch || 0;
+    this.consentCheck = (async () => {
+      try {
+        const accepted = wx.getStorageSync('personaLinkConsentedDocuments');
+        const versions = await require('./utils/request').requestData({
+          url: '/api/miniapp/legal-documents/versions', silentUnauthorized: true
+        });
+        if (epoch !== (this.consentEpoch || 0)) throw new Error('协议状态已变化，请重试');
+        const current = wx.getStorageSync(CONSENT_STORAGE_KEY) === CONSENT_VERSION
+          && Array.isArray(accepted) && Array.isArray(versions)
+          && [1, 2, 3].every((type) => {
+            const latest = versions.find((document) => Number(document.type) === type);
+            return latest && Number(latest.version) > 0 && accepted.some((document) =>
+              Number(document.type) === type && Number(document.version) === Number(latest.version));
+          });
+        if (!current) throw new Error('协议已更新，请重新阅读并同意');
+        this.globalData.hasConsent = true;
+      } catch (error) {
+        if (epoch === (this.consentEpoch || 0)) {
+          this.globalData.hasConsent = false;
+          const pages = getCurrentPages();
+          const current = pages[pages.length - 1];
+          if (!this.globalData.consentRedirecting && (!current || current.route !== 'pages/consent/index')) {
+            this.globalData.pendingLaunchUrl = this.consentLaunchUrl
+              || (current ? buildLaunchUrl(current.route, current.options) : '');
+            this.globalData.consentRedirecting = true;
+            wx.reLaunch({ url: '/pages/consent/index', complete: () => { this.globalData.consentRedirecting = false; } });
+          }
+        }
+        throw error;
+      }
+    })().finally(() => { this.consentCheck = null; this.consentLaunchUrl = ''; });
+    return this.consentCheck;
   },
 
   returnToHome() {

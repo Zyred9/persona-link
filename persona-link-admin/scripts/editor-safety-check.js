@@ -168,6 +168,7 @@ async function verifyTypeSaveBehavior() {
       globals: { window: { confirm: () => confirmResult, setTimeout: () => {} } },
     })
   validTypeForm(test)
+  test.drawerOpen.value = true
 
   test.editingId.value = 9
   test.editingVersion.value = { id: 8, versionStatus: 4, versionNote: '' }
@@ -188,6 +189,7 @@ async function verifyTypeSaveBehavior() {
   assert.strictEqual(savedVersionPayload.coverUrl, '/cover.png', '详情图不得覆盖首页封面')
 
   delaySaveTest = false
+  test.drawerOpen.value = true
   test.editingId.value = 9
   test.editingVersion.value = { id: 8, versionStatus: 4, versionNote: '' }
   failVersion = true
@@ -200,6 +202,7 @@ async function verifyTypeSaveBehavior() {
   assert.strictEqual(savedVersionPayload.dimensions[0].dimensionName, '维度', '复制草稿不得覆盖用户修改的维度名称')
   assert.strictEqual(savedVersionPayload.detailImageUrl, '/detail.png', '编辑已发布题型后新草稿需保存详情图')
   test.form.detailImageUrl = ''
+  test.drawerOpen.value = true
   await test.saveItem()
   assert.strictEqual(savedVersionPayload.detailImageUrl, null, '清空详情图必须显式发送 null')
   test.drawerOpen.value = true

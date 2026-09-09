@@ -12,7 +12,7 @@ public class ContentAuditLogEntity {
     /** 主键。 */
     @TableId(type = IdType.AUTO)
     private Long id;
-    /** 业务类型：1题型，2题型版本，3首页配置。 */
+    /** 业务类型：1题型，2题型版本，3首页配置，4广告配置。 */
     private Integer bizType;
     /** 业务 ID。 */
     private Long bizId;

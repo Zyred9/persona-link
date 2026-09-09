@@ -1,5 +1,7 @@
 package com.personalink.server.controller.app;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.MiniappHomeResponse;
 import com.personalink.server.dto.MiniappTestDetailResponse;
@@ -14,13 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/miniapp")
+@RequiredArgsConstructor
 public class MiniappContentController {
 
     private final MiniappContentService miniappContentService;
-
-    public MiniappContentController(MiniappContentService miniappContentService) {
-        this.miniappContentService = miniappContentService;
-    }
 
     /**
      * 获取按题型首页位置配置的可展示内容。

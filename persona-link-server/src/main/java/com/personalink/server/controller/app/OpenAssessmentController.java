@@ -1,5 +1,7 @@
 package com.personalink.server.controller.app;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AssessmentSessionResponse;
 import com.personalink.server.dto.CreateAssessmentRequest;
 import com.personalink.server.dto.ReportResponse;
@@ -25,17 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/miniapp/assessments")
+@RequiredArgsConstructor
 public class OpenAssessmentController {
 
     private final AuthService authService;
     private final AssessmentService assessmentService;
-
-    public OpenAssessmentController(
-            AuthService authService,
-            AssessmentService assessmentService) {
-        this.authService = authService;
-        this.assessmentService = assessmentService;
-    }
 
     /**
      * 查询当前用户最近一份未完成答卷。

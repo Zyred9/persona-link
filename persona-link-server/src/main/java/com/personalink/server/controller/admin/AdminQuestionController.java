@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.QuestionResponse;
 import com.personalink.server.dto.QuestionSaveRequest;
@@ -20,13 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/admin/questions")
+@RequiredArgsConstructor
 public class AdminQuestionController {
 
     private final ContentService contentService;
-
-    public AdminQuestionController(ContentService contentService) {
-        this.contentService = contentService;
-    }
 
     /**
      * 更新题目并整体替换其选项。

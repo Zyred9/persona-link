@@ -51,7 +51,7 @@ async function main() {
   assert.strictEqual(requests.length, 0);
   assert.strictEqual(homeLoads, 0);
   app.globalData.hasConsent = true;
-  assert.strictEqual(home.onShow(), undefined, '首页展示不能等待登录上报');
+  await home.onShow(); // 仅等待协议校验，不能等待尚未完成的登录上报。
   assert.strictEqual(homeLoads, 1, '登录完成前首页数据应立即开始加载');
   const start = request.authenticatedRequestData({ url: '/api/miniapp/assessments', method: 'POST' });
   assert.strictEqual(loginCount, 1, '并发统计与答题应共用一次登录');

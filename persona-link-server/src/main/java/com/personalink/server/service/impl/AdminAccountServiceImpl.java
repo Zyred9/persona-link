@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.personalink.server.entity.AdminAccountEntity;
@@ -25,6 +27,7 @@ import java.util.Objects;
  * 后台账号服务实现。
  */
 @Service
+@RequiredArgsConstructor
 public class AdminAccountServiceImpl extends ServiceImpl<AdminAccountMapper, AdminAccountEntity>
         implements AdminAccountService {
 
@@ -32,10 +35,6 @@ public class AdminAccountServiceImpl extends ServiceImpl<AdminAccountMapper, Adm
     private static final int NOT_DELETED = 0;
     private final BusinessSessionService businessSessionService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
-    public AdminAccountServiceImpl(BusinessSessionService businessSessionService) {
-        this.businessSessionService = businessSessionService;
-    }
 
     @Override
     public AdminAccountEntity findByUsername(String username) {

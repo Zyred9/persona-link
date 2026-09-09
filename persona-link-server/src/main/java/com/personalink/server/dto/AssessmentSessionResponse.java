@@ -12,5 +12,8 @@ public record AssessmentSessionResponse(
         int totalCount,
         int completedCount,
         int firstUnansweredIndex,
-        List<AssessmentQuestionResponse> questions) {
+        List<AssessmentQuestionResponse> questions,
+        int answerType,
+        String pairSessionId,
+        boolean canRestart) {
 }

@@ -1,5 +1,6 @@
 const { authenticatedRequestData } = require('../../../../utils/request');
 const { trackEvent } = require('../../../../utils/analytics');
+const { createReportAccess } = require('../../../../utils/report-access');
 
 const VIEW_ALIASES = {
   permission: 'permission-denied'
@@ -47,21 +48,25 @@ Page({
     this.loadReport();
   },
 
-  async loadReport() {
+  async loadReport(watch = false) {
     if (!this.reportId) {
       this.setData({ state: 'error', errorDescription: '报告参数缺失，请从测试记录重新进入。' });
       return;
     }
-    this.setData({ state: 'loading' });
-    try {
+    if (!this.reportAccess) this.reportAccess = createReportAccess(this, `/api/miniapp/reports/${encodeURIComponent(this.reportId)}`);
+    return this.reportAccess.run(async (active) => {
       const report = await authenticatedRequestData({
         url: `/api/miniapp/reports/${encodeURIComponent(this.reportId)}`
       });
-      this.setData({ state: 'ready', result: prepareResult(report) });
-    } catch (error) {
-      this.setData({ state: 'error', errorDescription: error.message || '报告加载失败' });
-    }
+      if (active()) this.setData({ state: 'ready', result: prepareResult(report) });
+    }, watch);
   },
+
+  watchAd() { return this.loadReport(true); },
+
+  onUnload() { if (this.reportAccess) this.reportAccess.dispose(); },
+  onHide() { if (this.reportAccess) this.reportAccess.setHidden(true); },
+  onShow() { if (this.reportAccess) this.reportAccess.setHidden(false); },
 
   onShareAppMessage() {
     const result = this.data.result || {};

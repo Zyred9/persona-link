@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.PublishCheckResponse;
 import com.personalink.server.dto.QuestionResponse;
@@ -30,13 +32,10 @@ import java.util.List;
 @Validated
 @RestController
 @RequestMapping("/api/admin/test-versions")
+@RequiredArgsConstructor
 public class AdminTestVersionController {
 
     private final ContentService contentService;
-
-    public AdminTestVersionController(ContentService contentService) {
-        this.contentService = contentService;
-    }
 
     /**
      * 查询版本详情。

@@ -35,9 +35,14 @@ const keyword = ref('')
 const typeFilter = ref('全部类型')
 const statusFilter = ref('全部状态')
 const drawerOpen = ref(false)
+let editorSequence = 0
+let editorTransition = 0
+const editorLoading = ref(false)
+const editorError = ref('')
 const imageTest = ref<TestItem | null>(null)
 const editingId = ref<number | null>(null)
 const editingVersion = ref<TestVersion | null>(null)
+const typeLocked = ref(false)
 const uploadingCover = ref(false)
 const saving = ref(false)
 const feedback = ref('')
@@ -62,9 +67,22 @@ function toView(item: TestDto): TestItem {
 function showFeedback(message: string) { feedback.value = message; window.setTimeout(() => { feedback.value = '' }, 2600) }
 
 async function closeDrawer() {
-  if (uploadingCover.value || saving.value || !await confirmDiscard('题型内容尚未保存，确认放弃修改吗？')) return
+  if (!await allowEditorTransition()) return
+  ++editorSequence
+  editorLoading.value = false
   drawerOpen.value = false
   markSaved()
+}
+
+async function allowEditorTransition() {
+  if (disposed || editorBusy.value) return false
+  const transition = ++editorTransition
+  const allowed = !drawerOpen.value || await confirmDiscard('题型内容尚未保存，确认放弃修改吗？')
+  return allowed && !disposed && transition === editorTransition && !editorBusy.value
+}
+
+function isCurrentEditor(sequence: number) {
+  return !disposed && drawerOpen.value && sequence === editorSequence
 }
 
 async function load() {
@@ -121,15 +139,35 @@ function resetForm() {
   Object.assign(form, { name: '', coverUrl: '', detailImageUrl: '', description: '', type: '单人测试', status: '启用', categoryId: categories.value[0]?.id ?? 0, estimatedMinutes: null, drawQuestionCount: null, dimensions: [{ dimensionName: '', sortNo: 1 }] })
 }
 
-function openCreate() { editingId.value = null; editingVersion.value = null; resetForm(); markSaved(); drawerOpen.value = true }
+async function openCreate() {
+  if (readOnly || !await allowEditorTransition()) return
+  ++editorSequence
+  editingId.value = null
+  editingVersion.value = null
+  typeLocked.value = false
+  editorLoading.value = false
+  editorError.value = ''
+  resetForm()
+  markSaved()
+  drawerOpen.value = true
+}
 
 async function openEdit(item: TestItem) {
+  if (readOnly || !await allowEditorTransition()) return
+  const sequence = ++editorSequence
   editingId.value = item.id
+  editingVersion.value = null
+  editorLoading.value = true
+  editorError.value = ''
   resetForm()
+  markSaved()
+  drawerOpen.value = true
   try {
     const [detail, versions] = await Promise.all([getTest(item.id), getTestVersions(item.id)])
+    if (!isCurrentEditor(sequence)) return
     const version = versions.find((candidate) => candidate.versionStatus === 1) ?? versions[0] ?? null
     editingVersion.value = version
+    typeLocked.value = versions.some((candidate) => Boolean(candidate.publishedAt) || [4, 5, 6].includes(candidate.versionStatus))
     Object.assign(form, {
       name: detail.testName, type: detail.testType === 2 ? '双人测试' : '单人测试', status: detail.status === 1 ? '启用' : '停用', categoryId: detail.categoryId,
       coverUrl: version?.coverUrl ?? '', description: version?.description ?? '', estimatedMinutes: version?.estimatedMinutes ?? null, drawQuestionCount: version?.drawQuestionCount ?? null,
@@ -137,19 +175,29 @@ async function openEdit(item: TestItem) {
       dimensions: version?.dimensions.map((item) => ({ id: item.id, dimensionCode: item.dimensionCode, dimensionName: item.dimensionName, sortNo: item.sortNo })) ?? [{ dimensionName: '', sortNo: 1 }],
     })
     markSaved()
-    drawerOpen.value = true
-  } catch (error) { showFeedback(error instanceof Error ? error.message : '题型详情加载失败') }
+  } catch (error) {
+    if (isCurrentEditor(sequence)) editorError.value = error instanceof Error ? error.message : '题型详情加载失败'
+  } finally {
+    if (isCurrentEditor(sequence)) editorLoading.value = false
+  }
 }
 
 async function handleImageUpload(event: Event, field: 'coverUrl' | 'detailImageUrl') {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (!file || uploadingCover.value) return
+  if (!file || disposed || !drawerOpen.value || readOnly || editorLoading.value || editorError.value || editorBusy.value) return
+  const sequence = editorSequence
   const label = { coverUrl: '版本封面', detailImageUrl: '详情图' }[field]
   uploadingCover.value = true
-  try { form[field] = await uploadImage(file); markDirty(); showFeedback(`${label}上传成功`) }
-  catch (error) { showFeedback(error instanceof Error ? error.message : `${label}上传失败`) }
-  finally { uploadingCover.value = false; input.value = '' }
+  try {
+    const url = await uploadImage(file)
+    if (!isCurrentEditor(sequence)) return
+    form[field] = url
+    markDirty()
+    showFeedback(`${label}上传成功`)
+  }
+  catch (error) { if (isCurrentEditor(sequence)) showFeedback(error instanceof Error ? error.message : `${label}上传失败`) }
+  finally { if (isCurrentEditor(sequence)) uploadingCover.value = false; input.value = '' }
 }
 
 function addDimension() {
@@ -178,7 +226,8 @@ function versionPayload(version?: TestVersion | null) {
 }
 
 async function saveItem() {
-  if (uploadingCover.value || saving.value) return
+  if (disposed || !drawerOpen.value || readOnly || editorLoading.value || editorError.value || editorBusy.value) return
+  const sequence = editorSequence
   if (!form.name.trim() || !form.categoryId) return showFeedback('请填写题型名称并选择分类')
   if (!form.coverUrl) return showFeedback('请上传版本封面')
   if (!form.dimensions.length || form.dimensions.some((item) => !item.dimensionName.trim())) return showFeedback('请填写完整的计分维度')
@@ -189,27 +238,32 @@ async function saveItem() {
   saving.value = true
   try {
     if (needsDraftCopy && !await confirmAction('当前版本不是草稿，保存将先复制为新草稿。确认继续吗？', { title: '创建草稿并保存', confirmText: '继续保存' })) return
+    if (!isCurrentEditor(sequence)) return
     const saved = await saveTest({ testName: form.name.trim(), testType: form.type === '双人测试' ? 2 : 1, categoryId: Number(form.categoryId), status: form.status === '启用' ? 1 : 0 }, editingId.value ?? undefined)
+    if (!isCurrentEditor(sequence)) return
     testSaved = true
     editingId.value = saved.id
     let draft = editingVersion.value
     if (draft && draft.versionStatus !== 1) {
       draft = await copyVersionAsDraft(draft.id)
+      if (!isCurrentEditor(sequence)) return
       editingVersion.value = draft
       form.dimensions.forEach((dimension) => {
         dimension.id = draft!.dimensions.find((copied) => copied.dimensionCode === dimension.dimensionCode)?.id
       })
     }
     await saveVersion(saved.id, versionPayload(draft), draft?.id)
+    if (!isCurrentEditor(sequence)) return
     markSaved()
     drawerOpen.value = false
     showFeedback(creating ? '题型及草稿版本已新建' : '题型已更新')
     await load()
   } catch (error) {
+    if (!isCurrentEditor(sequence)) return
     const message = error instanceof Error ? error.message : '保存失败'
     showFeedback(testSaved ? `题型基础信息已保存，但版本保存失败：${message}` : message)
   }
-  finally { saving.value = false }
+  finally { if (!disposed && sequence === editorSequence) saving.value = false }
 }
 
 async function toggleStatus(item: TestItem) {
@@ -306,13 +360,15 @@ onMounted(async () => {
     <div v-if="drawerOpen" class="admin-modal-backdrop" @click.self="closeDrawer">
       <form class="editor-drawer admin-editor-dialog type-editor-dialog" role="dialog" aria-modal="true" aria-label="题型编辑弹窗" @submit.prevent="saveItem" @input="markDirty" @change="markDirty">
         <header class="admin-dialog-header"><div><h2>{{ editingId ? '编辑题型' : '新建题型' }}</h2><p>先填写基本信息，再配置展示图片与答题设置。</p></div><button type="button" aria-label="关闭" :disabled="uploadingCover || saving" @click="closeDrawer">×</button></header>
-        <div class="drawer-body" :inert="saving || undefined" :aria-busy="saving">
+        <div v-if="editorLoading" class="editor-load-state" role="status">正在加载题型内容…</div>
+        <div v-else-if="editorError" class="editor-load-state" role="alert">{{ editorError }}，请关闭后重新编辑。</div>
+        <div v-else class="drawer-body" :inert="saving || undefined" :aria-busy="saving">
           <section class="admin-form-section">
             <h3>基本信息</h3><p>设置题型名称、分类和对外展示的介绍。</p>
             <div class="admin-form-grid">
               <label class="admin-field"><span>题型名称</span><input v-model="form.name" maxlength="30" placeholder="请输入题型名称" /><small class="admin-field-hint">{{ form.name.length }} / 30 字</small></label>
               <label class="admin-field"><span>所属分类</span><select v-model.number="form.categoryId"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.categoryName }}</option></select></label>
-              <label class="admin-field"><span>测试类型</span><select v-model="form.type"><option>单人测试</option><option>双人测试</option></select></label>
+              <label class="admin-field"><span>测试类型{{ typeLocked ? '（已有发布历史，不可修改）' : '' }}</span><select v-model="form.type" :disabled="typeLocked"><option>单人测试</option><option>双人测试</option></select></label>
               <label class="admin-field"><span>当前状态</span><select v-model="form.status"><option>启用</option><option>停用</option></select></label>
               <label class="admin-field admin-field-wide"><span>题型描述</span><textarea v-model="form.description" rows="2" maxlength="200" placeholder="用简短的文字介绍这个测试" /><small class="admin-field-hint">{{ form.description.length }} / 200 字</small></label>
             </div>
@@ -351,7 +407,7 @@ onMounted(async () => {
             </div>
           </section>
         </div>
-        <footer class="admin-dialog-footer"><span class="admin-footer-note">版本内容保存为草稿，发布后同步至小程序。</span><div class="admin-footer-actions"><button class="secondary-action" type="button" :disabled="uploadingCover || saving" @click="closeDrawer">取消</button><button class="primary-action" type="submit" :disabled="uploadingCover || saving">{{ saving ? '保存中...' : '保存' }}</button></div></footer>
+        <footer class="admin-dialog-footer"><span class="admin-footer-note">版本内容保存为草稿，发布后同步至小程序。</span><div class="admin-footer-actions"><button class="secondary-action" type="button" :disabled="uploadingCover || saving" @click="closeDrawer">取消</button><button class="primary-action" type="submit" :disabled="editorLoading || !!editorError || uploadingCover || saving">{{ saving ? '保存中...' : '保存' }}</button></div></footer>
       </form>
     </div>
 
@@ -404,6 +460,7 @@ button { cursor: pointer; }
 .empty-result { min-width: 1080px; padding: 46px; text-align: center; color: #878087; }
 .table-footer { display: flex; justify-content: flex-end; align-items: center; gap: 10px; min-width: 1120px; padding: 18px 6px 2px; color: #756e77; font-size: 13px; }.table-footer button, .table-footer b, .page-size { min-width: 38px; padding: 8px 10px; border: 1px solid #d3ccd4; border-radius: 8px; background: white; text-align: center; }.table-footer b { border-color: #211d22; background: #d7b4ff; color: #211d22; }
 .type-editor-dialog { --editor-width: 960px; }
+.editor-load-state { padding: 48px 24px; color: #756f78; text-align: center; }
 .cover-preview { display: grid; place-items: center; overflow: hidden; border: 1px solid #ddd6ce; border-radius: 10px; background: #fff; color: #817783; text-align: center; font-size: 13px; width: 100%; height: 250px; }
 .cover-preview img { width: 100%; height: 100%; object-fit: contain; }
 .image-card-grid { margin-top: 20px; }.image-card { display: grid; align-content: start; gap: 12px; min-width: 0; padding: 16px; border: 1px solid #e5ddd4; border-radius: 12px; background: #faf7f1; }

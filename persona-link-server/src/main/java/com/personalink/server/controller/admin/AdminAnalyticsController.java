@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AnalyticsOverviewResponse;
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.service.AnalyticsService;
@@ -17,13 +19,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/admin")
+@RequiredArgsConstructor
 public class AdminAnalyticsController {
 
     private final AnalyticsService analyticsService;
-
-    public AdminAnalyticsController(AnalyticsService analyticsService) {
-        this.analyticsService = analyticsService;
-    }
 
     /**
      * 查询运营数据总览。

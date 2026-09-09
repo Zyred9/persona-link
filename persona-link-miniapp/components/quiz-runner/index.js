@@ -19,6 +19,8 @@ Component({
     minSelectCount: 1,
     maxSelectCount: 1,
     isMultiple: false,
+    required: true,
+    submissionPending: false,
     isLast: false,
     saving: false,
     errorDescription: '暂时无法加载答卷，请稍后重试。'
@@ -40,6 +42,7 @@ Component({
       this.flow = source.flow || 'single';
       this.pairSessionId = source.pairSessionId || '';
       this.submitRequestId = null;
+      this.submissionPending = false;
       this.assessment = null;
       this.setData({
         state: 'loading',
@@ -99,6 +102,13 @@ Component({
         throw new Error('答卷中没有可作答的题目');
       }
       this.assessment = assessment;
+      // 路由参数不能覆盖服务端答卷所属的业务流程。
+      this.pairSessionId = assessment.pairSessionId || '';
+      this.flow = Number(assessment.answerType) === 2
+        ? (this.pairSessionId ? 'pair-partner' : 'pair-initiator') : 'single';
+      this.triggerEvent('context', { answerType: Number(assessment.answerType) || 1 });
+      this.submissionPending = Number(assessment.answerStatus) === 3;
+      this.setData({ submissionPending: this.submissionPending });
       const currentIndex = Math.min(
         Math.max(Number(assessment.firstUnansweredIndex) || 0, 0),
         assessment.questions.length - 1
@@ -108,7 +118,7 @@ Component({
     },
 
     chooseOption(event) {
-      if (this.data.saving) return;
+      if (this.data.saving || this.submissionPending) return;
       const optionId = String(event.currentTarget.dataset.optionId);
       let selectedOptionIds = this.data.selectedOptionIds.slice();
       if (this.data.isMultiple) {
@@ -119,7 +129,7 @@ Component({
           return;
         } else selectedOptionIds.push(optionId);
       } else {
-        selectedOptionIds = [optionId];
+        selectedOptionIds = !this.data.required && selectedOptionIds.includes(optionId) ? [] : [optionId];
       }
       this.assessment.questions[this.data.currentIndex].selectedOptionIds = selectedOptionIds.slice();
       this.applySelection(selectedOptionIds);
@@ -136,6 +146,7 @@ Component({
     },
 
     goPrevious() {
+      if (this.data.saving || this.submissionPending) return;
       if (this.data.currentIndex === 0) {
         this.triggerEvent('back');
         return;
@@ -146,7 +157,8 @@ Component({
     async continueTest() {
       if (this.data.saving) return;
       const selectedCount = this.data.selectedOptionIds.length;
-      if (selectedCount < this.data.minSelectCount || selectedCount > this.data.maxSelectCount) {
+      if (!this.submissionPending && (((selectedCount > 0 || this.data.required)
+        && selectedCount < this.data.minSelectCount) || selectedCount > this.data.maxSelectCount)) {
         wx.showToast({
           title: this.data.isMultiple
             ? `请选择${this.data.minSelectCount}-${this.data.maxSelectCount}项`
@@ -158,6 +170,10 @@ Component({
       const requestVersion = this.requestVersion;
       this.setData({ saving: true });
       try {
+        if (this.submissionPending) {
+          await this.submitAssessment(requestVersion);
+          return;
+        }
         const question = this.assessment.questions[this.data.currentIndex];
         await authenticatedRequestData({
           url: `/api/miniapp/assessments/${encodeURIComponent(this.answerSessionId)}/answers`,
@@ -180,11 +196,24 @@ Component({
 
     async submitAssessment(requestVersion) {
       this.submitRequestId = this.submitRequestId || createIdempotencyKey('submit');
-      const report = await authenticatedRequestData({
+      // 超时不代表服务端未提交；重试直接复用提交接口，不能再次保存已结束答卷。
+      this.submissionPending = true;
+      this.setData({ submissionPending: true });
+      let report;
+      try {
+        report = await authenticatedRequestData({
         url: `/api/miniapp/assessments/${encodeURIComponent(this.answerSessionId)}/submit`,
         method: 'POST',
         data: { submitRequestId: this.submitRequestId }
-      });
+        });
+      } catch (error) {
+        if (this.requestVersion === requestVersion
+          && error.statusCode >= 400 && error.statusCode < 500 && error.statusCode !== 401) {
+          this.submissionPending = false;
+          this.setData({ submissionPending: false });
+        }
+        throw error;
+      }
       if (this.requestVersion !== requestVersion) return;
       trackEvent(4, '/subpackages/test/pages/quiz/index', this.assessment.testId);
       let url;
@@ -226,9 +255,10 @@ Component({
         minSelectCount: question.minSelectCount,
         maxSelectCount: question.maxSelectCount,
         isMultiple,
-        questionTypeText: isMultiple
+        required: question.required !== false,
+        questionTypeText: (isMultiple
           ? `多选题（${question.minSelectCount}-${question.maxSelectCount}项）`
-          : '单选题',
+          : '单选题') + (question.required === false ? ' · 可跳过' : ''),
         isLast: currentIndex === questions.length - 1
       });
     },

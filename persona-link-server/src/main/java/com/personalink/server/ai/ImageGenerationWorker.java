@@ -1,5 +1,7 @@
 package com.personalink.server.ai;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.personalink.server.config.ImageGenerationProperties;
 import com.personalink.server.entity.ImageGenerationTaskEntity;
@@ -19,20 +21,13 @@ import static com.personalink.server.enums.ImageGenerationTaskStatus.*;
 
 /** 上游原生异步任务执行器；先持久化提交标记，再提交，得到任务 ID 后只查询。 */
 @Component
+@RequiredArgsConstructor
 public class ImageGenerationWorker {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageGenerationWorker.class);
     private final ImageGenerationTaskMapper mapper;
     private final ImageProviderClient client;
     private final GeneratedImageStorage storage;
     private final ImageGenerationProperties properties;
-
-    public ImageGenerationWorker(ImageGenerationTaskMapper mapper, ImageProviderClient client,
-            GeneratedImageStorage storage, ImageGenerationProperties properties) {
-        this.mapper = mapper;
-        this.client = client;
-        this.storage = storage;
-        this.properties = properties;
-    }
 
     /** 后台生成两张图；调用方通过任务详情接口查询，关闭页面不影响生成。 */
     @Async("aiImageGenerationExecutor")

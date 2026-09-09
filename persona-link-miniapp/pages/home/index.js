@@ -41,7 +41,7 @@ Page({
     errorDescription: '暂时无法连接服务，\n请稍后重试。'
   },
 
-  onShow() {
+  async onShow() {
     const app = getApp();
     if (app.globalData.resetHomeDetail) {
       app.globalData.resetHomeDetail = false;
@@ -51,6 +51,9 @@ Page({
       const accountVisible = this.data.containerVisible && this.data.containerMode === 'account';
       this.getTabBar().setData({ selected: accountVisible ? 1 : 0 });
     }
+    try {
+      if (app.verifyConsent) await app.verifyConsent();
+    } catch (error) { return; }
     if (app.globalData.hasConsent) {
       this.loadHome();
       trackEvent(2, '/pages/home/index');
@@ -158,6 +161,12 @@ Page({
     }
   },
 
+  loadMoreAccountRecords() {
+    if (!this.data.containerVisible || this.data.containerMode !== 'account') return;
+    const account = this.selectComponent('#home-account-center');
+    if (account) account.loadMoreRecords();
+  },
+
   clearAccount() {
     const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
     if (tabBar) {
@@ -238,7 +247,8 @@ Page({
     this.setData({
       containerVisible: true,
       containerMode: 'quiz',
-      quizVisible: true
+      quizVisible: true,
+      activeTestType: Number(assessment.answerType) || 1
     }, () => {
       this.selectComponent('#home-quiz-runner').start({
         answerSessionId: assessment.answerSessionId,
@@ -319,7 +329,7 @@ Page({
 
   async restartAssessment() {
     const assessment = this.data.currentAssessment;
-    if (!assessment || !assessment.answerSessionId) {
+    if (!assessment || !assessment.answerSessionId || assessment.canRestart === false) {
       return;
     }
     wx.showModal({

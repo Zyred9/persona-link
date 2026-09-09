@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.personalink.server.dto.CategoryQuery;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
  * 分类业务实现。
  */
 @Service
+@RequiredArgsConstructor
 public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, CategoryEntity>
         implements CategoryService {
 
@@ -35,10 +38,6 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, CategoryEnt
     private static final int DELETED = 1;
 
     private final TestMapper testMapper;
-
-    public CategoryServiceImpl(TestMapper testMapper) {
-        this.testMapper = testMapper;
-    }
 
     @Override
     @Transactional(readOnly = true)

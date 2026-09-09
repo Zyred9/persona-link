@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -10,21 +12,28 @@ import com.personalink.server.dto.JoinPairRequest;
 import com.personalink.server.dto.PairCreateResponse;
 import com.personalink.server.dto.PairReportResponse;
 import com.personalink.server.dto.PairSessionResponse;
+import com.personalink.server.dto.PairHistoryResponse;
+import com.personalink.server.dto.PageResponse;
+import java.util.List;
 import com.personalink.server.entity.AnswerSessionEntity;
 import com.personalink.server.entity.PairReportEntity;
 import com.personalink.server.entity.PairSessionEntity;
+import com.personalink.server.entity.ReportEntity;
 import com.personalink.server.entity.TestEntity;
 import com.personalink.server.entity.TestVersionEntity;
 import com.personalink.server.enums.AnswerStatus;
 import com.personalink.server.enums.PairStatus;
 import com.personalink.server.enums.TestType;
+import com.personalink.server.enums.ReportKind;
 import com.personalink.server.mapper.AnswerSessionMapper;
 import com.personalink.server.mapper.AnswerSessionQuestionMapper;
 import com.personalink.server.mapper.PairReportMapper;
 import com.personalink.server.mapper.PairSessionMapper;
+import com.personalink.server.mapper.ReportMapper;
 import com.personalink.server.mapper.TestMapper;
 import com.personalink.server.mapper.TestVersionMapper;
 import com.personalink.server.service.PairAssessmentService;
+import com.personalink.server.service.ReportAccessService;
 import com.personalink.server.exception.BusinessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -42,6 +51,7 @@ import java.util.UUID;
  * 双人邀请、加入、状态和报告业务实现。
  */
 @Service
+@RequiredArgsConstructor
 public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, PairSessionEntity>
         implements PairAssessmentService {
 
@@ -55,21 +65,25 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
     private final TestVersionMapper testVersionMapper;
     private final TestMapper testMapper;
     private final PairReportMapper pairReportMapper;
+    private final ReportMapper reportMapper;
     private final ObjectMapper objectMapper;
+    private final ReportAccessService reportAccessService;
 
-    public PairAssessmentServiceImpl(
-            AnswerSessionMapper answerSessionMapper,
-            AnswerSessionQuestionMapper answerSessionQuestionMapper,
-            TestVersionMapper testVersionMapper,
-            TestMapper testMapper,
-            PairReportMapper pairReportMapper,
-            ObjectMapper objectMapper) {
-        this.answerSessionMapper = answerSessionMapper;
-        this.answerSessionQuestionMapper = answerSessionQuestionMapper;
-        this.testVersionMapper = testVersionMapper;
-        this.testMapper = testMapper;
-        this.pairReportMapper = pairReportMapper;
-        this.objectMapper = objectMapper;
+    @Override
+    public PageResponse<PairHistoryResponse> history(String openId, long page, long size) {
+        if (Objects.isNull(openId) || openId.isBlank()) {
+            throw new BusinessException(HttpStatus.UNAUTHORIZED.value(), "请先登录后查询双人历史");
+        }
+        if (page < 1 || page > Integer.MAX_VALUE || size < 1 || size > 100) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST.value(), "双人历史分页参数不合法");
+        }
+        long total = this.baseMapper.countHistory(openId);
+        long offset = (page - 1) * size;
+        // 仅投影未加入邀请的过期状态，列表查询不修改业务数据。
+        List<PairHistoryResponse> records = offset >= total ? List.of()
+                : this.baseMapper.selectHistory(openId, offset, size, LocalDateTime.now(),
+                        PairStatus.INITIATOR_DONE.getCode(), PairStatus.EXPIRED.getCode());
+        return new PageResponse<>(records, total, page, size);
     }
 
     @Override
@@ -86,6 +100,13 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
         }
         if (AnswerStatus.REPORT_READY.getCode() != answerSession.getAnswerStatus()) {
             throw new BusinessException(HttpStatus.CONFLICT.value(), "完成双人答卷后才能创建邀请");
+        }
+        ReportEntity report = this.reportMapper.selectOne(Wrappers.<ReportEntity>lambdaQuery()
+                .eq(ReportEntity::getAnswerSessionId, answerSessionId)
+                .eq(ReportEntity::getDeleted, NORMAL)
+                .last("FOR UPDATE"), false);
+        if (Objects.isNull(report)) {
+            throw new BusinessException(HttpStatus.CONFLICT.value(), "个人报告已删除，不能创建邀请，请重新完成评测");
         }
         TestVersionEntity version = this.testVersionMapper.selectById(answerSession.getVersionId());
         TestEntity test = Objects.isNull(version) ? null : this.testMapper.selectById(version.getTestId());
@@ -168,6 +189,7 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
         }
         if (Objects.equals(pair.getPartnerOpenId(), openId)
                 && Objects.nonNull(pair.getPartnerAnswerSessionId())) {
+            this.validateOwnership(pair, openId);
             return this.toResponse(pair, openId);
         }
         if (PairStatus.INITIATOR_DONE.getCode() != pair.getPairStatus()) {
@@ -263,8 +285,9 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public PairReportResponse getReport(String openId, Long pairSessionId) {
+        this.reportAccessService.requireRead(openId, ReportKind.PAIR.getCode(), pairSessionId);
         PairSessionEntity pair = this.requireOwnedPair(pairSessionId, openId);
         PairReportEntity report = this.pairReportMapper.selectOne(
                 Wrappers.<PairReportEntity>lambdaQuery()
@@ -287,9 +310,7 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
     }
 
     private void validateOwnership(PairSessionEntity pair, String openId) {
-        if (Objects.isNull(pair)
-                || (!Objects.equals(pair.getInitiatorOpenId(), openId)
-                && !Objects.equals(pair.getPartnerOpenId(), openId))) {
+        if (Objects.isNull(pair) || !pair.isVisibleTo(openId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.value(), "配对记录不存在");
         }
     }

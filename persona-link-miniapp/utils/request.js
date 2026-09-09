@@ -2,6 +2,7 @@ const { getApiBaseUrl } = require('../config/env');
 
 const TOKEN_STORAGE_KEY = 'personaLinkBusinessToken';
 let pendingSession = null;
+let testRecordsGeneration = 0;
 
 function createRequestError(message, statusCode, responseData, responseRequestId) {
   const error = new Error(message);
@@ -147,15 +148,26 @@ function ensureSession() {
 }
 
 async function authenticatedRequestData(options) {
+  const app = typeof getApp === 'function' ? getApp() : null;
+  if (app && app.verifyConsent) await app.verifyConsent();
+  const generation = testRecordsGeneration;
+  const checkResult = (result) => {
+    if (generation !== testRecordsGeneration && /^\/api\/miniapp\/(assessments|reports|pairs)(\/|\?|$)/.test(options.url)) {
+      throw createRequestError('测试记录已删除，请重新进入页面');
+    }
+    return result;
+  };
   await ensureSession();
+  checkResult(null);
   try {
-    return await requestData(Object.assign({}, options, { silentUnauthorized: true }));
+    return checkResult(await requestData(Object.assign({}, options, { silentUnauthorized: true })));
   } catch (error) {
     if (error.statusCode !== 401) {
       throw error;
     }
     await ensureSession();
-    return requestData(Object.assign({}, options, { silentUnauthorized: true }));
+    checkResult(null);
+    return checkResult(await requestData(Object.assign({}, options, { silentUnauthorized: true })));
   }
 }
 
@@ -164,6 +176,7 @@ function createIdempotencyKey(prefix) {
 }
 
 module.exports = {
+  invalidateTestRecordRequests() { testRecordsGeneration += 1; },
   request,
   requestData,
   authenticatedRequestData,

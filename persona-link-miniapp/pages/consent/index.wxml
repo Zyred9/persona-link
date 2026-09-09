@@ -33,7 +33,9 @@
   </view>
 
   <view class="consent-actions">
-    <button class="paper-button paper-button--primary" bindtap="agreeAndContinue">同意并继续</button>
+    <text wx:if="{{state === 'error'}}">{{error}}</text>
+    <button wx:if="{{state === 'error'}}" class="paper-button" bindtap="loadDocuments">重新加载协议</button>
+    <button class="paper-button paper-button--primary" disabled="{{state !== 'ready'}}" loading="{{state === 'loading'}}" bindtap="agreeAndContinue">{{state === 'loading' ? '正在加载协议' : '同意并继续'}}</button>
     <button class="consent-exit" bindtap="exitMiniProgram">不同意并退出</button>
   </view>
 </view>

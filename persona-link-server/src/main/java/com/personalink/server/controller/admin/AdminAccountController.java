@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AdminAccountCreateRequest;
 import com.personalink.server.dto.AdminAccountQuery;
 import com.personalink.server.dto.AdminAccountResponse;
@@ -25,13 +27,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/admin/accounts")
+@RequiredArgsConstructor
 public class AdminAccountController {
 
     private final AdminAccountService adminAccountService;
-
-    public AdminAccountController(AdminAccountService adminAccountService) {
-        this.adminAccountService = adminAccountService;
-    }
 
     /**
      * 分页查询后台账号。

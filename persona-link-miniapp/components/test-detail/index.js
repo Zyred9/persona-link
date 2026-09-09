@@ -148,6 +148,10 @@ Component({
 
     retry() {
       this.loadTest(this.data.testId);
+    },
+
+    joinPair() {
+      wx.navigateTo({ url: '/subpackages/pair/pages/join/index' });
     }
   }
 });

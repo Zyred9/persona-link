@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.personalink.server.ai.AiQuestionGenerationWorker;
 import com.personalink.server.ai.DeepSeekClient;
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
 
 /** AI 题库生成任务业务实现。 */
 @Service
+@RequiredArgsConstructor
 public class AiQuestionBankServiceImpl implements AiQuestionBankService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AiQuestionBankServiceImpl.class);
@@ -57,22 +60,6 @@ public class AiQuestionBankServiceImpl implements AiQuestionBankService {
     private final TransactionTemplate transactionTemplate;
     private final TestVersionMapper testVersionMapper;
     private final TestMapper testMapper;
-
-    public AiQuestionBankServiceImpl(AiGenerationTaskMapper taskMapper,
-                                     ContentService contentService,
-                                     DeepSeekClient deepSeekClient,
-                                     AiQuestionGenerationWorker generationWorker,
-                                     TransactionTemplate transactionTemplate,
-                                     TestVersionMapper testVersionMapper,
-                                     TestMapper testMapper) {
-        this.taskMapper = taskMapper;
-        this.contentService = contentService;
-        this.deepSeekClient = deepSeekClient;
-        this.generationWorker = generationWorker;
-        this.transactionTemplate = transactionTemplate;
-        this.testVersionMapper = testVersionMapper;
-        this.testMapper = testMapper;
-    }
 
     @Override
     public AiGenerationTaskResponse create(AiGenerationStartRequest request, Long operatorId) {

@@ -8,6 +8,10 @@
   <page-state type="error" title="报告加载失败" description="{{errorDescription}}" action-text="重新加载" bind:action="retry"></page-state>
 </view>
 
+<view wx:elif="{{state === 'locked'}}" class="paper-page result-page">
+  <page-state title="测试结果已生成" description="{{adDescription}}" action-text="{{adAction}}" bind:action="watchAd"></page-state>
+</view>
+
 <view wx:elif="{{view === 'result'}}" class="paper-page result-page">
   <view class="result-card paper-card">
     <view class="result-card__top">

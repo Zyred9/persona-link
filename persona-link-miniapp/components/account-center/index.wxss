@@ -385,3 +385,9 @@
 .settings-about {
   margin-top: 44rpx;
 }
+.history-pagination {
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 24rpx;
+  color: #766e78;
+}

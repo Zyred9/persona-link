@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.TestRecordMapper">
+    <update id="hidePairs">
+        UPDATE t_pair_session
+        SET initiator_visible_flag = IF(initiator_open_id = #{openId}, 0, initiator_visible_flag),
+            partner_visible_flag = IF(partner_open_id = #{openId}, 0, partner_visible_flag),
+            pair_status = IF(pair_status IN (1, 2, 3), 6, pair_status)
+        WHERE deleted = 0 AND (initiator_open_id = #{openId} OR partner_open_id = #{openId})
+    </update>
+    <update id="deleteAnswers">
+        UPDATE t_answer_detail d INNER JOIN t_answer_session s ON s.id = d.answer_session_id
+        SET d.deleted = 1 WHERE s.open_id = #{openId} AND d.deleted = 0
+    </update>
+    <update id="deleteSnapshots">
+        UPDATE t_answer_session_question q INNER JOIN t_answer_session s ON s.id = q.answer_session_id
+        SET q.deleted = 1 WHERE s.open_id = #{openId} AND q.deleted = 0
+    </update>
+    <update id="deleteReports">
+        UPDATE t_report r INNER JOIN t_answer_session s ON s.id = r.answer_session_id
+        SET r.deleted = 1 WHERE s.open_id = #{openId} AND r.deleted = 0
+    </update>
+    <update id="deleteGrants">
+        UPDATE t_report_access SET deleted = 1 WHERE open_id = #{openId} AND deleted = 0
+    </update>
+    <update id="deleteAdTasks">
+        UPDATE t_report_ad_task SET deleted = 1 WHERE open_id = #{openId} AND deleted = 0
+    </update>
+</mapper>

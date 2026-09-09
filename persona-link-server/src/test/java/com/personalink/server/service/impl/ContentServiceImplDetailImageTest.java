@@ -29,6 +29,8 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -104,9 +106,10 @@ class ContentServiceImplDetailImageTest {
                 .getAnnotation(TableField.class).updateStrategy());
     }
 
-    @Test
-    void copyingPublishedVersionShouldRetainIndependentDetailImage() {
-        TestVersionEntity published = this.version(4);
+    @ParameterizedTest
+    @ValueSource(ints = {4, 6})
+    void copyingHistoricalVersionShouldRetainIndependentDetailImage(int status) {
+        TestVersionEntity published = this.version(status);
         when(this.versionMapper.selectById(12L)).thenReturn(published);
         when(this.versionMapper.selectOne(any(), eq(false))).thenReturn(published, null, published);
         when(this.testMapper.selectOne(any())).thenReturn(new TestEntity());
@@ -122,7 +125,7 @@ class ContentServiceImplDetailImageTest {
         assertEquals(1, draft.versionStatus());
         assertEquals("/uploads/cover.png", draft.coverUrl());
         assertEquals("/uploads/detail.png", draft.detailImageUrl());
-        assertEquals(4, published.getVersionStatus());
+        assertEquals(status, published.getVersionStatus());
         var locks = org.mockito.Mockito.inOrder(this.testMapper, this.versionMapper);
         locks.verify(this.versionMapper).selectById(12L);
         locks.verify(this.testMapper).selectOne(any());

@@ -3,4 +3,5 @@
   id="quiz-runner"
   bind:back="handleBack"
   bind:finish="handleFinish"
+  bind:context="handleContext"
 ></quiz-runner>

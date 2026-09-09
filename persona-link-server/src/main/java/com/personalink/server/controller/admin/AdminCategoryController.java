@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.CategoryOrderRequest;
 import com.personalink.server.dto.CategoryQuery;
 import com.personalink.server.dto.CategoryResponse;
@@ -28,13 +30,10 @@ import java.util.List;
 @Validated
 @RestController
 @RequestMapping("/api/admin/categories")
+@RequiredArgsConstructor
 public class AdminCategoryController {
 
     private final CategoryService categoryService;
-
-    public AdminCategoryController(CategoryService categoryService) {
-        this.categoryService = categoryService;
-    }
 
     /**
      * 分页查询分类。

@@ -3,6 +3,7 @@
 <view class="paper-page result-page">
   <page-state wx:if="{{state === 'loading'}}" type="loading" title="双人报告正在加载"></page-state>
   <page-state wx:elif="{{state === 'error'}}" type="error" title="双人报告加载失败" description="{{errorDescription}}" action-text="重新加载" bind:action="retry"></page-state>
+  <page-state wx:elif="{{state === 'locked'}}" title="双人报告已生成" description="{{adDescription}}" action-text="{{adAction}}" bind:action="watchAd"></page-state>
   <block wx:else>
   <view class="paper-card result-hero">
     <view class="pair-mascots result-mascots">

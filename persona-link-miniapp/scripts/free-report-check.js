@@ -14,6 +14,12 @@ async function check(deepResult, fail = false) {
     Page(value) { definition = value; },
     require(name) {
       if (name.endsWith('/analytics')) return { trackEvent() {} };
+      if (name.endsWith('/report-access')) return { createReportAccess(page) { return {
+        async run(load) {
+          try { await load(() => true); }
+          catch (error) { page.setData({ state: 'error' }); }
+        }
+      }; } };
       if (name.endsWith('/request')) return {
         async authenticatedRequestData({ url }) {
           requests.push(url);
@@ -42,7 +48,7 @@ async function check(deepResult, fail = false) {
 async function main() {
   assert.match(template, /wx:if="\{\{result\.deepDescription\}\}" class="deep-result-card/);
   assert.match(template, /<text class="deep-result-copy">\{\{result\.deepDescription\}\}<\/text>/);
-  assert.doesNotMatch(source + template, /会员|开通|解锁|watchVideo|ensureSession/);
+  assert.doesNotMatch(source + template, /会员|开通|watchVideo|ensureSession/);
   await check({ text: '完整深度报告' });
   await check(null);
   await check(null, true);

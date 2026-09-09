@@ -14,6 +14,7 @@
         SELECT COUNT(1)
         FROM t_report r
         INNER JOIN t_answer_session s ON s.id = r.answer_session_id AND s.deleted = 0
+        INNER JOIN t_test_version v ON v.id = s.version_id AND v.deleted = 0
         WHERE s.open_id = #{openId}
           AND r.deleted = 0
     </select>
@@ -24,12 +25,15 @@
                v.test_id,
                v.version_no,
                v.title,
-               r.result_code,
-               JSON_UNQUOTE(JSON_EXTRACT(r.result_snapshot, '$.resultName')) AS result_name,
+               CASE WHEN access.id IS NOT NULL THEN r.result_code END AS result_code,
+               CASE WHEN access.id IS NOT NULL
+                    THEN JSON_UNQUOTE(JSON_EXTRACT(r.result_snapshot, '$.resultName')) END AS result_name,
                r.generated_at
         FROM t_report r
         INNER JOIN t_answer_session s ON s.id = r.answer_session_id AND s.deleted = 0
         INNER JOIN t_test_version v ON v.id = s.version_id AND v.deleted = 0
+        LEFT JOIN t_report_access access ON access.report_type = 1 AND access.report_id = r.id
+            AND access.open_id = s.open_id AND access.deleted = 0
         WHERE s.open_id = #{openId}
           AND r.deleted = 0
         ORDER BY r.generated_at DESC, r.id DESC

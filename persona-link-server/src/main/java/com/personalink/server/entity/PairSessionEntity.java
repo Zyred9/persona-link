@@ -37,6 +37,13 @@ public class PairSessionEntity extends BaseAssessmentEntity {
     /** 邀请过期时间。 */
     private LocalDateTime expiresAt;
 
+    /** 本人删除记录后，旧 ID 和邀请码也不能重新取得本人访问权。 */
+    public boolean isVisibleTo(String openId) {
+        return java.util.Objects.nonNull(openId)
+                && ((openId.equals(this.initiatorOpenId) && Integer.valueOf(1).equals(this.initiatorVisibleFlag))
+                || (openId.equals(this.partnerOpenId) && Integer.valueOf(1).equals(this.partnerVisibleFlag)));
+    }
+
     public String getPairNo() { return this.pairNo; }
     public void setPairNo(String pairNo) { this.pairNo = pairNo; }
     public String getCreateRequestId() { return this.createRequestId; }

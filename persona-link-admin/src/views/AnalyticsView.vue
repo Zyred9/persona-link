@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getAnalytics, type AnalyticsOverview } from '../api'
 import { niceCeiling } from '../utils/chartScale'
 
 const range = ref('7')
 const overview = ref<AnalyticsOverview | null>(null)
 const errorMessage = ref('')
+let loadSequence = 0
+let disposed = false
 const metrics = computed(() => ({
   uv: formatCount(overview.value?.metrics.uv ?? 0),
   pv: formatCount(overview.value?.metrics.pv ?? 0),
@@ -51,16 +53,21 @@ function formatCount(value: number): string {
 }
 
 async function load() {
+  const sequence = ++loadSequence
   try {
     errorMessage.value = ''
-    overview.value = await getAnalytics(Number(range.value))
+    const result = await getAnalytics(Number(range.value))
+    if (disposed || sequence !== loadSequence) return
+    overview.value = result
   } catch (error) {
+    if (disposed || sequence !== loadSequence) return
     errorMessage.value = error instanceof Error ? error.message : '数据加载失败'
   }
 }
 
 watch(range, load)
 onMounted(load)
+onBeforeUnmount(() => { disposed = true; ++loadSequence })
 </script>
 
 <template>

@@ -88,6 +88,7 @@ const historySize = 5
 const creating = ref(false)
 const uploading = ref(false)
 const loadingReview = ref(false)
+const restoringTask = ref(false)
 const savingQuestion = ref(false)
 const savingRule = ref(false)
 const submitting = ref(false)
@@ -99,10 +100,20 @@ const requestStorageKey = 'ai-question-bank-request-id'
 const requestId = ref(loadRequestId())
 let timer: number | undefined
 let disposed = false
+let taskSequence = 0
+let historySequence = 0
+let reviewSequence = 0
+let switchSequence = 0
+let editRevision = 0
 const taskStatusLabels: Record<number, string> = { 1: '待生成', 2: '生成中', 3: '待审核', 4: '生成失败', 5: '已提交' }
 const readOnly = isReadOnly()
-const editorBusy = computed(() => creating.value || uploading.value || savingQuestion.value || savingRule.value || submitting.value)
-const { markDirty, markSaved, confirmDiscard } = useUnsavedChanges('AI 题库还有未保存的修改，确认放弃并离开吗？', editorBusy)
+const editorBusy = computed(() => creating.value || uploading.value || savingQuestion.value || savingRule.value || submitting.value || restoringTask.value)
+const { markDirty: markChangesDirty, markSaved, confirmDiscard } = useUnsavedChanges('AI 题库还有未保存的修改，确认放弃并离开吗？', editorBusy)
+
+function markDirty() {
+  ++editRevision
+  markChangesDirty()
+}
 
 function loadRequestId(): string {
   const stored = sessionStorage.getItem(requestStorageKey)
@@ -204,9 +215,11 @@ async function startGeneration() {
   touched.value = true
   if (formError.value || creating.value || uploading.value) return
   creating.value = true
+  const sequence = ++taskSequence
+  stopTimer()
   notice.value = ''
   try {
-    task.value = await createAiGenerationTask({
+    const created = await createAiGenerationTask({
       requestId: requestId.value,
       testName: form.name.trim(),
       testType: form.type,
@@ -219,15 +232,19 @@ async function startGeneration() {
       targetQuestionCount: form.bankCount,
       drawQuestionCount: form.drawCount,
     })
+    if (disposed || sequence !== taskSequence) return
+    task.value = created
     applyTaskToForm(task.value)
     formDirty.value = false
     markSavedIfClean()
     step.value = 2
     await router.replace({ query: { ...route.query, taskId: String(task.value.id) } })
+    if (disposed || sequence !== taskSequence) return
     sessionStorage.removeItem(requestStorageKey)
     schedulePoll(0)
     await loadTaskHistory()
   } catch (error) {
+    if (disposed || sequence !== taskSequence) return
     notice.value = error instanceof Error ? error.message : 'AI 生成任务创建失败'
   } finally {
     creating.value = false
@@ -235,11 +252,13 @@ async function startGeneration() {
 }
 
 async function loadTaskHistory() {
+  const sequence = ++historySequence
   try {
     const result = await getAiGenerationTasks({ page: historyPage.value, size: historySize, taskStatus: historyStatus.value })
+    if (disposed || sequence !== historySequence) return
     taskHistory.value = result.records
     historyTotal.value = result.total
-  } catch (error) { notice.value = error instanceof Error ? error.message : '任务历史加载失败' }
+  } catch (error) { if (!disposed && sequence === historySequence) notice.value = error instanceof Error ? error.message : '任务历史加载失败' }
 }
 
 async function changeHistoryPage(offset: number) {
@@ -248,8 +267,15 @@ async function changeHistoryPage(offset: number) {
 }
 
 async function restoreTask(taskId: number) {
+  const sequence = ++taskSequence
+  restoringTask.value = true
+  ++reviewSequence
+  loadingReview.value = false
+  stopTimer()
   try {
-    task.value = await getAiGenerationTask(taskId)
+    const restored = await getAiGenerationTask(taskId)
+    if (disposed || sequence !== taskSequence) return
+    task.value = restored
     sessionStorage.removeItem(requestStorageKey)
     applyTaskToForm(task.value)
     questions.splice(0, questions.length)
@@ -264,13 +290,22 @@ async function restoreTask(taskId: number) {
     else if (task.value.taskStatus === 3) { step.value = 2; if (await loadReview()) step.value = 3 }
     else { step.value = 2; if (!generationFailed.value) schedulePoll() }
   } catch (error) {
+    if (disposed || sequence !== taskSequence) return
     notice.value = error instanceof Error ? error.message : '生成任务恢复失败'
+  } finally {
+    if (!disposed && sequence === taskSequence) restoringTask.value = false
   }
 }
 
 async function resumeTask(taskId: number) {
-  if (!await confirmDiscard('当前 AI 题库还有未保存的修改，确认放弃并切换任务吗？') || disposed) return
+  const sequence = ++switchSequence
+  if (!await confirmDiscard('当前 AI 题库还有未保存的修改，确认放弃并切换任务吗？')
+      || disposed || sequence !== switchSequence) return
+  ++taskSequence
+  ++reviewSequence
+  stopTimer()
   await router.replace({ query: { ...route.query, taskId: String(taskId) } })
+  if (disposed || sequence !== switchSequence) return
   await restoreTask(taskId)
 }
 
@@ -281,9 +316,13 @@ function schedulePoll(delay = 1500) {
 }
 
 async function pollTask() {
-  if (!task.value) return
+  if (!task.value || disposed) return
+  const sequence = taskSequence
+  const taskId = task.value.id
   try {
-    task.value = await getAiGenerationTask(task.value.id)
+    const latest = await getAiGenerationTask(taskId)
+    if (disposed || sequence !== taskSequence || task.value?.id !== taskId) return
+    task.value = latest
     if (task.value.taskStatus === 1 || task.value.taskStatus === 2) {
       schedulePoll()
     } else if (task.value.taskStatus === 3) {
@@ -294,6 +333,7 @@ async function pollTask() {
       step.value = 4
     }
   } catch (error) {
+    if (disposed || sequence !== taskSequence || task.value?.id !== taskId) return
     notice.value = error instanceof Error ? error.message : '生成进度查询失败'
     schedulePoll(3000)
   }
@@ -306,12 +346,17 @@ function stopTimer() {
 }
 
 async function retryGeneration() {
-  if (!task.value) return
+  if (!task.value || disposed) return
+  const sequence = taskSequence
+  const taskId = task.value.id
   try {
     notice.value = ''
-    task.value = await retryAiGenerationTask(task.value.id)
+    const latest = await retryAiGenerationTask(taskId)
+    if (disposed || sequence !== taskSequence || task.value?.id !== taskId) return
+    task.value = latest
     schedulePoll(0)
   } catch (error) {
+    if (disposed || sequence !== taskSequence || task.value?.id !== taskId) return
     notice.value = error instanceof Error ? error.message : '重试失败'
   }
 }
@@ -325,6 +370,7 @@ async function removeQuestion(index: number) {
   if (readOnly || savingQuestion.value) return
   const question = questions[index]
   if (!question || questions.length <= 1) return
+  ++editRevision
   savingQuestion.value = true
   try {
     await deleteQuestion(question.id)
@@ -686,10 +732,16 @@ function applyResultConfig(resultDimensions: Array<{ id: number; dimensionCode?:
 }
 
 async function loadReview(): Promise<boolean> {
-  if (!task.value || loadingReview.value) return false
+  if (!task.value || loadingReview.value || disposed || hasUnsavedChanges()) return false
+  const sequence = ++reviewSequence
+  const taskGeneration = taskSequence
+  const versionId = task.value.versionId
+  const revision = editRevision
   loadingReview.value = true
   try {
-    const [questionData, resultConfig] = await Promise.all([getQuestions(task.value.versionId), getResultConfig(task.value.versionId)])
+    const [questionData, resultConfig] = await Promise.all([getQuestions(versionId), getResultConfig(versionId)])
+    if (disposed || sequence !== reviewSequence || taskGeneration !== taskSequence
+        || versionId !== task.value?.versionId || revision !== editRevision || hasUnsavedChanges()) return false
     applyResultConfig(resultConfig.dimensions, resultConfig.templates)
     questions.splice(0, questions.length, ...questionData.map(mapQuestion))
     dirtyQuestionIds.clear()
@@ -701,10 +753,11 @@ async function loadReview(): Promise<boolean> {
     if (!questions.length || !dimensions.length) throw new Error('生成结果不完整，请重试任务')
     return true
   } catch (error) {
+    if (disposed || sequence !== reviewSequence || taskGeneration !== taskSequence) return false
     notice.value = error instanceof Error ? error.message : '审核数据加载失败'
     return false
   } finally {
-    loadingReview.value = false
+    if (!disposed && sequence === reviewSequence) loadingReview.value = false
   }
 }
 
@@ -728,11 +781,15 @@ async function uploadVersionImage(event: Event, field: 'coverUrl' | 'detailImage
 
 onMounted(async () => {
   try {
-    categories.value = (await getCategories({ status: 1 })).records
+    const result = await getCategories({ status: 1 })
+    if (disposed) return
+    categories.value = result.records
   } catch (error) {
+    if (disposed) return
     notice.value = error instanceof Error ? error.message : '分类加载失败'
   }
   await loadTaskHistory()
+  if (disposed) return
   const taskId = Number(route.query.taskId)
   if (!Number.isInteger(taskId) || taskId <= 0) return
   await restoreTask(taskId)
@@ -740,12 +797,14 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disposed = true
+  ++taskSequence
+  ++reviewSequence
   stopTimer()
 })
 </script>
 
 <template>
-  <section class="ai-page">
+  <section class="ai-page" :inert="restoringTask || loadingReview" :aria-busy="restoringTask || loadingReview">
     <header class="ai-heading">
       <div><h1>AI题库助手 <span>♡</span></h1><p>{{ step === 1 ? '填写题型信息，由 DeepSeek 生成可审核题库' : step === 2 ? (generationFailed ? 'DeepSeek 生成失败，请查看失败原因并重试' : generationComplete ? 'DeepSeek 已完成题库生成，可进入人工审核' : 'DeepSeek 正在生成题库，页面会自动刷新真实进度') : step === 3 ? '逐题审核题目、选项、计分维度和分值' : '题库已提交，可继续在题型管理中编辑和发布' }}</p></div>
       <span class="preview-chip">DeepSeek</span>

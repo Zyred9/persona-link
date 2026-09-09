@@ -1,7 +1,7 @@
 const API_BASE_URLS = {
   develop: 'http://127.0.0.1:8080',
-  trial: '',
-  release: ''
+  trial: 'https://seeyoume.vip:8080',
+  release: 'https://seeyoume.vip:8080'
 };
 
 function getEnvVersion() {
@@ -10,12 +10,14 @@ function getEnvVersion() {
 }
 
 function getApiBaseUrl() {
-  const storedBaseUrl = wx.getStorageSync('personaLinkApiBaseUrl');
+  const envVersion = getEnvVersion();
+  // 调试地址仅用于开发版，避免本地缓存覆盖体验版和正式版服务地址。
+  const storedBaseUrl = envVersion === 'develop' && wx.getStorageSync('personaLinkApiBaseUrl');
   if (storedBaseUrl) {
     return storedBaseUrl.replace(/\/$/, '');
   }
 
-  const baseUrl = API_BASE_URLS[getEnvVersion()];
+  const baseUrl = API_BASE_URLS[envVersion];
   if (!baseUrl) {
     throw new Error('当前环境尚未配置 API 地址');
   }

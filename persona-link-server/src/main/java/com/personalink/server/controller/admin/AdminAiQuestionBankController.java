@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AdminSessionContext;
 import com.personalink.server.dto.AiGenerationStartRequest;
 import com.personalink.server.dto.AiGenerationTaskResponse;
@@ -23,13 +25,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/admin/ai-question-bank/tasks")
+@RequiredArgsConstructor
 public class AdminAiQuestionBankController {
 
     private final AiQuestionBankService aiQuestionBankService;
-
-    public AdminAiQuestionBankController(AiQuestionBankService aiQuestionBankService) {
-        this.aiQuestionBankService = aiQuestionBankService;
-    }
 
     /**
      * 分页查询 AI 题库生成任务。

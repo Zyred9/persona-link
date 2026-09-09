@@ -1,5 +1,7 @@
 package com.personalink.server.controller.admin;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.PageResponse;
 import com.personalink.server.dto.TestQuery;
@@ -32,13 +34,10 @@ import java.util.List;
 @Validated
 @RestController
 @RequestMapping("/api/admin/tests")
+@RequiredArgsConstructor
 public class AdminTestController {
 
     private final ContentService contentService;
-
-    public AdminTestController(ContentService contentService) {
-        this.contentService = contentService;
-    }
 
     /**
      * 分页查询题型。

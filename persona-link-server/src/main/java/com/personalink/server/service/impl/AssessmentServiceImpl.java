@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -12,10 +14,13 @@ import com.personalink.server.entity.*;
 import com.personalink.server.enums.AnswerStatus;
 import com.personalink.server.enums.PairStatus;
 import com.personalink.server.enums.QuestionType;
+import com.personalink.server.enums.ReportKind;
+import com.personalink.server.enums.TestType;
 import com.personalink.server.exception.BusinessException;
 import com.personalink.server.mapper.*;
 import com.personalink.server.model.ScoreAccumulator;
 import com.personalink.server.service.AssessmentService;
+import com.personalink.server.service.ReportAccessService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +36,7 @@ import java.util.stream.Collectors;
  * 小程序答卷、计分和单人报告业务实现。
  */
 @Service
+@RequiredArgsConstructor
 public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, AnswerSessionEntity>
         implements AssessmentService {
 
@@ -51,33 +57,7 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
     private final PairSessionMapper pairSessionMapper;
     private final PairReportMapper pairReportMapper;
     private final ObjectMapper objectMapper;
-
-    public AssessmentServiceImpl(
-            TestMapper testMapper,
-            TestVersionMapper testVersionMapper,
-            ScoreDimensionMapper scoreDimensionMapper,
-            QuestionMapper questionMapper,
-            QuestionOptionMapper questionOptionMapper,
-            ResultTemplateMapper resultTemplateMapper,
-            AnswerSessionQuestionMapper answerSessionQuestionMapper,
-            AnswerDetailMapper answerDetailMapper,
-            ReportMapper reportMapper,
-            PairSessionMapper pairSessionMapper,
-            PairReportMapper pairReportMapper,
-            ObjectMapper objectMapper) {
-        this.testMapper = testMapper;
-        this.testVersionMapper = testVersionMapper;
-        this.scoreDimensionMapper = scoreDimensionMapper;
-        this.questionMapper = questionMapper;
-        this.questionOptionMapper = questionOptionMapper;
-        this.resultTemplateMapper = resultTemplateMapper;
-        this.answerSessionQuestionMapper = answerSessionQuestionMapper;
-        this.answerDetailMapper = answerDetailMapper;
-        this.reportMapper = reportMapper;
-        this.pairSessionMapper = pairSessionMapper;
-        this.pairReportMapper = pairReportMapper;
-        this.objectMapper = objectMapper;
-    }
+    private final ReportAccessService reportAccessService;
 
     @Override
     @Transactional(readOnly = true)
@@ -132,7 +112,7 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
             throw new BusinessException(HttpStatus.BAD_REQUEST.value(), "选项不能重复");
         }
         this.validateSelectionCount(question, optionIds.size());
-        List<QuestionOptionEntity> options = this.questionOptionMapper.selectList(
+        List<QuestionOptionEntity> options = optionIds.isEmpty() ? List.of() : this.questionOptionMapper.selectList(
                 Wrappers.<QuestionOptionEntity>lambdaQuery()
                         .eq(QuestionOptionEntity::getQuestionId, questionId)
                         .in(QuestionOptionEntity::getId, optionIds)
@@ -153,7 +133,9 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
             detail.setOptionId(optionId);
             return detail;
         }).toList();
-        this.answerDetailMapper.upsertBatch(details);
+        if (!details.isEmpty()) {
+            this.answerDetailMapper.upsertBatch(details);
+        }
     }
 
     @Override
@@ -163,6 +145,9 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
             Long answerSessionId,
             RestartAssessmentRequest request) {
         AnswerSessionEntity session = this.requireOwnedLockedSession(answerSessionId, openId);
+        if (Objects.nonNull(this.findPartnerPair(session))) {
+            throw new BusinessException(HttpStatus.CONFLICT.value(), "受邀答卷不能重新开始，请继续完成当前配对");
+        }
         TestVersionEntity version = this.requireVersion(session.getVersionId());
         AnswerSessionEntity retried = this.baseMapper.selectOne(
                 Wrappers.<AnswerSessionEntity>lambdaQuery()
@@ -191,7 +176,7 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
         AnswerSessionEntity session = this.requireOwnedLockedSession(answerSessionId, openId);
         ReportEntity existingReport = this.findReportBySessionId(session.getId());
         if (Objects.nonNull(existingReport)) {
-            return this.toReportResponse(existingReport);
+            return this.toSubmissionResponse(openId, existingReport);
         }
         this.requireInProgress(session);
         AnswerSessionEntity requestOwner = this.baseMapper.selectOne(
@@ -248,23 +233,25 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 .eq(AnswerSessionEntity::getDeleted, NORMAL)
                 .update();
         this.tryGeneratePairReport(session.getId());
-        return this.toReportResponse(savedReport);
+        return this.toSubmissionResponse(openId, savedReport);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public ReportResponse getReport(String openId, Long reportId) {
         ReportEntity report = this.reportMapper.selectById(reportId);
         if (Objects.isNull(report)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.value(), "报告不存在");
         }
         this.requireOwnedSession(report.getAnswerSessionId(), openId);
+        this.reportAccessService.requireRead(openId, ReportKind.SINGLE.getCode(), reportId);
         return this.toReportResponse(report);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public PageResponse<ReportHistoryResponse> history(String openId, long page, long size) {
+        this.reportAccessService.grantFreeHistory(openId);
         long total = this.reportMapper.countHistory(openId);
         List<ReportHistoryResponse> records = this.reportMapper
                 .selectHistory(openId, (page - 1) * size, size)
@@ -479,6 +466,7 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                     optionResponses,
                     selectedOptionIds));
         }
+        PairSessionEntity partnerPair = this.findPartnerPair(session);
         return new AssessmentSessionResponse(
                 String.valueOf(session.getId()),
                 String.valueOf(version.getTestId()),
@@ -488,7 +476,23 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 snapshots.size(),
                 selectedMap.size(),
                 firstUnansweredIndex,
-                responses);
+                responses,
+                session.getAnswerType(),
+                Objects.isNull(partnerPair) ? null : String.valueOf(partnerPair.getId()),
+                Objects.isNull(partnerPair) && AnswerStatus.IN_PROGRESS.getCode() == session.getAnswerStatus());
+    }
+
+    private PairSessionEntity findPartnerPair(AnswerSessionEntity session) {
+        if (!Objects.equals(TestType.PAIR.getCode(), session.getAnswerType())) {
+            return null;
+        }
+        // 受邀答卷必须始终沿用发起者的版本和题目快照，不能走普通重开流程。
+        return this.pairSessionMapper.selectOne(Wrappers.<PairSessionEntity>lambdaQuery()
+                .eq(PairSessionEntity::getPartnerAnswerSessionId, session.getId())
+                .eq(PairSessionEntity::getPartnerOpenId, session.getOpenId())
+                .eq(PairSessionEntity::getDeleted, NORMAL)
+                .orderByDesc(PairSessionEntity::getId)
+                .last("LIMIT 1"), false);
     }
 
     private void validateSubmission(
@@ -846,6 +850,10 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
     }
 
     private void validateSelectionCount(QuestionEntity question, int selectedCount) {
+        QuestionType.of(question.getQuestionType());
+        if (selectedCount == 0 && ENABLED != question.getRequiredFlag()) {
+            return;
+        }
         if (QuestionType.SINGLE.getCode() == question.getQuestionType() && selectedCount != 1) {
             throw new BusinessException(HttpStatus.BAD_REQUEST.value(), "单选题只能选择一个选项");
         }
@@ -854,7 +862,6 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 || selectedCount > question.getMaxSelectCount())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST.value(), "多选题选择数量不合法");
         }
-        QuestionType.of(question.getQuestionType());
     }
 
     private BigDecimal scoreValue(QuestionOptionEntity option) {
@@ -870,6 +877,14 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 .map(ScoreDimensionEntity::getSortNo)
                 .findFirst()
                 .orElse(Integer.MAX_VALUE);
+    }
+
+    private ReportResponse toSubmissionResponse(String openId, ReportEntity report) {
+        if (!this.reportAccessService.canRead(openId, ReportKind.SINGLE.getCode(), report.getId())) {
+            return new ReportResponse(String.valueOf(report.getId()),
+                    String.valueOf(report.getAnswerSessionId()), null, null, report.getGeneratedAt());
+        }
+        return this.toReportResponse(report);
     }
 
     private ReportResponse toReportResponse(ReportEntity report) {

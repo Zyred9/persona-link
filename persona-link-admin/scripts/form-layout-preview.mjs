@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { parse, compileStyle } from '@vue/compiler-sfc'
 import { baseParse, compile } from '@vue/compiler-dom'
 
-const views = ['views/TypeManagementView.vue', 'views/ResultRulesView.vue', 'views/SettingsView.vue', 'components/AiImageGenerationDialog.vue', 'views/HomeConfigView.vue']
+const views = ['views/TypeManagementView.vue', 'views/ResultRulesView.vue', 'views/SettingsView.vue', 'components/AiImageGenerationDialog.vue', 'views/HomeConfigView.vue', 'views/AdConfigView.vue']
 const root = new URL('../', import.meta.url)
 const sample = {
   drawerOpen: true, editingId: 1, editingRuleKey: 'example', uploadingCover: false, saving: false,
@@ -42,9 +42,9 @@ createServer((request, response) => {
   const index = Number(new URL(request.url, 'http://localhost').searchParams.get('view') || 0)
   if (!views[index]) { response.writeHead(404); response.end(); return }
   const { descriptor } = parse(readFileSync(new URL(`src/${views[index]}`, root), 'utf8'))
-  const modal = index === 4 ? null : findModal(baseParse(descriptor.template.content))
-  const pageClass = ['type-page', 'rules-page', 'settings-view', 'image-preview-page', 'home-preview-page'][index]
-  const render = compile(`<section class="${pageClass}">${index === 4 ? descriptor.template.content : modal.loc.source}</section>`, { mode: 'function' }).code
+  const modal = index >= 4 ? null : findModal(baseParse(descriptor.template.content))
+  const pageClass = ['type-page', 'rules-page', 'settings-view', 'image-preview-page', 'home-preview-page', 'home-preview-page'][index]
+  const render = compile(`<section class="${pageClass}">${index >= 4 ? descriptor.template.content : modal.loc.source}</section>`, { mode: 'function' }).code
   const scopeId = 'data-v-layout-preview'
   const styles = readFileSync(new URL('src/styles.css', root), 'utf8') + descriptor.styles.map((style) =>
     compileStyle({ source: style.content, filename: views[index], id: scopeId, scoped: style.scoped }).code).join('\n')
@@ -61,7 +61,10 @@ createServer((request, response) => {
           const page=Vue.ref(1),pageSize=Vue.ref(10),listScroll=Vue.ref(null);
           Object.assign(result,{tests,page,pageSize,listScroll,pageCount:Vue.computed(()=>Math.ceil(tests.value.length/pageSize.value)),pagedTests:Vue.computed(()=>tests.value.slice((page.value-1)*pageSize.value,page.value*pageSize.value)),loading:false,message:'',savingId:null,targetId:0,dirtyIds:new Set(),preview:null,previewCategories:[],previewTests:[],selectedCategoryId:'all',isRowDirty:()=>false,markRowDirty:()=>{},save:()=>{},changePage:offset=>{page.value+=offset;if(listScroll.value)listScroll.value.scrollTop=0},changePageSize:event=>{pageSize.value=Number(event.target.value);page.value=1;if(listScroll.value)listScroll.value.scrollTop=0}});
         }
+        if (${index} === 5) {
+          Object.assign(result, {saved: {enabled:false,adUnitId:'',failurePolicy:1,updatedAt:null,updatedByName:null},form:Vue.reactive({enabled:false,adUnitId:'',failurePolicy:1}),notice:'',failed:false,dirty:false,isAdmin:()=>true,save:()=>{},load:()=>{}});
+        }
         return result;
       } }).mount('#app');
     </script></html>`)
-}).listen(8765, '127.0.0.1', () => console.log('Layout preview: http://127.0.0.1:8765/?view=0 (0=题型, 1=结果规则, 2=账号, 3=AI生图, 4=首页分页)'))
+}).listen(8765, '127.0.0.1', () => console.log('Layout preview: http://127.0.0.1:8765/?view=0 (0=题型, 1=结果规则, 2=账号, 3=AI生图, 4=首页分页, 5=广告配置)'))

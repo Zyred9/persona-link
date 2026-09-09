@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.ReportAccessMapper">
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO t_report_access (open_id, report_type, report_id, grant_source, granted_at, deleted)
+        VALUES (#{openId}, #{reportType}, #{reportId}, #{grantSource}, #{grantedAt}, 0)
+    </insert>
+    <insert id="grantHistory">
+        INSERT IGNORE INTO t_report_access (open_id, report_type, report_id, grant_source, granted_at, deleted)
+        SELECT s.open_id, 1, r.id, 1, NOW(), 0
+        FROM t_report r INNER JOIN t_answer_session s ON s.id = r.answer_session_id AND s.deleted = 0
+        WHERE s.open_id = #{openId} AND r.deleted = 0
+    </insert>
+</mapper>

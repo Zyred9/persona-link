@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.LegalDocumentMapper">
+    <insert id="publish">
+        INSERT INTO t_legal_document (type, title, content, version)
+        VALUES (#{type}, #{title}, #{content}, 1)
+        ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content),
+            version = version + 1, update_date = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

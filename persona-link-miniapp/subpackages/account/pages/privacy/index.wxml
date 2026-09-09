@@ -3,7 +3,7 @@
 <view class="paper-page privacy-page">
   <view class="paper-card privacy-intro">
     <text class="privacy-intro__title">你可以管理自己的数据</text>
-    <text class="privacy-intro__copy">查看已同意协议版本、了解数据使用说明，或提交删除请求。</text>
+    <text class="privacy-intro__copy">查看已同意协议版本、了解数据使用说明，或删除自己的测试记录。</text>
   </view>
 
   <view class="privacy-list">
@@ -15,13 +15,13 @@
       <text>数据使用说明</text>
       <text class="privacy-row__arrow">›</text>
     </button>
-    <button class="paper-card privacy-row privacy-row--danger" bindtap="requestDeletion">
-      <text>申请删除账号关联数据</text>
+    <button class="paper-card privacy-row privacy-row--danger" loading="{{deleting}}" disabled="{{deleting}}" bindtap="requestDeletion">
+      <text>{{deleting ? '正在删除' : '删除全部测试记录'}}</text>
       <text class="privacy-row__arrow">›</text>
     </button>
   </view>
 
   <view class="paper-card privacy-note">
-    删除请求会进入后台异步处理。完成后将刷新记录与结果页权限；不会删除他人已生成的独立报告。
+    删除范围包括你的未完成答卷、答案、测试报告及个人双人记录。未完成的双人测试将取消；对方仍可查看已完成的双人报告及自己的答卷。此操作不是账号注销，也不会删除反馈或登录信息。
   </view>
 </view>

@@ -1,11 +1,19 @@
 package com.personalink.server.controller.app;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.CreatePairRequest;
 import com.personalink.server.dto.JoinPairRequest;
 import com.personalink.server.dto.PairCreateResponse;
 import com.personalink.server.dto.PairReportResponse;
 import com.personalink.server.dto.PairSessionResponse;
 import com.personalink.server.dto.ApiResponse;
+import com.personalink.server.dto.PageResponse;
+import com.personalink.server.dto.PairHistoryResponse;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.personalink.server.service.PairAssessmentService;
 import com.personalink.server.service.impl.AuthService;
 import jakarta.validation.Valid;
@@ -22,17 +30,28 @@ import org.springframework.web.bind.annotation.RestController;
  * 小程序双人评测接口。
  */
 @RestController
+@Validated
 @RequestMapping("/api/miniapp/pairs")
+@RequiredArgsConstructor
 public class MiniappPairController {
 
     private final AuthService authService;
     private final PairAssessmentService pairAssessmentService;
 
-    public MiniappPairController(
-            AuthService authService,
-            PairAssessmentService pairAssessmentService) {
-        this.authService = authService;
-        this.pairAssessmentService = pairAssessmentService;
+    /**
+     * 分页查询当前用户可见的双人测试记录，最新创建记录在前。
+     * @param authorization Bearer 业务会话令牌
+     * @param page 页码，从 1 开始
+     * @param size 每页数量，最大 100
+     * @return 双人历史分页，不包含其他用户身份或答案
+     */
+    @GetMapping
+    public ApiResponse<PageResponse<PairHistoryResponse>> history(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestParam(defaultValue = "1") @Min(1) @Max(Integer.MAX_VALUE) long page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) long size) {
+        String openId = this.authService.requireSession(authorization).openId();
+        return ApiResponse.success(this.pairAssessmentService.history(openId, page, size));
     }
 
     /**

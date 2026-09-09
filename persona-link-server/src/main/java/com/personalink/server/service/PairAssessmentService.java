@@ -6,12 +6,16 @@ import com.personalink.server.dto.JoinPairRequest;
 import com.personalink.server.dto.PairCreateResponse;
 import com.personalink.server.dto.PairReportResponse;
 import com.personalink.server.dto.PairSessionResponse;
+import com.personalink.server.dto.PairHistoryResponse;
+import com.personalink.server.dto.PageResponse;
 import com.personalink.server.entity.PairSessionEntity;
 
 /**
  * 小程序双人配对业务接口。
  */
 public interface PairAssessmentService extends IService<PairSessionEntity> {
+
+    PageResponse<PairHistoryResponse> history(String openId, long page, long size);
 
     PairCreateResponse create(String openId, CreatePairRequest request);
 

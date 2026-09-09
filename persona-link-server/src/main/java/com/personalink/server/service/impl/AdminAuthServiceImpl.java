@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.personalink.server.dto.AdminLoginRequest;
 import com.personalink.server.dto.AdminLoginResponse;
 import com.personalink.server.dto.AdminProfileResponse;
@@ -27,6 +29,7 @@ import java.util.Objects;
  * 后台鉴权服务实现。
  */
 @Service
+@RequiredArgsConstructor
 public class AdminAuthServiceImpl implements AdminAuthService {
 
     private static final int ENABLED = 1;
@@ -42,12 +45,6 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private final AdminAccountService adminAccountService;
     private final BusinessSessionService businessSessionService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
-    public AdminAuthServiceImpl(AdminAccountService adminAccountService,
-                                BusinessSessionService businessSessionService) {
-        this.adminAccountService = adminAccountService;
-        this.businessSessionService = businessSessionService;
-    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)

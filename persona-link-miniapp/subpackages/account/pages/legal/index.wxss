@@ -23,6 +23,9 @@
 }
 
 .legal-paragraph {
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   display: block;
   margin-bottom: 34rpx;
   color: #514957;

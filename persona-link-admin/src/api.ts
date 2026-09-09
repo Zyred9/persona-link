@@ -247,6 +247,25 @@ export interface AdminAccount {
   createDate: string
 }
 
+export interface AdConfigInput {
+  enabled: boolean
+  adUnitId: string
+  failurePolicy: 1 | 2
+}
+
+export interface AdConfig extends AdConfigInput {
+  updatedAt: string | null
+  updatedByName: string | null
+}
+
+export function getAdConfig(): Promise<AdConfig> { return request('/api/admin/ad-config') }
+export interface FeedbackItem { id: string; openId: string; content: string; createdAt: string }
+export interface LegalDocument { type: 1 | 2 | 3; title: string; content: string; version: number; updatedAt: string | null }
+export function getFeedbacks(page: number, size: number): Promise<PageResponse<FeedbackItem>> { return request(`/api/admin/feedbacks${queryString({ page, size })}`) }
+export function getLegalDocuments(): Promise<LegalDocument[]> { return request('/api/admin/legal-documents') }
+export function saveLegalDocument(type: LegalDocument['type'], payload: Pick<LegalDocument, 'title' | 'content'>): Promise<LegalDocument> { return request(`/api/admin/legal-documents/${type}`, { method: 'PUT', body: JSON.stringify(payload) }) }
+export function saveAdConfig(payload: AdConfigInput): Promise<AdConfig> { return request('/api/admin/ad-config', { method: 'PUT', body: JSON.stringify(payload) }) }
+
 export interface AssetItem {
   fileName: string
   url: string

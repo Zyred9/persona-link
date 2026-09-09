@@ -14,6 +14,9 @@ const router = createRouter({
       children: [
         { path: '', name: 'dashboard', component: () => import('./views/DashboardView.vue') },
         { path: 'home-config', name: 'home-config', component: () => import('./views/HomeConfigView.vue') },
+        { path: 'ad-config', name: 'ad-config', component: () => import('./views/AdConfigView.vue'), meta: { adminOnly: true } },
+        { path: 'feedbacks', name: 'feedbacks', component: () => import('./views/FeedbackView.vue'), meta: { adminOnly: true } },
+        { path: 'legal-documents', name: 'legal-documents', component: () => import('./views/LegalDocumentsView.vue'), meta: { adminOnly: true } },
         { path: 'types', name: 'types', component: () => import('./views/TypeManagementView.vue') },
         { path: 'types/:id/questions', name: 'question-editor', component: () => import('./views/QuestionEditorView.vue') },
         { path: 'types/:id/results', name: 'result-rules', component: () => import('./views/ResultRulesView.vue') },

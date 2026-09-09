@@ -1,1 +1,1 @@
-<account-center initial-view="history"></account-center>
+<account-center initial-view="history" id="history-account-center"></account-center>

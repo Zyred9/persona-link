@@ -3,6 +3,29 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.personalink.server.mapper.PairSessionMapper">
 
+    <sql id="visibleHistory">
+        p.deleted = 0
+        AND ((p.initiator_open_id = #{openId} AND p.initiator_visible_flag = 1)
+          OR (p.partner_open_id = #{openId} AND p.partner_visible_flag = 1))
+    </sql>
+
+    <select id="countHistory" resultType="long">
+        SELECT COUNT(*) FROM t_pair_session p WHERE <include refid="visibleHistory"/>
+    </select>
+
+    <select id="selectHistory" resultType="com.personalink.server.dto.PairHistoryResponse">
+        SELECT CAST(p.id AS CHAR) AS pair_session_id,
+               COALESCE(NULLIF(v.title, ''), '已删除题型') AS title, v.version_no,
+               CASE WHEN p.pair_status = #{pendingStatus} AND p.expires_at &lt; #{now}
+                    THEN #{expiredStatus} ELSE p.pair_status END AS pair_status,
+               p.create_date AS created_at, p.expires_at
+        FROM t_pair_session p
+        LEFT JOIN t_test_version v ON v.id = p.version_id AND v.deleted = 0
+        WHERE <include refid="visibleHistory"/>
+        ORDER BY p.create_date DESC, p.id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
     <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
         INSERT IGNORE INTO t_pair_session
             (pair_no, create_request_id, invite_token_hash, version_id, initiator_open_id,

@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
@@ -65,6 +67,7 @@ import java.util.stream.Collectors;
 
 /** 人工内容运营业务实现。 */
 @Service
+@RequiredArgsConstructor
 public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> implements ContentService {
 
     private static final int NORMAL = 0;
@@ -104,24 +107,6 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     private final CategoryService categoryService;
     private final ObjectMapper objectMapper;
 
-    public ContentServiceImpl(TestVersionMapper versionMapper,
-                              ScoreDimensionMapper dimensionMapper,
-                              QuestionMapper questionMapper,
-                              QuestionOptionMapper optionMapper,
-                              ResultTemplateMapper resultMapper,
-                              ContentAuditLogMapper auditMapper,
-                              CategoryService categoryService,
-                              ObjectMapper objectMapper) {
-        this.versionMapper = versionMapper;
-        this.dimensionMapper = dimensionMapper;
-        this.questionMapper = questionMapper;
-        this.optionMapper = optionMapper;
-        this.resultMapper = resultMapper;
-        this.auditMapper = auditMapper;
-        this.categoryService = categoryService;
-        this.objectMapper = objectMapper;
-    }
-
     @Override
     @Transactional(readOnly = true)
     public PageResponse<TestResponse> pageTests(TestQuery query) {
@@ -156,11 +141,25 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TestResponse updateTest(Long id, TestSaveRequest request, Long operatorId) {
-        TestEntity before = this.getTestEntity(id);
+        TestEntity before = this.selectTestForUpdate(id);
+        if (Objects.isNull(before)) {
+            throw this.notFound("题型不存在");
+        }
         this.requireActiveCategory(request.categoryId());
+        if (!Objects.equals(before.getTestType(), request.testType())
+                && this.versionMapper.selectCount(Wrappers.<TestVersionEntity>lambdaQuery()
+                .eq(TestVersionEntity::getTestId, id)
+                .and(version -> version.isNotNull(TestVersionEntity::getPublishedAt)
+                        .or().in(TestVersionEntity::getVersionStatus, PUBLISHED, OFFLINE, ARCHIVED))) > 0) {
+            throw this.badRequest("题型已有发布历史，不能修改单人或双人类型");
+        }
         TestEntity entity = new TestEntity();
         entity.setId(id);
         this.applyTest(entity, request);
+        if (DISABLED == request.status()) {
+            entity.setHomeDisplay(HOME_REGULAR);
+            entity.setHomeSort(HOME_REGULAR);
+        }
         this.updateById(entity);
         this.writeAudit(BIZ_TEST, id, ACTION_UPDATE, before, entity, operatorId, null);
         return this.getTest(id);
@@ -169,7 +168,10 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TestResponse updateTestStatus(Long id, Integer status, Long operatorId) {
-        TestEntity before = this.getTestEntity(id);
+        TestEntity before = this.selectTestForUpdate(id);
+        if (Objects.isNull(before)) {
+            throw this.notFound("题型不存在");
+        }
         var update = this.lambdaUpdate()
                 .set(TestEntity::getStatus, status)
                 .eq(TestEntity::getId, id)
@@ -202,6 +204,10 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
             }
         }
         if (HOME_FOCUS == homeDisplay) {
+            List<TestEntity> previousFocus = this.list(Wrappers.<TestEntity>lambdaQuery()
+                    .ne(TestEntity::getId, id)
+                    .eq(TestEntity::getHomeDisplay, HOME_FOCUS)
+                    .eq(TestEntity::getDeleted, NORMAL));
             this.lambdaUpdate()
                     .set(TestEntity::getHomeDisplay, HOME_REGULAR)
                     .set(TestEntity::getHomeSort, HOME_REGULAR)
@@ -209,6 +215,17 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
                     .eq(TestEntity::getHomeDisplay, HOME_FOCUS)
                     .eq(TestEntity::getDeleted, NORMAL)
                     .update();
+            List<ContentAuditLogEntity> audits = previousFocus.stream().map(previous -> {
+                TestEntity after = new TestEntity();
+                after.setId(previous.getId());
+                after.setHomeDisplay(HOME_REGULAR);
+                after.setHomeSort(HOME_REGULAR);
+                return this.buildAudit(BIZ_TEST, previous.getId(), ACTION_UPDATE, previous, after,
+                        operatorId, "焦点位被题型 " + id + " 替换");
+            }).toList();
+            if (!audits.isEmpty()) {
+                this.auditMapper.insert(audits);
+            }
         }
         this.lambdaUpdate()
                 .set(TestEntity::getHomeDisplay, homeDisplay)
@@ -314,8 +331,9 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
         if (Objects.isNull(source)) {
             throw this.notFound("题型版本不存在");
         }
-        if (PUBLISHED != source.getVersionStatus() && OFFLINE != source.getVersionStatus()) {
-            throw this.badRequest("只有已发布或已下线版本可以复制为草稿");
+        if (PUBLISHED != source.getVersionStatus() && OFFLINE != source.getVersionStatus()
+                && ARCHIVED != source.getVersionStatus()) {
+            throw this.badRequest("只有已发布、已下线或已归档版本可以复制为草稿");
         }
         TestVersionEntity existingDraft = this.versionMapper.selectOne(
                 Wrappers.<TestVersionEntity>lambdaQuery()
@@ -639,6 +657,7 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TestVersionResponse cancelSchedule(Long versionId, Long operatorId) {
+        this.lockTestForVersion(versionId);
         TestVersionEntity target = this.selectVersionForUpdate(versionId);
         if (Objects.isNull(target)) {
             throw this.notFound("题型版本不存在");
@@ -656,8 +675,9 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public TestVersionResponse publish(Long versionId, Long operatorId) {
+        this.lockTestForVersion(versionId);
         TestVersionEntity target = this.selectVersionForUpdate(versionId);
         if (Objects.isNull(target)) {
             throw this.notFound("题型版本不存在");
@@ -675,9 +695,12 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
         TestVersionEntity current = this.selectPublishedVersionForUpdate(target.getTestId());
         LocalDateTime now = LocalDateTime.now();
         if (Objects.nonNull(current) && !Objects.equals(current.getId(), versionId)) {
+            TestVersionEntity previous = this.copyVersion(current);
             current.setVersionStatus(OFFLINE);
             current.setOfflineAt(now);
             this.versionMapper.updateById(current);
+            this.writeAudit(BIZ_VERSION, current.getId(), ACTION_OFFLINE, previous, current,
+                    operatorId, "被新版本 " + versionId + " 替换");
         }
         TestVersionEntity before = this.copyVersion(target);
         target.setVersionStatus(PUBLISHED);
@@ -692,6 +715,7 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TestVersionResponse offline(Long versionId, String reason, Long operatorId) {
+        this.lockTestForVersion(versionId);
         TestVersionEntity version = this.selectVersionForUpdate(versionId);
         if (Objects.isNull(version)) {
             throw this.notFound("题型版本不存在");
@@ -710,6 +734,7 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TestVersionResponse archive(Long versionId, Long operatorId) {
+        this.lockTestForVersion(versionId);
         TestVersionEntity version = this.selectVersionForUpdate(versionId);
         if (Objects.isNull(version)) {
             throw this.notFound("题型版本不存在");
@@ -726,11 +751,40 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public int publishDueVersions() {
         LocalDateTime now = LocalDateTime.now();
+        // 先锁题型再锁版本，与立即发布、类型修改保持同一顺序；停用/删除后的排期不生效。
+        List<TestVersionEntity> candidates = this.versionMapper.selectList(
+                Wrappers.<TestVersionEntity>lambdaQuery()
+                        .eq(TestVersionEntity::getVersionStatus, PENDING)
+                        .le(TestVersionEntity::getScheduledAt, now)
+                        .eq(TestVersionEntity::getDeleted, NORMAL));
+        if (candidates.isEmpty()) {
+            return 0;
+        }
+        Set<Long> candidateTestIds = candidates.stream().map(TestVersionEntity::getTestId).collect(Collectors.toSet());
+        List<TestEntity> tests = this.list(Wrappers.<TestEntity>lambdaQuery()
+                .in(TestEntity::getId, candidateTestIds)
+                .eq(TestEntity::getDeleted, NORMAL)
+                .orderByAsc(TestEntity::getId)
+                .last("FOR UPDATE"));
+        if (tests.isEmpty()) {
+            return 0;
+        }
+        Set<Long> activeCategories = this.categoryService.listByIds(tests.stream()
+                        .map(TestEntity::getCategoryId).collect(Collectors.toSet())).stream()
+                .filter(category -> ENABLED == category.getStatus())
+                .map(CategoryEntity::getId).collect(Collectors.toSet());
+        List<Long> eligibleTestIds = tests.stream()
+                .filter(test -> ENABLED == test.getStatus() && activeCategories.contains(test.getCategoryId()))
+                .map(TestEntity::getId).toList();
+        if (eligibleTestIds.isEmpty()) {
+            return 0;
+        }
         List<TestVersionEntity> dueVersions = this.versionMapper.selectList(
                 Wrappers.<TestVersionEntity>lambdaQuery()
+                        .in(TestVersionEntity::getTestId, eligibleTestIds)
                         .eq(TestVersionEntity::getVersionStatus, PENDING)
                         .le(TestVersionEntity::getScheduledAt, now)
                         .eq(TestVersionEntity::getDeleted, NORMAL)
@@ -748,6 +802,7 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
                         .eq(TestVersionEntity::getVersionStatus, PUBLISHED)
                         .eq(TestVersionEntity::getDeleted, NORMAL)
                         .last("FOR UPDATE"));
+        List<TestVersionEntity> previousVersions = currentVersions.stream().map(this::copyVersion).toList();
         currentVersions.forEach(version -> {
             version.setVersionStatus(OFFLINE);
             version.setOfflineAt(now);
@@ -762,10 +817,15 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
             version.setScheduledAt(null);
         });
         this.versionMapper.updateById(dueVersions);
-        List<ContentAuditLogEntity> audits = dueVersions.stream()
+        List<ContentAuditLogEntity> audits = new ArrayList<>(dueVersions.stream()
                 .map(version -> this.buildAudit(BIZ_VERSION, version.getId(), ACTION_PUBLISH,
                         beforeVersions.get(version.getId()), version, SYSTEM_OPERATOR_ID, "排期自动发布"))
-                .toList();
+                .toList());
+        for (int index = 0; index < currentVersions.size(); index++) {
+            TestVersionEntity current = currentVersions.get(index);
+            audits.add(this.buildAudit(BIZ_VERSION, current.getId(), ACTION_OFFLINE,
+                    previousVersions.get(index), current, SYSTEM_OPERATOR_ID, "被排期新版本替换"));
+        }
         this.auditMapper.insert(audits);
         return dueVersions.size();
     }
@@ -788,6 +848,10 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
         TestEntity test = this.getTestEntity(version.getTestId());
         if (ENABLED != test.getStatus()) {
             errors.add("题型已停用");
+        }
+        CategoryEntity category = this.categoryService.getById(test.getCategoryId());
+        if (Objects.isNull(category) || ENABLED != category.getStatus()) {
+            errors.add("分类不存在或已停用");
         }
         List<ScoreDimensionEntity> dimensions = this.listDimensions(version.getId());
         List<QuestionEntity> questions = this.questionMapper.selectList(Wrappers.<QuestionEntity>lambdaQuery()

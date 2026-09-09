@@ -1,5 +1,7 @@
 package com.personalink.server.service.impl;
 
+import lombok.RequiredArgsConstructor;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.personalink.server.dto.WechatMetricDayResponse;
@@ -20,14 +22,11 @@ import java.util.Objects;
 
 /** 微信官方日访问数据服务实现。 */
 @Service
+@RequiredArgsConstructor
 public class WechatMetricDayServiceImpl extends ServiceImpl<WechatMetricDayMapper, WechatMetricDayEntity>
         implements WechatMetricDayService {
 
     private final WechatAnalyticsClient wechatAnalyticsClient;
-
-    public WechatMetricDayServiceImpl(WechatAnalyticsClient wechatAnalyticsClient) {
-        this.wechatAnalyticsClient = wechatAnalyticsClient;
-    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
