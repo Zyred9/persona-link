@@ -6,9 +6,7 @@
 }
 
 .home-hero {
-  margin-right: -28rpx;
-  padding: 20rpx 0 0;
-  margin-left: -28rpx;
+  padding: 28rpx 0 0;
 }
 
 .home-title-image {
@@ -24,17 +22,14 @@
 
 .home-test-card--focus {
   width: auto;
-  margin-right: -28rpx;
-  margin-left: -28rpx;
+  margin-top: 28rpx;
 }
 
 .test-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20rpx;
-  margin-right: -28rpx;
-  margin-top: 0;
-  margin-left: -28rpx;
+  gap: 28rpx;
+  margin-top: 28rpx;
 }
 
 .home-test-card__image {
@@ -44,15 +39,11 @@
 
 .category-list {
   display: flex;
-  gap: 22rpx;
-  margin: 34rpx -28rpx 0;
+  gap: 28rpx;
+  margin: 28rpx 0 0;
   overflow-x: auto;
-  padding: 0 48rpx 12rpx;
+  padding: 0;
   white-space: nowrap;
-}
-
-.all-test-grid {
-  margin-top: 22rpx;
 }
 
 .category {

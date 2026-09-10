@@ -12,6 +12,7 @@ public class ReportHistoryRow {
     private Long testId;
     private Integer versionNo;
     private String title;
+    private String coverUrl;
     private String resultCode;
     private String resultName;
     private LocalDateTime generatedAt;
@@ -26,6 +27,8 @@ public class ReportHistoryRow {
     public void setVersionNo(Integer versionNo) { this.versionNo = versionNo; }
     public String getTitle() { return this.title; }
     public void setTitle(String title) { this.title = title; }
+    public String getCoverUrl() { return this.coverUrl; }
+    public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
     public String getResultCode() { return this.resultCode; }
     public void setResultCode(String resultCode) { this.resultCode = resultCode; }
     public String getResultName() { return this.resultName; }

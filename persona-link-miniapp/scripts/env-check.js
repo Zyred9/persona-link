@@ -15,7 +15,7 @@ function resolve(envVersion, stored = '') {
   vm.runInNewContext(source, sandbox);
   return sandbox.module.exports.getApiBaseUrl();
 }
-assert.equal(resolve('develop'), 'http://127.0.0.1:8080');
+assert.equal(resolve('develop'), 'http://192.168.8.128:8080');
 assert.equal(resolve('develop', 'http://localhost:9000/'), 'http://localhost:9000');
 for (const env of ['trial', 'release']) {
   assert.equal(resolve(env), 'https://seeyoume.vip:8080');

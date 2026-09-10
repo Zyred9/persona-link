@@ -9,6 +9,7 @@ public record ReportHistoryResponse(
         String testId,
         int versionNo,
         String title,
+        String coverUrl,
         String resultCode,
         String resultName,
         LocalDateTime generatedAt) {

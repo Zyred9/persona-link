@@ -63,6 +63,13 @@ public class LocalAssetService {
     private final OssConfiguration ossConfiguration;
     private final OSS ossClient;
     private ImageGenerationTaskMapper imageTaskMapper;
+    private com.personalink.server.service.AppConfigService appConfigService;
+
+    /** 首页标题图同样属于受保护的业务素材。 */
+    @Autowired
+    public void setAppConfigService(com.personalink.server.service.AppConfigService appConfigService) {
+        this.appConfigService = appConfigService;
+    }
 
     /** 图片任务模块存在时，未采用的生成结果同样属于受保护的业务素材。 */
     @Autowired(required = false)
@@ -86,6 +93,15 @@ public class LocalAssetService {
      * @return 图片访问地址
      */
     public AssetResponse saveImage(MultipartFile file) {
+        return this.saveImage(file, false);
+    }
+
+    /** 头像单独存储，避免暴露到后台素材库或被素材清理删除。 */
+    public AssetResponse saveAvatarImage(MultipartFile file) {
+        return this.saveImage(file, true);
+    }
+
+    private AssetResponse saveImage(MultipartFile file, boolean avatar) {
         if (Objects.isNull(file) || file.isEmpty() || file.getSize() > MAX_IMAGE_BYTES) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, 40001, "图片不能为空且不能超过5MB");
         }
@@ -97,7 +113,7 @@ public class LocalAssetService {
 
         try (InputStream inputStream = file.getInputStream()) {
             byte[] bytes = inputStream.readNBytes((int) MAX_IMAGE_BYTES + 1);
-            return this.saveImageBytes(bytes, file.getContentType(), extension);
+            return this.saveImageBytes(bytes, file.getContentType(), extension, avatar);
         } catch (IOException exception) {
             throw new IllegalStateException("读取待上传图片失败", exception);
         }
@@ -105,10 +121,10 @@ public class LocalAssetService {
 
     /** 保存经过服务端尺寸归一化的 AI 生成 PNG，复用上传资源归属及访问规则。 */
     public AssetResponse saveGeneratedImage(byte[] png) {
-        return this.saveImageBytes(png, "image/png", ".png");
+        return this.saveImageBytes(png, "image/png", ".png", false);
     }
 
-    private AssetResponse saveImageBytes(byte[] bytes, String contentType, String extension) {
+    private AssetResponse saveImageBytes(byte[] bytes, String contentType, String extension, boolean avatar) {
         if (Objects.isNull(bytes) || bytes.length == 0 || bytes.length > MAX_IMAGE_BYTES) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, 40001, "图片不能为空且不能超过5MB");
         }
@@ -122,13 +138,14 @@ public class LocalAssetService {
         metadata.setContentType(contentType);
         metadata.setContentLength(bytes.length);
         metadata.addUserMetadata(APP_METADATA_KEY, APP_METADATA_VALUE);
+        String objectKey = avatar ? "persona-link/avatars/" + fileName : this.ossObjectKey(fileName);
         try {
-            this.ossClient.putObject(this.ossConfiguration.getBucketName(), this.ossObjectKey(fileName),
+            this.ossClient.putObject(this.ossConfiguration.getBucketName(), objectKey,
                     new ByteArrayInputStream(bytes), metadata);
         } catch (OSSException | ClientException exception) {
             throw new IllegalStateException("上传图片到 OSS 失败", exception);
         }
-        return new AssetResponse(this.ossUrl(fileName));
+        return new AssetResponse(this.ossConfiguration.getDomain() + "/" + objectKey);
     }
 
     /**
@@ -174,7 +191,7 @@ public class LocalAssetService {
         }
         String url = ossImage ? this.ossUrl(fileName) : "/uploads/" + fileName;
         if (this.referenceCounts().getOrDefault(url, 0L) > 0) {
-            throw new BusinessException(HttpStatus.CONFLICT, 40903, "素材正在被题型或版本引用，不能删除");
+            throw new BusinessException(HttpStatus.CONFLICT, 40903, "素材正在被业务配置引用，不能删除");
         }
         if (ossImage) {
             try {
@@ -202,6 +219,11 @@ public class LocalAssetService {
 
     private Map<String, Long> referenceCounts() {
         Map<String, Long> references = new HashMap<>();
+        if (Objects.nonNull(this.appConfigService)) {
+            // 图片处理参数只影响展示；素材引用按不含查询参数和片段的原始地址统计。
+            String titleImageUrl = this.appConfigService.readHomeConfig().titleImageUrl().split("[?#]", 2)[0];
+            if (!titleImageUrl.isEmpty()) { references.merge(titleImageUrl, 1L, Long::sum); }
+        }
         this.testVersionMapper.selectList(Wrappers.<TestVersionEntity>lambdaQuery()
                         .select(TestVersionEntity::getCoverUrl, TestVersionEntity::getDetailImageUrl)
                         .eq(TestVersionEntity::getDeleted, NOT_DELETED))

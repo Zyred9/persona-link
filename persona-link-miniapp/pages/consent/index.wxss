@@ -4,6 +4,14 @@
   flex-direction: column;
 }
 
+.onboarding-panel { display: block; margin-top: 70rpx; }
+.onboarding-avatar::after { border: 0; }
+.onboarding-panel .paper-button { margin-top: 36rpx; }
+.onboarding-avatar { width: 200rpx; height: 200rpx; padding: 0; border: 3rpx solid #201b22; border-radius: 50%; background: #fff7ec; font-size: 24rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.onboarding-avatar image { width: 100%; height: 100%; }
+.onboarding-nickname { height: 90rpx; margin: 36rpx 0; padding: 0 24rpx; border: 2rpx solid #201b22; border-radius: 20rpx; background: #fffdf8; }
+.onboarding-error { display: block; margin-top: 24rpx; color: #b63232; font-size: 26rpx; }
+
 .consent-hero {
   display: flex;
   align-items: center;
@@ -33,6 +41,8 @@
   width: 142rpx;
   height: 142rpx;
   margin-top: 34rpx;
+  align-self: flex-end;
+  margin-bottom: -20rpx;
   background: #c7a5ff;
   border: 5rpx solid #201b22;
   border-radius: 50%;
@@ -44,6 +54,7 @@
   left: 50%;
   width: 46rpx;
   height: 46rpx;
+  box-sizing: border-box;
   background: #ff7469;
   border-right: 5rpx solid #201b22;
   border-bottom: 5rpx solid #201b22;
@@ -58,20 +69,23 @@
   content: '';
   background: #ff7469;
   border: 5rpx solid #201b22;
-  border-radius: 50%;
   box-sizing: border-box;
 }
 
 .heart-mascot__heart::before {
-  top: -24rpx;
-  left: -5rpx;
-  border-bottom-color: transparent;
+  top: -23rpx;
+  left: 0;
+  height: 23rpx;
+  border-bottom: 0;
+  border-radius: 46rpx 46rpx 0 0;
 }
 
 .heart-mascot__heart::after {
-  top: -5rpx;
-  left: -24rpx;
-  border-right-color: transparent;
+  top: 0;
+  left: -23rpx;
+  width: 23rpx;
+  border-right: 0;
+  border-radius: 46rpx 0 0 46rpx;
 }
 
 .heart-mascot__cheek {
@@ -104,7 +118,7 @@
 
 .consent-card {
   min-height: 258rpx;
-  margin-top: 108rpx;
+  margin-top: 132rpx;
   padding: 34rpx 28rpx 38rpx;
 }
 
@@ -137,20 +151,19 @@
 }
 
 .consent-actions {
-  margin-right: -20rpx;
-  margin-left: -20rpx;
   margin-top: auto;
-  margin-bottom: 116rpx;
+  margin-bottom: 100rpx;
   padding-top: 70rpx;
 }
 
 .consent-exit {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   width: 100%;
-  margin-top: 20px;
+  margin-top: 20rpx;
   min-height: 70rpx;
+  line-height: 1.3;
   color: #7b767b;
   font-size: 26rpx;
   font-weight: 800;

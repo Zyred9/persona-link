@@ -2,7 +2,7 @@
 
 <view class="paper-page legal-page">
   <text class="legal-title">{{document.title}}</text>
-  <text wx:if="{{state === 'ready'}}" class="legal-kicker">版本 V{{document.version}} · {{document.updatedAt}}</text>
+  <text wx:if="{{state === 'ready'}}" class="legal-kicker">更新于 {{document.updatedAt}}</text>
 
   <view class="paper-card legal-card">
     <rich-text wx:if="{{state === 'ready'}}" class="legal-paragraph" nodes="{{contentNodes}}" user-select="{{true}}"></rich-text>

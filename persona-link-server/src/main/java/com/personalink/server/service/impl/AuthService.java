@@ -10,6 +10,7 @@ import com.personalink.server.miniapp.auth.WechatCode2SessionClient;
 import com.personalink.server.dto.WechatLoginRequest;
 import com.personalink.server.dto.WechatLoginResponse;
 import com.personalink.server.service.BusinessSessionService;
+import com.personalink.server.service.MiniappUserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -29,9 +30,11 @@ public class AuthService {
 
     private final WechatCode2SessionClient wechatCode2SessionClient;
     private final BusinessSessionService businessSessionService;
+    private final MiniappUserService miniappUserService;
 
     public WechatLoginResponse login(WechatLoginRequest request) {
         String openId = this.wechatCode2SessionClient.exchange(request.code());
+        this.miniappUserService.findOrCreate(openId);
         LocalDateTime currentTime = LocalDateTime.now();
         LocalDateTime expiresAt = currentTime.plusDays(SESSION_DAYS);
         String token = MiniappTokenCodec.generateToken();

@@ -3,18 +3,10 @@
 <view class="paper-page privacy-page">
   <view class="paper-card privacy-intro">
     <text class="privacy-intro__title">你可以管理自己的数据</text>
-    <text class="privacy-intro__copy">查看已同意协议版本、了解数据使用说明，或删除自己的测试记录。</text>
+    <text class="privacy-intro__copy">可删除自己的全部测试记录。</text>
   </view>
 
   <view class="privacy-list">
-    <view class="paper-card privacy-row">
-      <text>已同意协议版本</text>
-      <text class="privacy-row__value">{{versionLabel}}</text>
-    </view>
-    <button class="paper-card privacy-row" bindtap="openPrivacyGuide">
-      <text>数据使用说明</text>
-      <text class="privacy-row__arrow">›</text>
-    </button>
     <button class="paper-card privacy-row privacy-row--danger" loading="{{deleting}}" disabled="{{deleting}}" bindtap="requestDeletion">
       <text>{{deleting ? '正在删除' : '删除全部测试记录'}}</text>
       <text class="privacy-row__arrow">›</text>

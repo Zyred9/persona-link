@@ -44,43 +44,40 @@ App({
   },
 
   ensureConsent(options) {
-    const hasConsented = wx.getStorageSync(CONSENT_STORAGE_KEY) === CONSENT_VERSION;
     const source = options || {};
-    this.globalData.hasConsent = hasConsented;
-    if (hasConsented) {
-      this.verifyConsent(buildLaunchUrl(source.path, source.query)).catch(() => {});
-      return;
+    const pages = getCurrentPages();
+    const current = pages[pages.length - 1];
+    if ([1007, 1008, 1044, 1096, 1158].includes(Number(source.scene))) {
+      const sharedUrl = buildLaunchUrl(source.path, source.query);
+      if (sharedUrl) this.globalData.pendingLaunchUrl = sharedUrl;
     }
-    if (source.path === 'pages/consent/index') {
-      this.globalData.consentRedirecting = false;
-      return;
-    }
-    if (this.globalData.consentRedirecting) {
-      return;
-    }
-
-    this.globalData.pendingLaunchUrl = buildLaunchUrl(source.path, source.query);
-    this.globalData.consentRedirecting = true;
-    wx.reLaunch({
-      url: '/pages/consent/index',
-      complete: () => {
-        this.globalData.consentRedirecting = false;
-      }
-    });
+    // 头像选择和阅读协议返回时，保留正在进行的引导步骤。
+    if (current && ['pages/consent/index', 'subpackages/account/pages/legal/index'].includes(current.route)) return;
+    if (source.path === 'pages/consent/index' || source.path === 'subpackages/account/pages/legal/index') return;
+    this.verifyConsent(buildLaunchUrl(source.path, source.query)).catch(() => {});
   },
 
   verifyConsent(launchUrl) {
     if (launchUrl) this.consentLaunchUrl = launchUrl;
     if (this.consentCheck) return this.consentCheck;
+    this.globalData.hasConsent = false;
     const epoch = this.consentEpoch || 0;
     this.consentCheck = (async () => {
       try {
+        const { onboardingProfile, isProfileComplete, TOKEN_STORAGE_KEY, writeProfileCache } = require('./utils/request');
+        const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
+        if (!token) throw new Error('请先点击微信登录');
+        const profile = await onboardingProfile();
+        if (!isProfileComplete(profile)) throw new Error('请先设置微信头像和昵称');
+        writeProfileCache(token, profile.nickname, profile.avatarUrl);
         const accepted = wx.getStorageSync('personaLinkConsentedDocuments');
         const versions = await require('./utils/request').requestData({
           url: '/api/miniapp/legal-documents/versions', silentUnauthorized: true
         });
         if (epoch !== (this.consentEpoch || 0)) throw new Error('协议状态已变化，请重试');
+        if (token !== wx.getStorageSync(TOKEN_STORAGE_KEY)) throw new Error('登录状态已变化，请重新登录');
         const current = wx.getStorageSync(CONSENT_STORAGE_KEY) === CONSENT_VERSION
+          && wx.getStorageSync('personaLinkConsentToken') === token
           && Array.isArray(accepted) && Array.isArray(versions)
           && [1, 2, 3].every((type) => {
             const latest = versions.find((document) => Number(document.type) === type);
@@ -94,7 +91,7 @@ App({
           this.globalData.hasConsent = false;
           const pages = getCurrentPages();
           const current = pages[pages.length - 1];
-          if (!this.globalData.consentRedirecting && (!current || current.route !== 'pages/consent/index')) {
+          if (!this.globalData.consentRedirecting && (!current || !['pages/consent/index', 'subpackages/account/pages/legal/index'].includes(current.route))) {
             this.globalData.pendingLaunchUrl = this.consentLaunchUrl
               || (current ? buildLaunchUrl(current.route, current.options) : '');
             this.globalData.consentRedirecting = true;

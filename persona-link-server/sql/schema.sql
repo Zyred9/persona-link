@@ -1,5 +1,30 @@
 -- 手工建库脚本，由数据库管理员执行。
 
+-- 通用应用配置增量；执行前核对目标数据库。
+CREATE TABLE IF NOT EXISTS t_app_config (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    config_key VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT '全局唯一配置键',
+    config_value LONGTEXT NOT NULL COMMENT '配置值',
+    value_type TINYINT NOT NULL COMMENT '1字符串，2数字，3布尔，4JSON',
+    config_name VARCHAR(100) NOT NULL COMMENT '配置中文名称',
+    remark VARCHAR(500) DEFAULT NULL COMMENT '配置说明',
+    deleted TINYINT NOT NULL DEFAULT 0,
+    create_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_app_config_key (config_key),
+    CONSTRAINT chk_app_config_value_type CHECK (value_type IN (1, 2, 3, 4))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='应用通用配置';
+
+INSERT INTO t_app_config (config_key, config_value, value_type, config_name, remark)
+VALUES ('miniapp.home.title_image_url', '', 1, '小程序首页标题图', '空值使用小程序内置home-title.png')
+ON DUPLICATE KEY UPDATE config_key = VALUES(config_key);
+
+INSERT INTO t_app_config (config_key, config_value, value_type, config_name, remark)
+VALUES ('miniapp.version', '1.0.0', 1, '小程序版本号', '设置页版本信息展示值')
+ON DUPLICATE KEY UPDATE config_key = VALUES(config_key);
+
+
 -- 用户反馈和协议配置增量；不写入占位协议正文。执行前核对目标数据库。
 CREATE TABLE IF NOT EXISTS t_feedback (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -206,6 +231,7 @@ CREATE TABLE t_report (
     report_no VARCHAR(32) NOT NULL COMMENT '报告业务编号',
     answer_session_id BIGINT UNSIGNED NOT NULL COMMENT '答题会话ID',
     result_code VARCHAR(32) NOT NULL COMMENT '命中的结果编码',
+    cover_url VARCHAR(500) NULL COMMENT '报告生成时的题型封面快照',
     result_snapshot JSON NOT NULL COMMENT '生成时的结果展示快照',
     generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '删除标记：0正常，1删除',
@@ -222,6 +248,7 @@ CREATE TABLE t_pair_session (
     create_request_id VARCHAR(64) NOT NULL COMMENT '创建邀请幂等请求号',
     invite_token_hash CHAR(64) NOT NULL COMMENT '邀请令牌哈希，不保存明文',
     version_id BIGINT UNSIGNED NOT NULL COMMENT '双方共同使用的题型版本ID',
+    cover_url VARCHAR(500) NULL COMMENT '配对创建时的题型封面快照',
     initiator_open_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT '发起者OpenID',
     initiator_answer_session_id BIGINT UNSIGNED NOT NULL COMMENT '发起者答题会话ID',
     partner_open_id VARCHAR(128) COLLATE utf8mb4_bin NULL COMMENT '受邀者OpenID',
@@ -444,3 +471,15 @@ CREATE TABLE IF NOT EXISTS t_image_generation_task (
     CONSTRAINT chk_image_task_provider CHECK (provider IN (1, 2)),
     CONSTRAINT chk_image_task_status CHECK (task_status BETWEEN 1 AND 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI封面详情双图任务';
+-- 小程序用户资料增量，可重复执行；历史会话首次读取资料时补建用户。
+CREATE TABLE IF NOT EXISTS t_miniapp_user (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    open_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT '微信用户唯一标识',
+    nickname VARCHAR(32) NOT NULL DEFAULT '' COMMENT '用户主动填写的昵称',
+    avatar_url VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '本服务上传的头像地址',
+    deleted TINYINT NOT NULL DEFAULT 0,
+    create_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_miniapp_user_open_id (open_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='小程序用户资料';

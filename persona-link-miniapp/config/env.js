@@ -1,5 +1,5 @@
 const API_BASE_URLS = {
-  develop: 'http://127.0.0.1:8080',
+  develop: 'http://192.168.8.128:8080',
   trial: 'https://seeyoume.vip:8080',
   release: 'https://seeyoume.vip:8080'
 };

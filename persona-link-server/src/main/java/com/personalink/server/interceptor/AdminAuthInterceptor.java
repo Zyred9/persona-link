@@ -30,6 +30,7 @@ public class AdminAuthInterceptor implements HandlerInterceptor {
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
         AdminSessionContext context = (request.getRequestURI().startsWith("/api/admin/accounts")
                 || request.getRequestURI().startsWith("/api/admin/ad-config")
+                || request.getRequestURI().startsWith("/api/admin/app-configs")
                 || request.getRequestURI().startsWith("/api/admin/feedbacks")
                 || request.getRequestURI().startsWith("/api/admin/legal-documents"))
                 ? adminAuthService.requireAdminSession(authorization)

@@ -2,24 +2,10 @@ const { authenticatedRequestData, invalidateTestRecordRequests } = require('../.
 
 Page({
   data: {
-    versionLabel: '尚无有效协议记录',
     deleting: false
   },
 
-  onLoad() {
-    const documents = wx.getStorageSync('personaLinkConsentedDocuments');
-    const labels = { 1: '用户协议', 2: '隐私指引', 3: '免责声明' };
-    if (Array.isArray(documents) && documents.length) this.setData({
-      versionLabel: documents.map(({ type, version }) => `${labels[type]} V${version}`).join(' / ')
-    });
-  },
   onUnload() { this.disposed = true; },
-
-  openPrivacyGuide() {
-    wx.navigateTo({
-      url: '/subpackages/account/pages/legal/index?type=privacyGuide'
-    });
-  },
 
   requestDeletion() {
     if (this.data.deleting || this.confirming) return;

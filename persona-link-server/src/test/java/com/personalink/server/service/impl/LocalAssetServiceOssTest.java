@@ -45,6 +45,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class LocalAssetServiceOssTest {
+    @Test
+    void configuredHomeTitleWithImageParametersCannotBeDeleted() {
+        String name = "oss-" + "f".repeat(32) + ".png";
+        var config = mock(com.personalink.server.service.AppConfigService.class);
+        this.service.setAppConfigService(config);
+        when(config.readHomeConfig()).thenReturn(new com.personalink.server.dto.HomeConfigResponse(
+                "https://cdn.example.com/persona-link/images/" + name + "?x-oss-process=image/resize,w_300#preview"));
+        assertEquals(40903, assertThrows(BusinessException.class, () -> this.service.deleteImage(name)).getCode());
+        verify(this.oss, never()).deleteObject(anyString(), anyString());
+    }
+
     private static final byte[] PNG = Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aL1sAAAAASUVORK5CYII=");
     @TempDir Path directory;
@@ -94,6 +105,16 @@ class LocalAssetServiceOssTest {
         try (var files = Files.list(this.directory)) {
             assertEquals(0, files.count());
         }
+    }
+
+    @Test
+    void avatarUploadUsesSeparatePrefixOutsideManagedAssets() {
+        String url = this.service.saveAvatarImage(this.image()).url();
+        assertTrue(url.startsWith("https://cdn.example.com/persona-link/avatars/"));
+        verify(this.oss).putObject(eq("bucket"), startsWith("persona-link/avatars/"),
+                any(InputStream.class), any(ObjectMetadata.class));
+        assertThrows(BusinessException.class, () -> this.service.saveAvatarImage(
+                new MockMultipartFile("file", "fake.png", "image/png", new byte[]{1})));
     }
 
     @Test
@@ -252,6 +273,8 @@ class LocalAssetServiceOssTest {
     @Test
     void missingOssConfigurationShouldNotPreventContextStartup() {
         new ApplicationContextRunner().withUserConfiguration(OssConfiguration.class, LocalAssetService.class)
+                .withBean(com.personalink.server.service.AppConfigService.class,
+                        () -> mock(com.personalink.server.service.AppConfigService.class))
                 .withBean(TestVersionMapper.class, () -> this.mapper)
                 .withPropertyValues("PERSONA_LINK_UPLOAD_DIR=" + this.directory)
                 .run(context -> {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personalink.server.mapper.AppConfigMapper">
+    <update id="restoreDeleted">
+        UPDATE t_app_config SET config_value = #{configValue}, value_type = #{valueType},
+            config_name = #{configName}, remark = #{remark}, deleted = 0, update_date = CURRENT_TIMESTAMP
+        WHERE config_key = #{configKey} AND deleted = 1
+    </update>
+    <insert id="upsert">
+        INSERT INTO t_app_config (config_key, config_value, value_type, config_name, remark)
+        VALUES (#{configKey}, #{configValue}, #{valueType}, #{configName}, #{remark})
+        ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), value_type = VALUES(value_type),
+            config_name = VALUES(config_name), remark = VALUES(remark), deleted = 0, update_date = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

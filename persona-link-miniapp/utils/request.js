@@ -1,6 +1,7 @@
 const { getApiBaseUrl } = require('../config/env');
 
 const TOKEN_STORAGE_KEY = 'personaLinkBusinessToken';
+const PROFILE_CACHE_KEY = 'personaLinkProfileCache';
 let pendingSession = null;
 let testRecordsGeneration = 0;
 
@@ -62,6 +63,10 @@ function request(options) {
       header: headers,
       timeout: options.timeout || 10000,
       success(response) {
+        if (options.sessionBound && token !== wx.getStorageSync(TOKEN_STORAGE_KEY)) {
+          reject(createRequestError('登录状态已变化，请重新加载资料'));
+          return;
+        }
         if (response.statusCode >= 200 && response.statusCode < 300) {
           resolve(response.data);
           return;
@@ -135,7 +140,7 @@ async function requestSession() {
 }
 
 function createSession() {
-  // 首页统计与开始测试可能同时登录，共用请求避免重复创建会话。
+  // 重复点击共用登录请求，避免重复创建会话。
   if (!pendingSession) {
     pendingSession = requestSession().finally(() => { pendingSession = null; });
   }
@@ -144,7 +149,41 @@ function createSession() {
 
 function ensureSession() {
   const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
-  return token ? Promise.resolve(token) : createSession();
+  return token ? Promise.resolve(token) : Promise.reject(createRequestError('请先点击微信登录'));
+}
+
+function onboardingProfile(data, expectedToken) {
+  return ensureSession().then((token) => {
+    if (expectedToken && expectedToken !== token) throw createRequestError('登录状态已变化，请重新登录');
+    return requestData({ url: '/api/miniapp/profile',
+      method: data ? 'PUT' : 'GET', data, sessionBound: true, silentUnauthorized: true });
+  });
+}
+
+function isProfileComplete(profile) {
+  return !!(profile && String(profile.nickname || '').trim() && String(profile.avatarUrl || '').trim());
+}
+
+// 账户中心首次进入时先用缓存的完整资料渲染，避免重复拉取导致的等待。
+function readProfileCache(token) {
+  if (!token) return null;
+  let cache;
+  try {
+    cache = wx.getStorageSync(PROFILE_CACHE_KEY);
+  } catch (error) {
+    return null;
+  }
+  if (!cache || cache.token !== token || !cache.nickname || !cache.avatarUrl) return null;
+  return cache;
+}
+
+function writeProfileCache(token, nickname, avatarUrl) {
+  if (!token || !nickname || !avatarUrl) return;
+  try {
+    wx.setStorageSync(PROFILE_CACHE_KEY, { token, nickname, avatarUrl });
+  } catch (error) {
+    // 缓存失败不影响主流程。
+  }
 }
 
 async function authenticatedRequestData(options) {
@@ -158,6 +197,9 @@ async function authenticatedRequestData(options) {
     return result;
   };
   await ensureSession();
+  if (options.expectedToken && options.expectedToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) {
+    throw createRequestError('登录状态已变化，请重新加载资料');
+  }
   checkResult(null);
   try {
     return checkResult(await requestData(Object.assign({}, options, { silentUnauthorized: true })));
@@ -165,9 +207,56 @@ async function authenticatedRequestData(options) {
     if (error.statusCode !== 401) {
       throw error;
     }
+    if (app && app.ensureConsent) app.ensureConsent();
+    throw error;
+  }
+}
+
+async function authenticatedUploadData(options) {
+  const app = typeof getApp === 'function' ? getApp() : null;
+  if (app && app.verifyConsent) await app.verifyConsent();
+  return uploadData(options);
+}
+
+async function uploadData(options) {
+  await ensureSession();
+  const upload = () => {
+    const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
+    if (options.expectedToken && options.expectedToken !== token) {
+      return Promise.reject(createRequestError('登录状态已变化，请重新加载资料'));
+    }
+    return new Promise((resolve, reject) => {
+      wx.uploadFile({
+        url: `${getApiBaseUrl()}${options.url}`,
+        filePath: options.filePath,
+        name: 'file',
+        header: { Authorization: `Bearer ${token}` },
+        timeout: 30000,
+        success(response) {
+          if (token !== wx.getStorageSync(TOKEN_STORAGE_KEY)) {
+            reject(createRequestError('登录状态已变化，请重新加载资料'));
+            return;
+          }
+          if (response.statusCode === 401) clearSession(token);
+          let body;
+          try { body = JSON.parse(response.data); } catch (error) {
+            reject(createRequestError('上传服务响应异常', response.statusCode));
+            return;
+          }
+          if (response.statusCode < 200 || response.statusCode >= 300 || !body || body.code !== 0) {
+            reject(createRequestError(body && body.message || '头像上传失败', response.statusCode, body));
+            return;
+          }
+          resolve(body.data);
+        },
+        fail(error) { reject(createRequestError(error.errMsg || '头像上传失败，请重试')); }
+      });
+    });
+  };
+  try { return await upload(); } catch (error) {
+    if (error.statusCode !== 401) throw error;
     await ensureSession();
-    checkResult(null);
-    return checkResult(await requestData(Object.assign({}, options, { silentUnauthorized: true })));
+    return upload();
   }
 }
 
@@ -176,10 +265,17 @@ function createIdempotencyKey(prefix) {
 }
 
 module.exports = {
+  loginSession: createSession,
+  onboardingProfile,
+  onboardingAvatar(filePath, expectedToken) { return uploadData({ url: '/api/miniapp/profile/avatar', filePath, expectedToken }); },
+  isProfileComplete,
+  readProfileCache,
+  writeProfileCache,
   invalidateTestRecordRequests() { testRecordsGeneration += 1; },
   request,
   requestData,
   authenticatedRequestData,
+  authenticatedUploadData,
   ensureSession,
   createIdempotencyKey,
   TOKEN_STORAGE_KEY

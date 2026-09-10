@@ -200,6 +200,6 @@ assert(profileSource.includes('reopenAccountAfterLeave'), '我的页子视图未
   );
   assert(new RegExp(`<account-center\\b[^>]*initial-view="${view}"[^>]*>`).test(wrapper), `账户页未复用共享组件：${view}`);
 });
-assert(accountSource.includes('this.setCurrentView(view)'), '账户中心未在当前 PageFrame 切换视图');
+assert(accountSource.includes('wx.navigateTo({ url: VIEW_ROUTES[view] })'), '账户子视图未使用独立页面返回');
 
 console.log(`MINIAPP_SELF_CHECK_OK routes=${routes.length} js=${javaScriptFiles.length} json=${jsonFiles.length}`);

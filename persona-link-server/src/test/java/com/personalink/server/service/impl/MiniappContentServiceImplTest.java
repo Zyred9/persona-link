@@ -22,7 +22,9 @@ class MiniappContentServiceImplTest {
     @BeforeEach
     void setUp() {
         this.contentMapper = mock(MiniappContentMapper.class);
-        this.contentService = new MiniappContentServiceImpl();
+        var appConfigService = mock(com.personalink.server.service.AppConfigService.class);
+        when(appConfigService.readHomeConfig()).thenReturn(new com.personalink.server.dto.HomeConfigResponse("https://example.com/title.png"));
+        this.contentService = new MiniappContentServiceImpl(appConfigService);
         ReflectionTestUtils.setField(this.contentService, "baseMapper", this.contentMapper);
     }
 
@@ -41,6 +43,7 @@ class MiniappContentServiceImplTest {
         MiniappHomeResponse response = this.contentService.getHome();
 
         assertEquals(List.of(focus), response.focusTests());
+        assertEquals("https://example.com/title.png", response.titleImageUrl());
         assertEquals(List.of(recommended), response.recommendedTests());
         assertEquals(List.of(another), response.allTests());
     }

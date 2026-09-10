@@ -15,7 +15,8 @@
 
     <select id="selectHistory" resultType="com.personalink.server.dto.PairHistoryResponse">
         SELECT CAST(p.id AS CHAR) AS pair_session_id,
-               COALESCE(NULLIF(v.title, ''), '已删除题型') AS title, v.version_no,
+               COALESCE(NULLIF(v.title, ''), '已删除题型') AS title,
+               COALESCE(p.cover_url, v.cover_url) AS cover_url, v.version_no,
                CASE WHEN p.pair_status = #{pendingStatus} AND p.expires_at &lt; #{now}
                     THEN #{expiredStatus} ELSE p.pair_status END AS pair_status,
                p.create_date AS created_at, p.expires_at
@@ -28,11 +29,11 @@
 
     <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
         INSERT IGNORE INTO t_pair_session
-            (pair_no, create_request_id, invite_token_hash, version_id, initiator_open_id,
+            (pair_no, create_request_id, invite_token_hash, version_id, cover_url, initiator_open_id,
              initiator_answer_session_id, pair_status, initiator_visible_flag,
              partner_visible_flag, expires_at, deleted)
         VALUES
-            (#{pairNo}, #{createRequestId}, #{inviteTokenHash}, #{versionId}, #{initiatorOpenId},
+            (#{pairNo}, #{createRequestId}, #{inviteTokenHash}, #{versionId}, #{coverUrl}, #{initiatorOpenId},
              #{initiatorAnswerSessionId}, #{pairStatus}, #{initiatorVisibleFlag},
              #{partnerVisibleFlag}, #{expiresAt}, #{deleted})
     </insert>

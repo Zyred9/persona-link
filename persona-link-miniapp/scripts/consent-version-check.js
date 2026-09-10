@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const source = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const versions = [1, 2, 3].map(type => ({ type, version: 1 }));
-const storage = new Map([['personaLinkConsentVersion', 'v2.0'], ['personaLinkConsentedDocuments', versions]]);
+const storage = new Map([['personaLinkConsentVersion', 'v2.0'], ['personaLinkConsentedDocuments', versions], ['personaLinkBusinessToken', 'token'], ['personaLinkConsentToken', 'token']]);
 let app, reply = () => Promise.resolve(versions), checks = 0, logins = 0;
 let currentPage = { route: 'subpackages/pair/pages/join/index', options: { code: 'ABCDE' } };
 const redirects = [], businessCalls = [];
@@ -18,7 +18,7 @@ const wx = {
 vm.runInNewContext(source('app.js'), {
   App(d) { app = d; }, wx,
   getCurrentPages: () => [currentPage],
-  require: () => ({ requestData: () => { checks++; return reply(); } })
+  require: () => ({ TOKEN_STORAGE_KEY: 'personaLinkBusinessToken', onboardingProfile: async () => ({ nickname: '名字', avatarUrl: '/avatar' }), isProfileComplete: () => true, writeProfileCache: () => {}, requestData: () => { checks++; return reply(); } })
 });
 const requestModule = { exports: {} };
 vm.runInNewContext(source('utils/request.js'), {
@@ -30,11 +30,12 @@ async function main() {
   reply = () => new Promise(done => { resolve = done; });
   const launch = app.verifyConsent();
   const core = requestModule.exports.authenticatedRequestData({ url: '/api/miniapp/assessments' });
+  await new Promise(setImmediate);
   assert.equal(checks, 1, '启动与业务共享校验');
   assert.equal(logins, 0, '校验中不得登录');
   resolve(versions);
   await Promise.all([launch, core]);
-  assert.equal(logins, 1);
+  assert.equal(logins, 0, '有效会话校验不能重复登录');
   assert.equal(app.globalData.hasConsent, true);
   let home, currentLoads = 0;
   const analyticsModule = { exports: {} };
@@ -75,6 +76,7 @@ async function main() {
   assert.equal(app.globalData.hasConsent, false, '网络失败不得放行');
   reply = () => new Promise(done => { resolve = done; });
   const stale = app.verifyConsent();
+  await new Promise(setImmediate);
   app.consentEpoch = 1;
   app.globalData.hasConsent = true;
   resolve(versions.map(d => ({ ...d, version: 2 })));

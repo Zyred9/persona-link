@@ -1,12 +1,12 @@
-<app-nav-bar title=""></app-nav-bar>
+<app-nav-bar title="映见你我"></app-nav-bar>
 
 <view class="paper-page consent-page">
   <view class="consent-hero">
     <view>
-      <text class="consent-kicker">心动测测</text>
+      <text class="consent-kicker">{{step === 'login' ? '1 / 3 · 微信登录' : step === 'profile' ? '2 / 3 · 头像与昵称' : '3 / 3 · 阅读协议'}}</text>
       <view class="consent-title">
-        <text>先说好，</text>
-        <text>再一起玩。</text>
+        <text>{{step === 'login' ? '登录，' : step === 'profile' ? '让我们，' : '先说好，'}}</text>
+        <text>{{step === 'login' ? '遇见自己。' : step === 'profile' ? '认识你。' : '再一起玩。'}}</text>
       </view>
     </view>
     <view class="heart-mascot">
@@ -17,12 +17,26 @@
     </view>
   </view>
 
-  <view class="paper-card consent-card">
+  <view wx:if="{{step === 'login'}}" class="onboarding-panel">
+    <text class="consent-card__copy">使用微信登录后，设置头像昵称，再阅读并同意协议即可开始。</text>
+    <button class="paper-button paper-button--primary" bindtap="login" loading="{{busy}}" disabled="{{busy}}">微信登录</button>
+  </view>
+
+  <form wx:elif="{{step === 'profile'}}" class="onboarding-panel" bindsubmit="saveProfile">
+    <button class="onboarding-avatar" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{busy}}" loading="{{busy}}" aria-label="选择微信头像">
+      <image wx:if="{{avatarImage}}" src="{{avatarImage}}" mode="aspectFill"></image>
+      <text wx:else>选择微信头像</text>
+    </button>
+    <input class="onboarding-nickname" type="nickname" name="nickname" value="{{nickname}}" maxlength="32" placeholder="点击使用微信昵称" bindinput="handleNicknameInput" bindblur="handleNicknameInput" disabled="{{busy}}" />
+    <button class="paper-button paper-button--primary" form-type="submit" loading="{{busy}}" disabled="{{busy}}">确认头像昵称，下一步</button>
+  </form>
+
+  <view wx:if="{{step === 'consent'}}" class="paper-card consent-card">
     <text class="consent-card__title">这是娱乐测试，不是判断。</text>
     <text class="consent-card__copy">结果只供娱乐和自我了解参考，不构成心理、医疗、婚恋或职业建议。</text>
   </view>
 
-  <view class="consent-legal">
+  <view wx:if="{{step === 'consent'}}" class="consent-legal">
     <text>继续前，请阅读并同意</text>
     <text class="consent-link" data-type="userAgreement" bindtap="openLegal">《用户协议》</text>
     <text>、</text>
@@ -33,9 +47,9 @@
   </view>
 
   <view class="consent-actions">
-    <text wx:if="{{state === 'error'}}">{{error}}</text>
-    <button wx:if="{{state === 'error'}}" class="paper-button" bindtap="loadDocuments">重新加载协议</button>
-    <button class="paper-button paper-button--primary" disabled="{{state !== 'ready'}}" loading="{{state === 'loading'}}" bindtap="agreeAndContinue">{{state === 'loading' ? '正在加载协议' : '同意并继续'}}</button>
-    <button class="consent-exit" bindtap="exitMiniProgram">不同意并退出</button>
+    <text wx:if="{{error}}" class="onboarding-error">{{error}}</text>
+    <button wx:if="{{step === 'consent' && state === 'error'}}" class="paper-button" bindtap="loadDocuments">重新加载协议</button>
+    <button wx:if="{{step === 'consent'}}" class="paper-button paper-button--primary" disabled="{{state !== 'ready' || busy}}" loading="{{state === 'loading' || busy}}" bindtap="agreeAndContinue">{{state === 'loading' ? '正在加载协议' : '同意并进入小程序'}}</button>
+    <button class="consent-exit" bindtap="exitMiniProgram">{{step === 'consent' ? '不同意并退出' : '暂不使用并退出'}}</button>
   </view>
 </view>

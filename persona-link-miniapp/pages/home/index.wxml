@@ -1,4 +1,4 @@
-<app-nav-bar title="心动测测" brand="{{true}}"></app-nav-bar>
+<app-nav-bar title="映见你我" brand="{{true}}"></app-nav-bar>
 
 <view class="paper-page home-page">
   <block wx:if="{{state === 'ready'}}">
@@ -8,7 +8,7 @@
       <button wx:if="{{currentAssessment.canRestart}}" class="paper-button" bindtap="restartAssessment">重新开始</button>
     </view>
     <view class="home-hero">
-      <image class="home-title-image" src="/assets/images/home-title.png" mode="widthFix"></image>
+      <image class="home-title-image" src="{{titleImageUrl}}" mode="widthFix" binderror="handleTitleImageError"></image>
     </view>
 
     <view
@@ -63,7 +63,7 @@
   <block wx:elif="{{state === 'loading'}}">
     <view class="home-intro">
       <text class="home-kicker">今日刚好适合认识自己</text>
-      <image class="home-title-image home-title-image--loading" src="/assets/images/home-title.png" mode="widthFix"></image>
+      <image class="home-title-image home-title-image--loading" src="{{titleImageUrl}}" mode="widthFix" binderror="handleTitleImageError"></image>
     </view>
     <page-state type="loading" title="内容正在加载"></page-state>
   </block>

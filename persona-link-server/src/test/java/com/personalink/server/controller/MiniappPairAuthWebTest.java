@@ -5,6 +5,7 @@ import com.personalink.server.config.AssetWebMvcConfiguration;
 import com.personalink.server.controller.app.MiniappPairController;
 import com.personalink.server.miniapp.auth.WechatCode2SessionClient;
 import com.personalink.server.service.BusinessSessionService;
+import com.personalink.server.service.MiniappUserService;
 import com.personalink.server.service.PairAssessmentService;
 import com.personalink.server.service.impl.AuthService;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,8 @@ class MiniappPairAuthWebTest {
     private PairAssessmentService pairAssessmentService;
     @MockitoBean
     private BusinessSessionService businessSessionService;
+    @MockitoBean
+    private MiniappUserService miniappUserService;
     @MockitoBean
     private WechatCode2SessionClient wechatCode2SessionClient;
 

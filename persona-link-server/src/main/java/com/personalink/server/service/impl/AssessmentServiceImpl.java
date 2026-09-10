@@ -216,6 +216,7 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
         report.setReportNo(this.businessNo());
         report.setAnswerSessionId(session.getId());
         report.setResultCode(template.getResultCode());
+        report.setCoverUrl(this.requireVersion(session.getVersionId()).getCoverUrl());
         report.setResultSnapshot(this.writeJson(snapshot));
         report.setGeneratedAt(now);
         this.reportMapper.insertIgnore(report);
@@ -907,6 +908,7 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 String.valueOf(row.getTestId()),
                 row.getVersionNo(),
                 row.getTitle(),
+                row.getCoverUrl(),
                 row.getResultCode(),
                 row.getResultName(),
                 row.getGeneratedAt());

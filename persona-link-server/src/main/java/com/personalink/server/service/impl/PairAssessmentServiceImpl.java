@@ -153,6 +153,7 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
         pair.setCreateRequestId(request.createRequestId());
         pair.setInviteTokenHash(this.hashToken(inviteToken));
         pair.setVersionId(answerSession.getVersionId());
+        pair.setCoverUrl(version.getCoverUrl());
         pair.setInitiatorOpenId(openId);
         pair.setInitiatorAnswerSessionId(answerSession.getId());
         pair.setPairStatus(PairStatus.INITIATOR_DONE.getCode());

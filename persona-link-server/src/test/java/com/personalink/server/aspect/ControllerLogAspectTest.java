@@ -27,10 +27,8 @@ import static org.mockito.Mockito.doReturn;
 
 class ControllerLogAspectTest {
 
-    private static final String MASKED_VALUE = "***";
-
     @Test
-    void assessmentAndReportBodiesStayOutOfSuccessAndFailureLogs() throws Throwable {
+    void assessmentAndReportBodiesAppearInSuccessAndFailureLogs() throws Throwable {
         var aspect = new ControllerLogAspect(new ObjectMapper());
         var point = mock(ProceedingJoinPoint.class);
         var signature = mock(MethodSignature.class);
@@ -57,9 +55,11 @@ class ControllerLogAspectTest {
             }
             String logs = appender.list.stream().map(ILoggingEvent::getFormattedMessage)
                     .reduce("", String::concat);
-            assertFalse(logs.contains("private-choice"));
-            assertFalse(logs.contains("private-payload"));
-            assertFalse(logs.contains("private-report"));
+            assertTrue(logs.contains("private-choice"));
+            assertTrue(logs.contains("private-payload"));
+            assertTrue(logs.contains("private-report"));
+            assertTrue(appender.list.stream().allMatch(event ->
+                    event.getFormattedMessage().contains("private-payload")));
             assertTrue(appender.list.stream().anyMatch(event -> event.getThrowableProxy() != null));
         } finally {
             RequestContextHolder.resetRequestAttributes();
@@ -68,7 +68,7 @@ class ControllerLogAspectTest {
     }
 
     @Test
-    void feedbackBodyNeverAppearsInRequestOrResponseLogs() throws Throwable {
+    void feedbackBodyAppearsInRequestAndResponseLogs() throws Throwable {
         var aspect = new ControllerLogAspect(new ObjectMapper());
         var point = mock(ProceedingJoinPoint.class);
         var signature = mock(MethodSignature.class);
@@ -84,8 +84,11 @@ class ControllerLogAspectTest {
                 RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest("POST", path)));
                 aspect.logController(point);
             }
-            assertFalse(appender.list.toString().contains("private-report-text"));
-            assertTrue(appender.list.stream().allMatch(event -> event.getFormattedMessage().contains("***")));
+            assertTrue(appender.list.stream().allMatch(event -> {
+                String message = event.getFormattedMessage();
+                return message.contains("入参：{\"arg0\":{\"content\":\"private-report-text\"}}")
+                        && message.contains("\"data\":{\"content\":\"private-report-text\"}");
+            }));
         } finally {
             RequestContextHolder.resetRequestAttributes();
             logger.detachAppender(appender);
@@ -93,7 +96,7 @@ class ControllerLogAspectTest {
     }
 
     @Test
-    void logControllerShouldMaskSensitiveRequestAndResponseValues() throws Throwable {
+    void logControllerShouldKeepOriginalRequestAndResponseValues() throws Throwable {
         ControllerLogAspect aspect = new ControllerLogAspect(new ObjectMapper());
         ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
         MethodSignature signature = mock(MethodSignature.class);
@@ -129,11 +132,11 @@ class ControllerLogAspectTest {
         assertTrue(logs.contains("出参："));
         assertTrue(logs.contains("cover.png"));
         assertTrue(logs.contains("tester"));
-        assertTrue(logs.contains(MASKED_VALUE));
-        assertFalse(logs.contains("request-secret"));
-        assertFalse(logs.contains("wechat-code"));
-        assertFalse(logs.contains("login-password"));
-        assertFalse(logs.contains("response-secret"));
+        assertFalse(logs.contains("***"));
+        assertTrue(logs.contains("request-secret"));
+        assertTrue(logs.contains("wechat-code"));
+        assertTrue(logs.contains("login-password"));
+        assertTrue(logs.contains("response-secret"));
         assertFalse(logs.contains("binary-content"));
     }
 

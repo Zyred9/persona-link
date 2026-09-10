@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { assetUrl, getMiniappHome, getTests, updateTestHomeDisplay, type MiniappHome, type TestItem } from '../api'
+import { assetUrl, getMiniappHome, getTests, saveHomeConfig, updateTestHomeDisplay, uploadImage, type MiniappHome, type TestItem } from '../api'
 import { isReadOnly } from '../auth'
 import { useUnsavedChanges } from '../composables/useUnsavedChanges'
 
 const tests = ref<TestItem[]>([])
 const preview = ref<MiniappHome | null>(null)
 const loading = ref(true)
+const titleImageUrl = ref('')
+const titleDirty = ref(false)
+const savingTitle = ref(false)
+const uploadingTitle = ref(false)
+const titleFileInput = ref<HTMLInputElement | null>(null)
+const titlePreviewFailed = ref(false)
 // ponytail: 一次仅保存一行；需要并发保存时改为按题型锁。
 const savingId = ref<number | null>(null)
 const message = ref('')
@@ -21,8 +27,8 @@ const pageSize = ref(10)
 const listScroll = ref<HTMLElement | null>(null)
 const pageCount = computed(() => Math.max(1, Math.ceil(tests.value.length / pageSize.value)))
 const pagedTests = computed(() => tests.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
-const saving = computed(() => savingId.value !== null)
-const { markDirty, markSaved } = useUnsavedChanges('首页配置还有未保存的题型，确认放弃修改并离开吗？', saving)
+const saving = computed(() => savingId.value !== null || savingTitle.value || uploadingTitle.value)
+const { markDirty, markSaved } = useUnsavedChanges('首页配置还有未保存的修改，确认放弃修改并离开吗？', saving)
 const previewCategories = computed(() => [
   { categoryId: 'all', categoryName: '全部' },
   ...(preview.value?.categories ?? []),
@@ -41,6 +47,7 @@ function showMessage(value: string) {
 
 function updatePreview(value: MiniappHome) {
   preview.value = value
+  titlePreviewFailed.value = false
   if (!previewCategories.value.some((item) => item.categoryId === selectedCategoryId.value)) {
     selectedCategoryId.value = 'all'
   }
@@ -55,7 +62,47 @@ function markRowSaved(id: number) {
   const next = new Set(dirtyIds.value)
   next.delete(id)
   dirtyIds.value = next
-  if (!next.size) markSaved()
+  if (!next.size && !titleDirty.value) markSaved()
+}
+
+function markTitleDirty() {
+  titleDirty.value = true
+  markDirty()
+}
+
+async function handleTitleUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || readOnly || loading.value || saving.value) return
+  uploadingTitle.value = true
+  try {
+    titleImageUrl.value = await uploadImage(file)
+    markTitleDirty()
+    showMessage('标题图上传成功，请保存标题图后生效')
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '标题图上传失败')
+  } finally {
+    uploadingTitle.value = false
+  }
+}
+
+async function saveTitle() {
+  if (readOnly || saving.value || !titleDirty.value) return
+  savingTitle.value = true
+  try {
+    const saved = await saveHomeConfig(titleImageUrl.value.trim())
+    titleImageUrl.value = saved.titleImageUrl
+    titleDirty.value = false
+    if (!dirtyIds.value.size) markSaved()
+    if (preview.value) preview.value = { ...preview.value, titleImageUrl: saved.titleImageUrl }
+    titlePreviewFailed.value = false
+    showMessage('首页标题图已保存，小程序下次加载首页时生效')
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '首页标题图保存失败')
+  } finally {
+    savingTitle.value = false
+  }
 }
 
 function isRowDirty(id: number): boolean {
@@ -104,6 +151,8 @@ async function load() {
     const targetIndex = latestTests.findIndex((item) => item.id === targetId.value)
     page.value = targetIndex < 0 ? 1 : Math.floor(targetIndex / pageSize.value) + 1
     updatePreview(home)
+    titleImageUrl.value = home.titleImageUrl ?? ''
+    titleDirty.value = false
     dirtyIds.value = new Set()
     markSaved()
   } catch (error) {
@@ -114,7 +163,7 @@ async function load() {
 }
 
 async function save(item: TestItem) {
-  if (savingId.value !== null) return
+  if (readOnly || saving.value) return
   savingId.value = item.id
   try {
     const homeDisplay = Number(item.homeDisplay)
@@ -147,6 +196,16 @@ onMounted(load)
       <div><p class="eyebrow">HOME CONTENT</p><h1>首页配置 <span>♡</span></h1><p>管理小程序首页推荐内容与展示顺序，保存后立即生效。</p></div>
     </header>
     <p v-if="message" class="message" role="status">{{ message }}</p>
+    <form class="title-config panel" @submit.prevent="saveTitle">
+      <label for="home-title-url">首页标题图地址 <small v-if="titleDirty" class="dirty-mark">未保存</small></label>
+      <div class="title-input-row">
+        <input ref="titleFileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden :disabled="readOnly || loading || saving" @change="handleTitleUpload" />
+        <button type="button" :disabled="readOnly || loading || saving" @click="titleFileInput?.click()">{{ uploadingTitle ? '上传中...' : '上传图片' }}</button>
+        <input id="home-title-url" v-model="titleImageUrl" type="text" maxlength="1024" placeholder="请输入图片地址，留空使用默认标题图" :disabled="readOnly || loading || saving" @input="markTitleDirty" />
+        <button type="submit" :disabled="readOnly || loading || saving || !titleDirty">{{ savingTitle ? '保存中...' : '保存标题图' }}</button>
+      </div>
+      <p>上传图片或填写图片链接，点击保存后生效；清空并保存后恢复默认标题图。建议尺寸 1200 × 468，支持 PNG/JPG/WebP，不超过 5MB。</p>
+    </form>
     <p v-if="loading" class="panel">题型加载中...</p>
     <div v-else class="layout">
       <div class="test-list">
@@ -169,7 +228,7 @@ onMounted(load)
           <label>排序
             <input v-model.number="item.homeSort" type="number" min="0" :disabled="readOnly || savingId === item.id" @input="markRowDirty(item.id)" />
           </label>
-          <button type="button" :disabled="readOnly || savingId !== null || !isRowDirty(item.id)" @click="save(item)">{{ savingId === item.id ? '保存中...' : '保存' }}</button>
+          <button type="button" :disabled="readOnly || saving || !isRowDirty(item.id)" @click="save(item)">{{ savingId === item.id ? '保存中...' : '保存' }}</button>
         </article>
         <p v-if="!tests.length" class="panel">暂无题型，请先在题型管理中创建。</p>
         </div>
@@ -188,7 +247,8 @@ onMounted(load)
           <div class="phone-screen">
             <div class="phone-status"><strong>9:41</strong><span>▮▮▮　⌁　▰</span></div>
             <div class="phone-nav"><strong>心动测测 <i>♡</i></strong><span>•••　◉</span></div>
-            <div class="phone-copy">把此刻的你，<br />收进一张小卡片。</div>
+            <img v-if="preview?.titleImageUrl && !titlePreviewFailed" class="phone-title-image" :src="assetUrl(preview.titleImageUrl)" alt="首页标题图" @error="titlePreviewFailed = true" />
+            <div v-else class="phone-copy">把此刻的你，<br />收进一张小卡片。</div>
             <div class="phone-content">
               <img v-if="preview?.focusTests[0]?.coverUrl" class="preview-focus" :src="assetUrl(preview.focusTests[0].coverUrl)" :alt="preview.focusTests[0].title" />
               <div v-if="preview?.recommendedTests.length" class="preview-grid">
@@ -226,6 +286,15 @@ onMounted(load)
 <style scoped>
 .home-tests,.test-list{display:grid;gap:16px}
 .test-list{min-width:0}
+.title-config{display:grid;gap:10px}
+.title-config label{font-weight:700}
+.title-input-row{display:flex;gap:12px;flex-wrap:wrap}
+.title-input-row input{flex:1;min-width:180px}
+.title-input-row input,.title-input-row button{height:40px;padding:0 12px;border:1.5px solid #222;border-radius:9px;background:#fff;font:inherit}
+.title-input-row button{background:#ff654d;color:#fff;cursor:pointer}
+.title-input-row :disabled{opacity:.45;cursor:not-allowed}
+.title-config p{margin:0;font-size:13px}
+.phone-title-image{display:block;width:calc(100% - 44px);height:auto;max-height:150px;object-fit:contain;margin:12px 22px 16px}
 .list-summary,.list-pagination{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .list-summary{justify-content:space-between}
 .list-scroll{display:grid;align-content:start;gap:12px;max-height:clamp(320px,calc(100dvh - 320px),700px);overflow-y:auto;overscroll-behavior:contain;padding:2px 8px 2px 2px;scrollbar-gutter:stable}

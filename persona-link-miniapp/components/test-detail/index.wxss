@@ -150,3 +150,7 @@
   margin-top: auto;
   padding-top: 60rpx;
 }
+
+.pair-detail-actions .paper-button + .paper-button {
+  margin-top: 20rpx;
+}

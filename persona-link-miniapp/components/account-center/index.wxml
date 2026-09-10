@@ -8,17 +8,42 @@
 <block wx:if="{{currentView === 'profile'}}">
   <view class="paper-page profile-page">
     <view class="paper-card profile-card">
-      <view class="profile-face">
+      <block wx:if="{{profileState === 'ready' && avatarUrl && nickname}}">
+        <view class="profile-face profile-avatar">
+          <image class="profile-avatar__image" src="{{avatarImage}}" mode="aspectFill" aria-label="用户头像"></image>
+        </view>
+        <view class="profile-copy">
+          <text class="profile-title">{{nickname}}</text>
+        </view>
+      </block>
+      <block wx:else>
+      <button class="profile-face profile-avatar" open-type="{{profileState === 'ready' ? 'chooseAvatar' : ''}}" bindchooseavatar="chooseAvatar" loading="{{avatarUploading}}" disabled="{{profileState !== 'ready' || avatarUploading || profileSaving}}" aria-label="使用微信头像">
+        <image wx:if="{{avatarImage && profileState === 'ready'}}" class="profile-avatar__image" src="{{avatarImage}}" mode="aspectFill"></image>
+        <block wx:else>
         <view class="profile-heart"></view>
         <view class="profile-cheek profile-cheek--left"></view>
         <view class="profile-cheek profile-cheek--right"></view>
         <view class="profile-smile"></view>
-      </view>
+        </block>
+      </button>
       <view class="profile-copy">
-        <text class="profile-badge">游客</text>
-        <text class="profile-title">先从一题开始</text>
+        <text class="profile-badge">{{profileState === 'ready' ? '已登录' : profileState === 'loading' ? '正在登录' : '未登录'}}</text>
+        <form wx:if="{{profileState === 'ready'}}" class="profile-name-form" bindsubmit="saveProfile">
+          <input name="nickname" class="profile-title profile-nickname" type="nickname" maxlength="32" value="{{draftNickname}}" placeholder="微信昵称" placeholder-class="profile-nickname__placeholder" disabled="{{profileSaving || avatarUploading}}" bindinput="handleNicknameInput" bindblur="handleNicknameInput" bindconfirm="saveProfile" confirm-type="done" aria-label="使用微信昵称" />
+          <button wx:if="{{draftNickname !== nickname}}" class="profile-name-save" form-type="submit" loading="{{profileSaving}}" disabled="{{profileSaving || avatarUploading}}">保存</button>
+        </form>
+        <text wx:else class="profile-title">先从一题开始</text>
         <text class="profile-description">所有测试和双人配对均可免费体验</text>
+        <text wx:if="{{profileState === 'ready'}}" class="profile-description profile-hint">点击头像或昵称，使用微信资料</text>
       </view>
+      </block>
+    </view>
+
+    <page-state wx:if="{{profileState === 'loading'}}" type="loading" title="正在加载个人资料"></page-state>
+    <button wx:elif="{{profileState === 'error'}}" class="paper-button paper-button--primary profile-action" bindtap="loadProfile">微信登录 · 重试</button>
+    <view wx:if="{{profileError}}" class="profile-error">
+      <text>{{profileError}}</text>
+      <button wx:if="{{profileState === 'ready'}}" class="paper-button profile-action" disabled="{{profileSaving || avatarUploading}}" bindtap="loadProfile">重新加载资料</button>
     </view>
 
     <view class="profile-menu">
@@ -42,35 +67,30 @@
 <block wx:elif="{{currentView === 'history'}}">
   <view class="paper-page history-page">
     <view class="history-summary">
-      <view class="history-summary__item history-summary__item--active">单人测试 {{historyState === 'error' ? '加载失败' : total}}</view>
-      <view class="history-summary__item">双人配对 {{pairHistoryState === 'error' ? '加载失败' : pairTotal}}</view>
+      <view class="history-summary__item {{historyTab === 'single' ? 'history-summary__item--active' : ''}}" data-tab="single" bindtap="switchHistoryTab">单人测试 {{historyState === 'error' ? '加载失败' : totalLabel}}</view>
+      <view class="history-summary__item {{historyTab === 'pair' ? 'history-summary__item--active' : ''}}" data-tab="pair" bindtap="switchHistoryTab">双人配对 {{pairHistoryState === 'error' ? '加载失败' : pairTotalLabel}}</view>
     </view>
+    <block wx:if="{{historyTab === 'single'}}">
     <text class="paper-section-title history-section-title">测试报告</text>
     <page-state wx:if="{{historyState === 'loading'}}" type="loading" title="单人记录正在加载"></page-state>
     <page-state wx:elif="{{historyState === 'error'}}" type="error" title="单人记录加载失败" description="{{historyErrorDescription}}" action-text="重新加载" bind:action="retrySingleHistory"></page-state>
     <view wx:elif="{{historyState === 'empty'}}" class="history-pagination">还没有单人测试记录</view>
     <block wx:else>
-        <button
+        <view
           wx:for="{{records}}"
           wx:key="reportId"
           class="paper-card history-record history-record--single"
           data-report-id="{{item.reportId}}"
           bindtap="handleRecordTap"
         >
-          <view class="history-face" aria-hidden="true">
-            <view class="history-face__eye history-face__eye--left"></view>
-            <view class="history-face__eye history-face__eye--right"></view>
-            <view class="history-face__cheek history-face__cheek--left"></view>
-            <view class="history-face__cheek history-face__cheek--right"></view>
-            <view class="history-face__smile"></view>
-          </view>
+          <image wx:if="{{item.coverImage}}" class="history-cover" src="{{item.coverImage}}" mode="aspectFill" aria-label="题型封面" data-url="{{item.previewUrl}}" catchtap="previewCover"></image>
+          <view wx:else class="history-cover history-cover--empty">封面</view>
           <view class="history-record__copy">
             <text class="history-record__title">{{item.title}}</text>
             <text class="history-record__result">{{item.resultName}}</text>
             <text class="history-record__meta">{{item.generatedAt}}{{item.versionLabel ? ' · ' + item.versionLabel : ''}}</text>
           </view>
-          <view class="history-record__more" data-report-id="{{item.reportId}}" catchtap="deleteRecord">···</view>
-        </button>
+        </view>
 
       <view class="history-pagination">
         <button wx:if="{{historyMoreError}}" class="paper-button" bindtap="retrySingleHistory">{{historyMoreError}} · 点击重试</button>
@@ -79,12 +99,14 @@
         <text wx:else>已加载全部单人记录</text>
       </view>
     </block>
+    </block>
+    <block wx:if="{{historyTab === 'pair'}}">
     <text class="paper-section-title history-section-title">双人配对</text>
     <page-state wx:if="{{pairHistoryState === 'loading'}}" type="loading" title="双人记录正在加载"></page-state>
     <page-state wx:elif="{{pairHistoryState === 'error'}}" type="error" title="双人记录加载失败" description="{{pairHistoryErrorDescription}}" action-text="重新加载" bind:action="retryPairHistory"></page-state>
     <view wx:elif="{{pairHistoryState === 'empty'}}" class="history-pagination">还没有双人配对记录</view>
     <block wx:else>
-        <button
+        <view
           wx:for="{{pairRecords}}"
           wx:key="pairSessionId"
           class="paper-card history-record history-record--pair {{item.waiting ? 'history-record--waiting' : ''}}"
@@ -92,12 +114,14 @@
           data-report-ready="{{item.reportReady}}"
           bindtap="handlePairTap"
         >
+          <image wx:if="{{item.coverImage}}" class="history-cover" src="{{item.coverImage}}" mode="aspectFill" aria-label="题型封面" data-url="{{item.previewUrl}}" catchtap="previewCover"></image>
+          <view wx:else class="history-cover history-cover--empty">封面</view>
           <view class="history-record__copy">
             <text class="history-record__title">{{item.title}}</text>
             <text class="history-record__result">{{item.resultText}}</text>
             <text class="history-record__meta">{{item.meta}} · {{item.reportReady ? '查看报告' : '查看进度'}}</text>
           </view>
-        </button>
+        </view>
 
       <view class="history-pagination">
         <button wx:if="{{pairHistoryMoreError}}" class="paper-button" bindtap="retryPairHistory">{{pairHistoryMoreError}} · 点击重试</button>
@@ -105,6 +129,7 @@
         <button wx:elif="{{pairHistoryHasMore}}" class="paper-button" bindtap="retryPairHistory">加载更多双人记录</button>
         <text wx:else>已加载全部双人记录</text>
       </view>
+    </block>
     </block>
   </view>
 </block>
@@ -133,7 +158,7 @@
 
 <block wx:else>
   <view class="paper-page settings-page">
-    <text class="paper-section-title">隐私与数据</text>
+    <text class="paper-section-title">协议与隐私</text>
 
     <button class="paper-card settings-row" bindtap="openPrivacy">
       <text>隐私与数据</text>

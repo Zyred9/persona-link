@@ -5,9 +5,9 @@
 
     <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
         INSERT IGNORE INTO t_report
-            (report_no, answer_session_id, result_code, result_snapshot, generated_at, deleted)
+            (report_no, answer_session_id, result_code, cover_url, result_snapshot, generated_at, deleted)
         VALUES
-            (#{reportNo}, #{answerSessionId}, #{resultCode}, #{resultSnapshot}, #{generatedAt}, 0)
+            (#{reportNo}, #{answerSessionId}, #{resultCode}, #{coverUrl}, #{resultSnapshot}, #{generatedAt}, 0)
     </insert>
 
     <select id="countHistory" resultType="long">
@@ -16,6 +16,7 @@
         INNER JOIN t_answer_session s ON s.id = r.answer_session_id AND s.deleted = 0
         INNER JOIN t_test_version v ON v.id = s.version_id AND v.deleted = 0
         WHERE s.open_id = #{openId}
+          AND s.answer_type = 1
           AND r.deleted = 0
     </select>
 
@@ -25,6 +26,7 @@
                v.test_id,
                v.version_no,
                v.title,
+               COALESCE(r.cover_url, v.cover_url) AS cover_url,
                CASE WHEN access.id IS NOT NULL THEN r.result_code END AS result_code,
                CASE WHEN access.id IS NOT NULL
                     THEN JSON_UNQUOTE(JSON_EXTRACT(r.result_snapshot, '$.resultName')) END AS result_name,
@@ -35,6 +37,7 @@
         LEFT JOIN t_report_access access ON access.report_type = 1 AND access.report_id = r.id
             AND access.open_id = s.open_id AND access.deleted = 0
         WHERE s.open_id = #{openId}
+          AND s.answer_type = 1
           AND r.deleted = 0
         ORDER BY r.generated_at DESC, r.id DESC
         LIMIT #{offset}, #{size}

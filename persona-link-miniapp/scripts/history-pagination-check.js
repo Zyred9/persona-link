@@ -7,12 +7,15 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 let definition, modal;
 let pairAuto = true;
 const requests = [];
+const navigations = [];
 vm.runInNewContext(read('components/account-center/index.js'), {
   Component: (value) => { definition = value; },
-  require: () => ({ authenticatedRequestData: (options) => pairAuto && options.url.startsWith('/api/miniapp/pairs?')
+  require: () => ({ resolveImageUrl: (url) => url ? `resolved:${url}` : '', resolvePreviewUrl: (url) => url ? `raw:${url}` : '', readProfileCache: () => null, writeProfileCache: () => {}, authenticatedRequestData: (options) => options.url === '/api/miniapp/profile'
+    ? Promise.resolve({ nickname: '', avatarUrl: '' })
+    : pairAuto && options.url.startsWith('/api/miniapp/pairs?')
     ? Promise.resolve({ records: [], total: 0 })
     : new Promise((resolve, reject) => requests.push({ ...options, resolve, reject })) }),
-  wx: { getStorageSync() {}, showModal(value) { modal = value; }, showToast() {} },
+  wx: { getStorageSync() {}, navigateTo({ url }) { navigations.push(url); }, showModal(value) { modal = value; }, showToast() {} },
   clearTimeout() {}
 });
 function component() {
@@ -21,14 +24,58 @@ function component() {
     setData(value, callback) { Object.assign(this.data, value); if (callback) callback(); }, triggerEvent() {} };
 }
 const page = (start, count = 20, total = 45) => ({ total, records: Array.from({ length: count }, (_, i) => ({
-  reportId: String(start - i), generatedAt: '2026-09-09T10:00:00', resultCode: 'A'
+  reportId: String(start - i), coverUrl: `/covers/${start - i}.png`, generatedAt: '2026-09-09T10:00:00', resultCode: 'A'
 })) });
 async function run() {
+  const accountTemplate = read('components/account-center/index.wxml');
+  assert.match(accountTemplate, /data-tab="single" bindtap="switchHistoryTab"/);
+  assert.match(accountTemplate, /data-tab="pair" bindtap="switchHistoryTab"/);
+  assert.match(accountTemplate, /historyTab === 'single' \? 'history-summary__item--active'/);
+  assert.match(accountTemplate, /historyTab === 'pair' \? 'history-summary__item--active'/);
+  assert.match(accountTemplate, /<block wx:if="\{\{historyTab === 'single'\}\}">/);
+  assert.match(accountTemplate, /<block wx:if="\{\{historyTab === 'pair'\}\}">/);
+  assert.equal((accountTemplate.match(/class="history-cover"/g) || []).length, 2);
+  assert.doesNotMatch(accountTemplate, /history-face/);
+  const accountStyle = read('components/account-center/index.wxss');
+  const coverStyle = accountStyle.match(/\.history-cover \{[\s\S]*?\}/);
+  assert.ok(coverStyle);
+  assert.match(coverStyle[0], /top: 50%/);
+  assert.match(coverStyle[0], /transform: translateY\(-50%\)/);
+  assert.doesNotMatch(accountStyle, /\.history-face/);
+
   const history = component();
+  assert.equal(history.data.historyTab, 'single');
+  history.switchHistoryTab({ currentTarget: { dataset: { tab: 'pair' } } });
+  assert.equal(history.data.historyTab, 'pair');
+  history.switchHistoryTab({ currentTarget: { dataset: { tab: 'single' } } });
+  assert.equal(history.data.historyTab, 'single');
+  history.switchHistoryTab({ currentTarget: { dataset: { tab: 'invalid' } } });
+  assert.equal(history.data.historyTab, 'single');
+
+  const restored = component();
+  restored.data.currentView = 'profile';
+  restored.data.historyTab = 'pair';
+  restored.loadRecords = () => {};
+  let enterHistoryState;
+  const setData = restored.setData;
+  restored.setData = function(value, callback) {
+    if (!enterHistoryState) enterHistoryState = value;
+    setData.call(this, value, callback);
+  };
+  restored.setCurrentView('history');
+  assert.equal(enterHistoryState.currentView, 'history');
+  assert.equal(enterHistoryState.historyTab, 'pair', '进入测试记录时必须在同一次渲染中恢复上次页签');
+
+  history.handlePairTap({ currentTarget: { dataset: { pairSessionId: 'pair 1', reportReady: false } } });
+  history.handlePairTap({ currentTarget: { dataset: { pairSessionId: 'pair/2', reportReady: 'true' } } });
+  assert.equal(navigations[0], '/subpackages/pair/pages/wait/index?pairSessionId=pair%201');
+  assert.equal(navigations[1], '/subpackages/pair/pages/result/index?pairSessionId=pair%2F2');
+
   const first = history.loadRecords();
   await history.loadMoreRecords(); assert.equal(requests.length, 1);
   requests.at(-1).resolve(page(45)); await first;
   assert.equal(history.data.records.length, 20); assert.equal(history.data.historyHasMore, true);
+  assert.equal(history.data.records[0].coverImage, 'resolved:/covers/45.png');
   const second = history.loadMoreRecords();
   await history.loadMoreRecords(); assert.equal(requests.length, 2);
   assert.match(requests.at(-1).url, /page=2&size=20/);
@@ -74,12 +121,13 @@ async function run() {
   singleFirst.reject(new Error('single offline'));
   const pairPage = (start, count = 20, total = 23) => ({ total, records: Array.from({ length: count }, (_, i) => ({
     pairSessionId: String(start - i), title: `真实题型${start - i}`, pairStatus: i % 2 ? 1 : 4,
-    createdAt: '2026-09-08T12:00:00', versionNo: 3
+    coverUrl: `/pair-covers/${start - i}.png`, createdAt: '2026-09-08T12:00:00', versionNo: 3
   })) });
   pairFirst.resolve(pairPage(23)); await both;
   assert.equal(pairs.data.historyState, 'error');
   assert.equal(pairs.data.pairHistoryState, 'ready');
   assert.equal(pairs.data.pairRecords[0].title, '真实题型23');
+  assert.equal(pairs.data.pairRecords[0].coverImage, 'resolved:/pair-covers/23.png');
   assert.match(pairs.data.pairRecords[0].meta, /V3/);
   let more = pairs.loadMoreRecords(); const pairSecond = requests.at(-1);
   const requestCount = requests.length;
@@ -123,6 +171,11 @@ async function run() {
     assert.match(statement[0], /v.deleted = 0/);
     assert.match(statement[0], /r.deleted = 0/);
   }
-  console.log('HISTORY_PAGINATION_CHECK_OK single+pair/paging/retry/dedup/stale/delete/failure-isolation/three-entry-wiring/order');
+  const reportHistory = sql.match(/<select id="selectHistory"[\s\S]*?<\/select>/)[0];
+  const pairSql = read('../persona-link-server/src/main/resources/mapper/PairSessionMapper.xml');
+  const pairHistory = pairSql.match(/<select id="selectHistory"[\s\S]*?<\/select>/)[0];
+  assert.match(reportHistory, /v\.cover_url/);
+  assert.match(pairHistory, /v\.cover_url/);
+  console.log('HISTORY_PAGINATION_CHECK_OK tabs/pair-navigation/covers-centered/single+pair/paging/retry/dedup/stale/delete/failure-isolation/three-entry-wiring/order');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

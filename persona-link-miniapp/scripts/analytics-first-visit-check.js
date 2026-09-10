@@ -51,11 +51,18 @@ async function main() {
   assert.strictEqual(requests.length, 0);
   assert.strictEqual(homeLoads, 0);
   app.globalData.hasConsent = true;
-  await home.onShow(); // 仅等待协议校验，不能等待尚未完成的登录上报。
-  assert.strictEqual(homeLoads, 1, '登录完成前首页数据应立即开始加载');
-  const start = request.authenticatedRequestData({ url: '/api/miniapp/assessments', method: 'POST' });
-  assert.strictEqual(loginCount, 1, '并发统计与答题应共用一次登录');
+  await analytics.trackEvent(2, '/pages/home/index');
+  await assert.rejects(request.authenticatedRequestData({ url: '/api/miniapp/assessments', method: 'POST' }), /请先点击微信登录/);
+  assert.strictEqual(loginCount, 0, '统计与答题不能偷偷创建登录会话');
+  const login = request.loginSession();
+  const duplicateLogin = request.loginSession();
+  assert.strictEqual(loginCount, 1, '重复点击共用一次微信登录');
   finishLogin();
+  await Promise.all([login, duplicateLogin]);
+  await home.onShow(); // 仅等待协议校验，不能等待尚未完成的登录上报。
+  assert.strictEqual(homeLoads, 1, '完成登录后加载首页');
+  const start = request.authenticatedRequestData({ url: '/api/miniapp/assessments', method: 'POST' });
+  assert.strictEqual(loginCount, 1, '并发统计与答题复用已建立的会话');
   await Promise.all([firstVisit, start]);
   const events = requests.filter((item) => item.url.endsWith('/events/batch'));
   assert.strictEqual(events.length, 1, '无旧 token 的首次首页访问必须上报');
@@ -63,16 +70,17 @@ async function main() {
   await analytics.trackEvent(2, '/pages/home/index');
   assert.strictEqual(loginCount, 1, '后续访问复用已登录会话');
   storage.set(request.TOKEN_STORAGE_KEY, 'expired-token');
-  const staleA = request.authenticatedRequestData({ url: '/expired-a' });
-  const staleB = request.authenticatedRequestData({ url: '/expired-b' });
+  const staleA = assert.rejects(request.authenticatedRequestData({ url: '/expired-a' }), /expired/);
+  const staleB = assert.rejects(request.authenticatedRequestData({ url: '/expired-b' }), /expired/);
   await new Promise(setImmediate);
   const failedRequests = requests.filter((item) => item.header.Authorization === 'Bearer expired-token');
   assert.strictEqual(failedRequests.length, 2);
   failedRequests[0].success({ statusCode: 401, data: { message: 'expired' } });
   await new Promise(setImmediate);
-  assert.strictEqual(loginCount, 2, '首个过期请求触发一次刷新登录');
+  assert.strictEqual(loginCount, 1, '过期请求不能自动刷新登录');
+  const relogin = request.loginSession();
   finishLogin();
-  await staleA;
+  await Promise.all([staleA, relogin]);
   failedRequests[1].success({ statusCode: 401, data: { message: 'expired' } });
   await new Promise(setImmediate);
   assert.strictEqual(storage.get(request.TOKEN_STORAGE_KEY), 'test-token', '延迟返回的旧 401 不能清除新会话');

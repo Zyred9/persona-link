@@ -8,6 +8,7 @@ const { trackEvent } = require('../../utils/analytics');
 const { resolveImageUrl } = require('../../utils/image');
 
 const ALL_CATEGORY_ID = 'all';
+const DEFAULT_TITLE_IMAGE = '/assets/images/home-title.png';
 
 function prepareTests(tests) {
   return (Array.isArray(tests) ? tests : []).map((item) => Object.assign({}, item, {
@@ -24,6 +25,7 @@ function filterTests(tests, categoryId) {
 Page({
   data: {
     state: 'loading',
+    titleImageUrl: DEFAULT_TITLE_IMAGE,
     categories: [{ categoryId: ALL_CATEGORY_ID, categoryName: '全部' }],
     selectedCategoryId: ALL_CATEGORY_ID,
     focusTest: null,
@@ -57,9 +59,7 @@ Page({
     if (app.globalData.hasConsent) {
       this.loadHome();
       trackEvent(2, '/pages/home/index');
-    }
-    if (getApp().globalData.hasConsent && wx.getStorageSync(TOKEN_STORAGE_KEY)) {
-      this.loadCurrentAssessment();
+      if (wx.getStorageSync(TOKEN_STORAGE_KEY)) this.loadCurrentAssessment();
     }
   },
 
@@ -109,6 +109,7 @@ Page({
       const hasContent = categories.length > 1 || focusTests.length > 0 || recommendedTests.length > 0 || allTests.length > 0;
       this.setData({
         state: hasContent ? 'ready' : 'empty',
+        titleImageUrl: resolveImageUrl(home.titleImageUrl) || DEFAULT_TITLE_IMAGE,
         categories,
         selectedCategoryId,
         focusTest: focusTests[0] || null,
@@ -118,6 +119,12 @@ Page({
       });
     } catch (error) {
       this.setData({ state: 'error' });
+    }
+  },
+
+  handleTitleImageError() {
+    if (this.data.titleImageUrl !== DEFAULT_TITLE_IMAGE) {
+      this.setData({ titleImageUrl: DEFAULT_TITLE_IMAGE });
     }
   },
 
@@ -220,13 +227,13 @@ Page({
 
   onShareAppMessage() {
     if (!this.data.detailVisible || !this.data.activeTestId) {
-      return { title: '心动测测', path: '/pages/home/index' };
+      return { title: '映见你我', path: '/pages/home/index' };
     }
     const detailPath = Number(this.data.activeTestType) === 2
       ? '/subpackages/pair/pages/detail/index'
       : '/subpackages/test/pages/detail/index';
     return {
-      title: '心动测测',
+      title: '映见你我',
       path: `${detailPath}?id=${encodeURIComponent(this.data.activeTestId)}`
     };
   },

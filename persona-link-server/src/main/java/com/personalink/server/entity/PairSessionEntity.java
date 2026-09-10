@@ -18,6 +18,8 @@ public class PairSessionEntity extends BaseAssessmentEntity {
     private String inviteTokenHash;
     /** 双方共同使用的题型版本 ID。 */
     private Long versionId;
+    /** 配对创建时的题型封面快照。 */
+    private String coverUrl;
     /** 发起者 OpenID。 */
     private String initiatorOpenId;
     /** 发起者答题会话 ID。 */
@@ -52,6 +54,8 @@ public class PairSessionEntity extends BaseAssessmentEntity {
     public void setInviteTokenHash(String inviteTokenHash) { this.inviteTokenHash = inviteTokenHash; }
     public Long getVersionId() { return this.versionId; }
     public void setVersionId(Long versionId) { this.versionId = versionId; }
+    public String getCoverUrl() { return this.coverUrl; }
+    public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
     public String getInitiatorOpenId() { return this.initiatorOpenId; }
     public void setInitiatorOpenId(String initiatorOpenId) { this.initiatorOpenId = initiatorOpenId; }
     public Long getInitiatorAnswerSessionId() { return this.initiatorAnswerSessionId; }

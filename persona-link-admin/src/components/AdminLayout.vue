@@ -16,6 +16,7 @@ const navigation = [
   { icon: 'overview', label: '运营总览', to: '/' },
   { icon: 'content', label: '题型管理', to: '/types' },
   { icon: 'home', label: '首页配置', to: '/home-config' },
+  { icon: 'settings', label: '通用配置', to: '/app-configs', adminOnly: true },
   { icon: 'ad', label: '广告配置', to: '/ad-config', adminOnly: true },
   { icon: 'feedback', label: '反馈管理', to: '/feedbacks', adminOnly: true },
   { icon: 'legal', label: '协议管理', to: '/legal-documents', adminOnly: true },

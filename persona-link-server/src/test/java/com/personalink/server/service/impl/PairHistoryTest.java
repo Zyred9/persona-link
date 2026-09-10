@@ -23,7 +23,8 @@ class PairHistoryTest {
         var mapper = mock(PairSessionMapper.class);
         var service = new PairAssessmentServiceImpl(null, null, null, null, null, null, new ObjectMapper(), null);
         ReflectionTestUtils.setField(service, "baseMapper", mapper);
-        var row = new PairHistoryResponse("21", "沟通测试", 2, 5, LocalDateTime.now(), LocalDateTime.now());
+        var row = new PairHistoryResponse("21", "沟通测试", "/covers/communication.png", 2, 5,
+                LocalDateTime.now(), LocalDateTime.now());
         when(mapper.countHistory("owner")).thenReturn(21L);
         when(mapper.selectHistory(eq("owner"), eq(20L), eq(20L), any(), eq(1), eq(5)))
                 .thenReturn(List.of(row));
@@ -73,6 +74,7 @@ class PairHistoryTest {
         assertTrue(list.contains("ORDER BY p.create_date DESC, p.id DESC LIMIT ? OFFSET ?"));
         assertTrue(list.contains("CASE WHEN p.pair_status = ? AND p.expires_at < ? THEN ? ELSE p.pair_status END"));
         assertTrue(list.contains("LEFT JOIN t_test_version v ON v.id = p.version_id AND v.deleted = 0"));
+        assertTrue(list.contains("v.cover_url"));
         assertFalse(list.contains("UPDATE"));
         String projection = list.substring(0, list.indexOf("FROM"));
         assertFalse(projection.contains("open_id"));

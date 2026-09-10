@@ -5,8 +5,9 @@ const vm = require('node:vm');
 
 const storage = new Map();
 let calls = [], toasts = [], redirects = [], modal, reply;
-const app = { globalData: { consentVersion: 'v2.0', consentStorageKey: 'consent' } };
+const app = { verifyConsent: async () => {}, globalData: { consentVersion: 'v2.0', consentStorageKey: 'consent' } };
 const api = {
+  TOKEN_STORAGE_KEY: 'personaLinkBusinessToken',
   authenticatedRequestData: (options) => { calls.push(options); return reply(options); },
   requestData: (options) => { calls.push(options); return reply(options); },
   createIdempotencyKey: (() => { let id = 0; return () => `key-${++id}`; })(),
@@ -65,11 +66,13 @@ async function run() {
   assert.ok(legal.data.contentNodes.includes('&lt;script&gt;'));
 
   const consent = load('pages/consent/index.js');
+  consent.profileToken = 'token';
+  storage.set('personaLinkBusinessToken', 'token');
   reply = () => Promise.reject(new Error('未配置'));
-  await consent.loadDocuments(); consent.agreeAndContinue();
+  await consent.loadDocuments(); await consent.agreeAndContinue();
   assert.equal(storage.has('consent'), false);
   reply = (options) => Promise.resolve({ type: Number(options.url.slice(-1)), version: 3, content: '正式内容' });
-  await consent.loadDocuments(); consent.agreeAndContinue();
+  await consent.loadDocuments(); await consent.agreeAndContinue();
   assert.equal(storage.get('personaLinkConsentedDocuments').length, 3);
   assert.equal(storage.get('consent'), 'v2.0');
 

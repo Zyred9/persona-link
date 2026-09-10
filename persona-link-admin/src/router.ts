@@ -12,6 +12,7 @@ const router = createRouter({
       component: AdminLayout,
       meta: { requiresAuth: true },
       children: [
+        { path: 'app-configs', name: 'app-configs', component: () => import('./views/AppConfigView.vue'), meta: { adminOnly: true } },
         { path: '', name: 'dashboard', component: () => import('./views/DashboardView.vue') },
         { path: 'home-config', name: 'home-config', component: () => import('./views/HomeConfigView.vue') },
         { path: 'ad-config', name: 'ad-config', component: () => import('./views/AdConfigView.vue'), meta: { adminOnly: true } },

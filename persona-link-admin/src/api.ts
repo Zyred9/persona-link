@@ -13,6 +13,25 @@ export interface PageResponse<T> {
   size: number
 }
 
+export interface AppConfigInput {
+  configKey: string
+  configValue: string
+  valueType: number
+  configName: string
+  remark: string
+}
+
+export interface AppConfig extends AppConfigInput {
+  id: number
+  createDate: string
+  updateDate: string
+}
+
+export function getAppConfigs(params: Record<string, unknown>): Promise<PageResponse<AppConfig>> { return request(`/api/admin/app-configs${queryString(params)}`) }
+export function getAppConfig(id: number): Promise<AppConfig> { return request(`/api/admin/app-configs/${id}`) }
+export function saveAppConfig(item: AppConfigInput, id?: number): Promise<AppConfig> { return request(id ? `/api/admin/app-configs/${id}` : '/api/admin/app-configs', { method: id ? 'PUT' : 'POST', body: JSON.stringify(item) }) }
+export function deleteAppConfigs(ids: number[]): Promise<void> { return request('/api/admin/app-configs/deletes', { method: 'POST', body: JSON.stringify(ids) }) }
+
 export interface AdminLoginResponse extends AdminProfile {
   token: string
   expiresAt: string
@@ -70,6 +89,7 @@ export interface MiniappHomeTest {
 }
 
 export interface MiniappHome {
+  titleImageUrl: string
   categories: Array<{ categoryId: string; categoryName: string }>
   focusTests: MiniappHomeTest[]
   recommendedTests: MiniappHomeTest[]
@@ -339,6 +359,7 @@ export function saveTest(item: Pick<TestItem, 'testName' | 'testType' | 'categor
 export function updateTestStatus(id: number, status: number): Promise<TestItem> { return request(`/api/admin/tests/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }) }
 export function updateTestHomeDisplay(id: number, homeDisplay: number, homeSort: number): Promise<TestItem> { return request(`/api/admin/tests/${id}/home-display`, { method: 'PUT', body: JSON.stringify({ homeDisplay, homeSort }) }) }
 export function getMiniappHome(): Promise<MiniappHome> { return request('/api/miniapp/home') }
+export function saveHomeConfig(titleImageUrl: string): Promise<{ titleImageUrl: string }> { return request('/api/admin/home-config', { method: 'PUT', body: JSON.stringify({ titleImageUrl }) }) }
 export function deleteTests(ids: number[]): Promise<void> { return request('/api/admin/tests/deletes', { method: 'POST', body: JSON.stringify(ids) }) }
 export function getTestVersions(testId: number): Promise<TestVersion[]> { return request(`/api/admin/tests/${testId}/versions`) }
 export function getVersion(versionId: number): Promise<TestVersion> { return request(`/api/admin/test-versions/${versionId}`) }

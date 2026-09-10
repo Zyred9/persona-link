@@ -9,10 +9,12 @@ import java.util.List;
  * @param focusTests 焦点推荐题型
  * @param recommendedTests 推荐题型
  * @param allTests 全部可用题型
+ * @param titleImageUrl 首页标题图地址，空值使用小程序默认图
  */
 public record MiniappHomeResponse(
         List<MiniappHomeCategoryResponse> categories,
         List<MiniappHomeTestResponse> focusTests,
         List<MiniappHomeTestResponse> recommendedTests,
-        List<MiniappHomeTestResponse> allTests) {
+        List<MiniappHomeTestResponse> allTests,
+        String titleImageUrl) {
 }
