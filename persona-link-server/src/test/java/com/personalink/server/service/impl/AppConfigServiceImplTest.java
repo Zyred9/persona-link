@@ -30,6 +30,19 @@ class AppConfigServiceImplTest {
     }
 
     @Test
+    void readsPairJoinHeroKeyWithEmptyFallback() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), AppConfigEntity.class);
+        AppConfigMapper mapper = mock(AppConfigMapper.class);
+        AppConfigServiceImpl service = new AppConfigServiceImpl();
+        ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        assertEquals("", service.readPairConfig().joinHeroImageUrl());
+        AppConfigEntity row = new AppConfigEntity();
+        row.setConfigValue("https://example.com/pair.png");
+        when(mapper.selectOne(any(), anyBoolean())).thenReturn(row);
+        assertEquals(row.getConfigValue(), service.readPairConfig().joinHeroImageUrl());
+    }
+
+    @Test
     void readsOnlyHomeKeyAndSavesNormalizedValueIncludingClear() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), AppConfigEntity.class);
         AppConfigMapper mapper = mock(AppConfigMapper.class);

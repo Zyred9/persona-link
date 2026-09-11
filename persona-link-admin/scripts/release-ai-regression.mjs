@@ -9,7 +9,7 @@ function expectSource(source, pattern, message) {
   if (!pattern.test(source)) throw new Error(message)
 }
 
-expectSource(releases, /getTests\(\{ page: 1, size: 100 \}\)[\s\S]*pageCount[\s\S]*getTests\(\{ page: index \+ 2, size: 100 \}\)/, '发布页必须加载全部题型分页')
+expectSource(releases, /getTests\(\{ page: 1, size: 100, status: 1 \}\)[\s\S]*pageCount[\s\S]*getTests\(\{ page: index \+ 2, size: 100, status: 1 \}\)/, '发布页必须分页加载全部启用题型')
 expectSource(releases, /openConfirmation\('schedule', draft\)[\s\S]*openConfirmation\('publish', draft\)[\s\S]*openConfirmation\('offline', item\)/, '发布、预约和下线必须先打开确认弹窗')
 expectSource(releases, /confirmationScheduleAt\.value = action === 'schedule' \? scheduleAt\.value : ''/, '预约发布必须锁定确认时的时间快照')
 expectSource(releases, /scheduleVersion\(version\.id, confirmationScheduleAt\.value\)/, '预约发布请求必须提交确认弹窗展示的时间快照')
@@ -168,7 +168,7 @@ async function verifyAiBehavior() {
   assert.strictEqual(questionPayloads[0].dimensionId, 1, '单选题必须提交题目维度')
   assert.ok(questionPayloads[0].options.every((option) => option.dimensionId === null), '单选题选项不得提交无效维度')
 
-  Object.assign(test.questions[0], { type: 2, dimensionId: 1, minSelect: 1, maxSelect: 2 })
+  Object.assign(test.questions[0], { type: 2, dimensionId: 1, minSelect: 2, maxSelect: 2 })
   test.questions[0].options.forEach((option) => { option.dimensionId = 1 })
   await test.saveQuestion()
   assert.strictEqual(questionPayloads[1].dimensionId, null, '多选题不得提交无效题目维度')

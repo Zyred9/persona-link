@@ -1,0 +1,24 @@
+<app-nav-bar title="作答回顾" show-back="{{true}}"></app-nav-bar>
+<view class="paper-page review-page" bindtouchstart="handleReviewTouchStart" bindtouchend="handleReviewTouchEnd">
+  <page-state wx:if="{{state === 'loading'}}" type="loading" title="正在加载历史作答"></page-state>
+  <page-state wx:elif="{{state === 'error'}}" type="error" title="暂时无法回顾" description="{{error}}" action-text="重新加载" bind:action="loadReview"></page-state>
+  <view wx:elif="{{question}}" class="review-panel {{questionSlideClass}}">
+    <view wx:if="{{participants.length > 1}}" class="review-tabs">
+      <button wx:for="{{participants}}" wx:key="key" class="paper-button review-tab {{activeKey === item.key ? 'review-tab--active' : ''}}" data-key="{{item.key}}" bindtap="switchParticipant">{{item.label}}</button>
+    </view>
+    <text class="review-title">{{title}}</text>
+    <view class="review-meta"><text>第 {{questionIndex + 1}} / {{questionCount}} 题</text><text>仅查看 · 不可修改</text></view>
+    <view class="paper-card review-question">{{question.questionText}}</view>
+    <view class="review-options">
+      <view wx:for="{{question.options}}" wx:key="optionId" class="paper-card review-option {{item.selected ? 'review-option--selected' : ''}}">
+        <text class="review-option__text">{{item.optionCode ? item.optionCode + '. ' : ''}}{{item.optionText}}</text>
+        <text wx:if="{{item.selected}}" class="review-option__selected">✓ 已选</text>
+      </view>
+    </view>
+    <text wx:if="{{question.unanswered}}" class="review-note">此题未作答</text>
+    <view class="review-actions">
+      <button class="paper-button" disabled="{{questionIndex === 0}}" bindtap="previousQuestion">上一题</button>
+      <button class="paper-button paper-button--primary" disabled="{{questionIndex + 1 >= questionCount}}" bindtap="nextQuestion">下一题</button>
+    </view>
+  </view>
+</view>

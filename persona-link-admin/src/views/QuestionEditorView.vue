@@ -23,8 +23,6 @@ const currentQuestionId = ref<number | null>(null)
 const question = ref('')
 const questionType = ref(1)
 const dimensionId = ref<number | null>(null)
-const minSelectCount = ref(1)
-const maxSelectCount = ref(1)
 const requiredFlag = ref(1)
 const options = ref<EditableOption[]>([])
 const feedback = ref('')
@@ -40,10 +38,7 @@ const valid = computed(() => {
   const optionsValid = options.value.length >= 2 && options.value.every((option) => option.optionText.trim() && option.scoreValue !== null)
   if (!question.value.trim() || !optionsValid) return false
   if (questionType.value === 1) return dimensionId.value !== null
-  return minSelectCount.value >= 1
-    && minSelectCount.value <= maxSelectCount.value
-    && maxSelectCount.value <= options.value.length
-    && options.value.every((option) => option.dimensionId !== null)
+  return options.value.every((option) => option.dimensionId !== null)
 })
 
 function blankOptions(): EditableOption[] {
@@ -65,8 +60,6 @@ function showQuestion(index: number) {
   question.value = item?.questionText ?? ''
   questionType.value = item?.questionType ?? 1
   dimensionId.value = item?.dimensionId ?? null
-  minSelectCount.value = item?.minSelectCount ?? 1
-  maxSelectCount.value = item?.maxSelectCount ?? 1
   requiredFlag.value = item?.requiredFlag ?? 1
   options.value = item?.options.map((option) => ({
     optionCode: option.optionCode,
@@ -118,8 +111,8 @@ async function save(label: string) {
     const saved = await saveQuestion(versionId, {
       questionType: questionType.value,
       dimensionId: singleChoice ? dimensionId.value ?? undefined : undefined,
-      minSelectCount: singleChoice ? 1 : minSelectCount.value,
-      maxSelectCount: singleChoice ? 1 : maxSelectCount.value,
+      minSelectCount: singleChoice ? 1 : 2,
+      maxSelectCount: singleChoice ? 1 : options.value.length,
       questionNo: currentQuestionId.value ? questions.value[currentIndex.value].questionNo : questions.value.length + 1,
       questionText: question.value.trim(),
       requiredFlag: requiredFlag.value,
@@ -177,14 +170,14 @@ onMounted(load)
     <div class="question-layout">
       <article class="question-card">
         <div class="question-index">第 {{ currentIndex + 1 }} 题</div>
-        <label v-if="questions.length">选择题目<select :value="currentIndex" :disabled="saving" @change="selectQuestion"><option v-for="(item, index) in questions" :key="item.id" :value="index">第 {{ item.questionNo }} 题</option></select></label>
+        <label v-if="questions.length">选择题目<select :value="currentIndex" :disabled="saving" @change="selectQuestion"><option v-for="(item, index) in questions" :key="item.id" :value="index">第 {{ item.questionNo }} 题 {{ item.questionText }}</option></select></label>
         <div class="question-settings" @input="markDirty" @change="markDirty">
           <label>题目类型<select v-model.number="questionType" :disabled="editorLocked"><option :value="1">单选题</option><option :value="2">多选题</option></select></label>
           <label v-if="questionType === 1">计分维度<select v-model.number="dimensionId" :disabled="editorLocked"><option :value="null" disabled>请选择计分维度</option><option v-for="item in version?.dimensions ?? []" :key="item.id" :value="item.id">{{ item.dimensionName }}</option></select></label>
           <label>是否必答<select v-model.number="requiredFlag" :disabled="editorLocked"><option :value="1">是</option><option :value="0">否</option></select></label>
           <template v-if="questionType === 2">
-            <label>最少选择<input v-model.number="minSelectCount" type="number" min="1" :max="options.length" :disabled="editorLocked" /></label>
-            <label>最多选择<input v-model.number="maxSelectCount" type="number" min="1" :max="options.length" :disabled="editorLocked" /></label>
+            <label>最少选择<input :value="2" type="number" disabled /></label>
+            <label>最多选择<input :value="options.length" type="number" disabled /></label>
           </template>
         </div>
         <label>题干<textarea v-model="question" maxlength="120" rows="3" :disabled="editorLocked" @input="markDirty" /></label>

@@ -10,6 +10,7 @@ import com.personalink.server.dto.AiGeneratedQuestionBatch;
 import com.personalink.server.dto.AiGeneratedResultRule;
 import com.personalink.server.dto.AiGeneratedSetup;
 import com.personalink.server.dto.QuestionOptionSaveRequest;
+import com.personalink.server.dto.QuestionResponse;
 import com.personalink.server.dto.QuestionSaveRequest;
 import com.personalink.server.dto.ResultConfigSaveRequest;
 import com.personalink.server.dto.ResultTemplateSaveRequest;
@@ -21,6 +22,7 @@ import com.personalink.server.dto.TestVersionSaveRequest;
 import com.personalink.server.entity.AiGenerationTaskEntity;
 import com.personalink.server.enums.AiGenerationTaskStatus;
 import com.personalink.server.exception.BusinessException;
+import com.personalink.server.exception.AiQuestionTextConflictException;
 import com.personalink.server.mapper.AiGenerationTaskMapper;
 import com.personalink.server.service.ContentService;
 import org.slf4j.Logger;
@@ -36,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /** 串行生成单个 AI 题库任务的异步 Worker。 */
@@ -103,10 +106,14 @@ public class AiQuestionGenerationWorker {
             int questionCount = Math.min(BATCH_SIZE,
                     task.getTargetQuestionCount() - task.getGeneratedQuestionCount());
             this.markCurrentBatch(taskId, batchNo);
-            AiGeneratedQuestionBatch batch = this.generateValidQuestionBatch(taskId, task.getModelName(),
+            List<String> existingQuestionTexts = this.contentService.listQuestions(task.getVersionId()).stream()
+                    .map(QuestionResponse::questionText).toList();
+            List<ScoreDimensionResponse> savedDimensions = version.dimensions();
+            this.generateValidQuestionBatch(taskId, task.getModelName(),
                     test.getTestName(), test.getTestType(), task.getPromptText(), dimensions, dimensionCodes,
-                    firstQuestionNo, questionCount);
-            this.persistQuestionBatch(taskId, batchNo, this.toQuestionRequests(batch, version.dimensions()));
+                    firstQuestionNo, questionCount, existingQuestionTexts,
+                    batch -> this.persistQuestionBatch(taskId, batchNo,
+                            this.toQuestionRequests(batch, savedDimensions)));
             task = this.requireTask(taskId);
         }
         this.markPendingReview(taskId);
@@ -120,7 +127,7 @@ public class AiQuestionGenerationWorker {
         return this.generateWithValidation(taskId, "维度和结果规则",
                 feedback -> this.deepSeekClient.generateSetup(
                         modelName, testName, testType, promptText, feedback),
-                AiGenerationValidator::validateSetup);
+                AiGenerationValidator::validateSetup, setup -> { });
     }
 
     AiGeneratedQuestionBatch generateValidQuestionBatch(Long taskId,
@@ -131,28 +138,37 @@ public class AiQuestionGenerationWorker {
                                                          List<AiGeneratedDimension> dimensions,
                                                          Set<String> dimensionCodes,
                                                          int firstQuestionNo,
-                                                         int questionCount) {
+                                                         int questionCount,
+                                                         List<String> existingQuestionTexts,
+                                                         Consumer<AiGeneratedQuestionBatch> persistBatch) {
         return this.generateWithValidation(taskId, "题目批次 " + firstQuestionNo + "-"
                         + (firstQuestionNo + questionCount - 1),
                 feedback -> this.deepSeekClient.generateQuestionBatch(modelName, testName, testType, promptText,
-                        dimensions, firstQuestionNo, questionCount, feedback),
+                        dimensions, firstQuestionNo, questionCount, existingQuestionTexts, feedback),
                 batch -> {
                     AiGenerationValidator.validateQuestionBatch(
-                            batch, dimensionCodes, firstQuestionNo, questionCount);
+                            batch, dimensionCodes, firstQuestionNo, questionCount, existingQuestionTexts);
                     return batch;
-                });
+                }, persistBatch);
     }
 
     private <T> T generateWithValidation(Long taskId,
                                          String contentName,
                                          Function<String, T> generator,
-                                         Function<T, T> validator) {
+                                         Function<T, T> validator,
+                                         Consumer<T> persister) {
         String validationFeedback = "";
         for (int attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
+            boolean persisting = false;
             try {
-                return validator.apply(generator.apply(validationFeedback));
+                T result = validator.apply(generator.apply(validationFeedback));
+                persisting = true;
+                // SQL 判重更宽时，必须等待整批事务回滚后再生成；其它持久化故障直接失败。
+                persister.accept(result);
+                return result;
             } catch (RuntimeException exception) {
-                if (!this.isRetryableGenerationError(exception) || attempt == MAX_GENERATION_ATTEMPTS) {
+                if ((persisting && !(exception instanceof AiQuestionTextConflictException))
+                        || !this.isRetryableGenerationError(exception) || attempt == MAX_GENERATION_ATTEMPTS) {
                     throw exception;
                 }
                 validationFeedback = exception.getMessage();
@@ -165,6 +181,7 @@ public class AiQuestionGenerationWorker {
 
     private boolean isRetryableGenerationError(RuntimeException exception) {
         return exception instanceof IllegalArgumentException
+                || exception instanceof AiQuestionTextConflictException
                 || (exception instanceof BusinessException businessException
                 && (businessException.getCode() == RETRYABLE_AI_SERVICE_CODE
                 || businessException.getCode() == INVALID_AI_RESPONSE_CODE));

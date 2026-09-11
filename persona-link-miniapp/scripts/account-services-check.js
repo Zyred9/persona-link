@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const storage = new Map();
-let calls = [], toasts = [], redirects = [], modal, reply;
+let calls = [], toasts = [], redirects = [], modal, reply, pullDownStops = 0;
 const app = { verifyConsent: async () => {}, globalData: { consentVersion: 'v2.0', consentStorageKey: 'consent' } };
 const api = {
   TOKEN_STORAGE_KEY: 'personaLinkBusinessToken',
@@ -17,13 +17,17 @@ const wx = {
   showToast: (value) => toasts.push(value), showModal: (value) => { modal = value; },
   getStorageSync: (key) => storage.get(key), setStorageSync: (key, value) => storage.set(key, value),
   getStorageInfoSync: () => ({ keys: [...storage.keys()] }), removeStorageSync: (key) => storage.delete(key),
+  stopPullDownRefresh: () => { pullDownStops++; },
   reLaunch: (value) => redirects.push(value), switchTab: (value) => redirects.push(value)
+};
+const modules = {
+  '../../utils/markdown': require('../subpackages/account/utils/markdown'),
+  '../../../../utils/format': require('../utils/format')
 };
 function load(file, component = false) {
   let definition;
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
-    require: (name) => name === '../../utils/markdown'
-      ? require('../subpackages/account/utils/markdown') : api,
+    require: (name) => Object.prototype.hasOwnProperty.call(modules, name) ? modules[name] : api,
     wx, getApp: () => app, Page: (value) => { definition = value; },
     Component: (value) => { definition = value; }, setTimeout: () => 1, clearTimeout() {}
   });
@@ -61,9 +65,14 @@ async function run() {
   legal.type = 2;
   reply = () => Promise.reject(new Error('未配置'));
   await legal.loadDocument(); assert.equal(legal.data.state, 'error');
-  reply = () => Promise.resolve({ type: 2, content: '<script>纯文本</script>', version: 1 });
+  reply = () => Promise.resolve({ type: 2, content: '<script>纯文本</script>', version: 1, updatedAt: '2026-09-10T13:58:02' });
   await legal.loadDocument(); assert.equal(legal.data.state, 'ready');
   assert.ok(legal.data.contentNodes.includes('&lt;script&gt;'));
+  assert.equal(legal.data.document.updatedAt, '2026-09-10 13:58:02', '更新时间必须格式化为 年-月-日 时:分:秒');
+  reply = () => Promise.resolve({ type: 2, content: '更新后的协议', version: 2, updatedAt: '2026-09-10T14:30:00' });
+  await legal.onPullDownRefresh();
+  assert.equal(legal.data.document.version, 2, '下拉刷新必须重新拉取协议');
+  assert.equal(pullDownStops, 1, '下拉刷新结束后必须收起刷新动画');
 
   const consent = load('pages/consent/index.js');
   consent.profileToken = 'token';
@@ -102,6 +111,6 @@ async function run() {
   requestModule.exports.invalidateTestRecordRequests();
   respond({ statusCode: 200, data: { code: 0, data: { pairSessionId: 1 } } });
   await assert.rejects(stale, /测试记录已删除/);
-  console.log('ACCOUNT_SERVICES_CHECK_OK feedback/legal/consent/deletion');
+  console.log('ACCOUNT_SERVICES_CHECK_OK feedback/legal/legal-time/legal-refresh/consent/deletion');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

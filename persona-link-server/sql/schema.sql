@@ -24,6 +24,10 @@ INSERT INTO t_app_config (config_key, config_value, value_type, config_name, rem
 VALUES ('miniapp.version', '1.0.0', 1, '小程序版本号', '设置页版本信息展示值')
 ON DUPLICATE KEY UPDATE config_key = VALUES(config_key);
 
+INSERT INTO t_app_config (config_key, config_value, value_type, config_name, remark)
+VALUES ('miniapp.pair.join_hero_image_url', '', 1, '加入双人测试页头图', '空值或图片加载失败时隐藏加入页头图')
+ON DUPLICATE KEY UPDATE config_key = VALUES(config_key);
+
 
 -- 用户反馈和协议配置增量；不写入占位协议正文。执行前核对目标数据库。
 CREATE TABLE IF NOT EXISTS t_feedback (

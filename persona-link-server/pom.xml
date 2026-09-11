@@ -13,7 +13,7 @@
 
     <groupId>com.personalink</groupId>
     <artifactId>persona-link-server</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1-release</version>
     <name>persona-link-server</name>
     <description>心动测测服务端</description>
 

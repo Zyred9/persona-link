@@ -27,7 +27,9 @@ class AppConfigManagementTest {
                     new AppConfigSaveRequest("custom", "false", 3, "布尔", ""),
                     new AppConfigSaveRequest("custom", "{\"a\":[1,true]}", 4, "JSON", ""),
                     new AppConfigSaveRequest("miniapp.version", " 1.2.3 ", 1, "版本", ""),
-                    new AppConfigSaveRequest("miniapp.home.title_image_url", " HTTPS://example.com/a.png ", 1, "头图", "")}) {
+                    new AppConfigSaveRequest("miniapp.home.title_image_url", " HTTPS://example.com/a.png ", 1, "头图", ""),
+                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", " HTTPS://example.com/pair.png ", 1, "双人头图", ""),
+                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "", 1, "双人头图", "")}) {
                 assertTrue(validator.validate(request).isEmpty(), request.toString());
             }
             for (var request : new AppConfigSaveRequest[]{
@@ -39,11 +41,15 @@ class AppConfigManagementTest {
                     new AppConfigSaveRequest("miniapp.version", "  ", 1, "版本", ""),
                     new AppConfigSaveRequest("miniapp.version", "1", 2, "版本", ""),
                     new AppConfigSaveRequest("miniapp.home.title_image_url", "javascript:alert(1)", 1, "头图", ""),
-                    new AppConfigSaveRequest("miniapp.home.title_image_url", "true", 3, "头图", "")}) {
+                    new AppConfigSaveRequest("miniapp.home.title_image_url", "true", 3, "头图", ""),
+                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "javascript:alert(1)", 1, "双人头图", ""),
+                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "true", 3, "双人头图", "")}) {
                 assertFalse(validator.validate(request).isEmpty(), request.toString());
             }
             assertEquals("https://example.com/a.png", new AppConfigSaveRequest("miniapp.home.title_image_url",
                     " HTTPS://example.com/a.png ", 1, "头图", null).configValue());
+            assertEquals("https://example.com/pair.png", new AppConfigSaveRequest("miniapp.pair.join_hero_image_url",
+                    " HTTPS://example.com/pair.png ", 1, "双人头图", null).configValue());
         }
     }
 

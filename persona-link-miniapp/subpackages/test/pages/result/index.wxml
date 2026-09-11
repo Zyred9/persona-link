@@ -14,13 +14,10 @@
 
 <view wx:elif="{{view === 'result'}}" class="paper-page result-page">
   <view class="result-card paper-card">
-    <view class="result-card__top">
-      <view class="result-card__summary">
-        <text class="result-badge">你的类型是</text>
-        <text class="result-name">{{result.name}}</text>
-        <text class="result-description">{{result.description}}</text>
-      </view>
-      <view class="result-face"><view class="result-face__eye result-face__eye--left"></view><view class="result-face__eye result-face__eye--right"></view><view class="result-face__cheek result-face__cheek--left"></view><view class="result-face__cheek result-face__cheek--right"></view><view class="result-face__smile"></view></view>
+    <view class="result-card__summary">
+      <text class="result-badge">你的类型是</text>
+      <text class="result-name">{{result.name}}</text>
+      <text class="result-description">{{result.description}}</text>
     </view>
     <view wx:for="{{result.dimensions}}" wx:key="dimensionId" class="score-row">
       <text class="score-row__label">{{item.dimensionName}}</text><view class="score-row__track"><view class="score-row__bar score-row__bar--{{item.barTone}}" style="width: {{item.normalizedScore}}%;"></view></view><text class="score-row__value">{{item.normalizedScore}}</text>

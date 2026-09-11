@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "测试详情",
+  "enablePullDownRefresh": false,
+  "disableScroll": true,
   "usingComponents": {
     "app-nav-bar": "/components/app-nav-bar/index",
     "test-detail": "/components/test-detail/index"

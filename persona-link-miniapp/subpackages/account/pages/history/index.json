@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "测试记录",
+  "enablePullDownRefresh": false,
+  "disableScroll": true,
   "usingComponents": {
     "account-center": "/components/account-center/index"
   }

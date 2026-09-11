@@ -87,6 +87,51 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public AssessmentReviewResponse review(String openId, Long answerSessionId) {
+        return new AssessmentReviewResponse(List.of(this.reviewParticipant(
+                this.requireOwnedSession(answerSessionId, openId), true)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AssessmentReviewResponse reviewPair(String openId, Long pairSessionId) {
+        PairSessionEntity pair = this.pairSessionMapper.selectById(pairSessionId);
+        if (Objects.isNull(pair) || !pair.isVisibleTo(openId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, 404, "配对记录不存在");
+        }
+        boolean initiator = Objects.equals(openId, pair.getInitiatorOpenId());
+        Long ownId = initiator ? pair.getInitiatorAnswerSessionId() : pair.getPartnerAnswerSessionId();
+        Long otherId = initiator ? pair.getPartnerAnswerSessionId() : pair.getInitiatorAnswerSessionId();
+        List<AssessmentReviewParticipantResponse> participants = new ArrayList<>();
+        participants.add(this.reviewParticipant(this.requireOwnedSession(ownId, openId), true));
+        // 对方删除记录或尚未提交，不公开其答案；配对身份必须与答卷所有者一致。
+        String otherOpenId = initiator ? pair.getPartnerOpenId() : pair.getInitiatorOpenId();
+        if (Objects.nonNull(otherId) && pair.isVisibleTo(otherOpenId)) {
+            AnswerSessionEntity other = this.getById(otherId);
+            if (Objects.nonNull(other) && Objects.equals(otherOpenId, other.getOpenId())
+                    && this.isSubmitted(other)) {
+                participants.add(this.reviewParticipant(other, false));
+            }
+        }
+        return new AssessmentReviewResponse(participants);
+    }
+
+    private boolean isSubmitted(AnswerSessionEntity session) {
+        return Objects.equals(AnswerStatus.SUBMITTED.getCode(), session.getAnswerStatus())
+                || Objects.equals(AnswerStatus.REPORT_READY.getCode(), session.getAnswerStatus());
+    }
+
+    private AssessmentReviewParticipantResponse reviewParticipant(AnswerSessionEntity session, boolean self) {
+        if (!this.isSubmitted(session)) {
+            throw new BusinessException(HttpStatus.CONFLICT.value(), "完成并提交测试后才能查看作答回顾");
+        }
+        AssessmentSessionResponse response = this.buildSessionResponse(session, true);
+        return new AssessmentReviewParticipantResponse(self ? "self" : "partner",
+                self ? "我的作答" : "对方的作答", response.answerSessionId(), response.title(), response.questions());
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void saveAnswer(
             String openId,
@@ -235,6 +280,31 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 .update();
         this.tryGeneratePairReport(session.getId());
         return this.toSubmissionResponse(openId, savedReport);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void abandon(String openId, Long answerSessionId) {
+        AnswerSessionEntity session = this.requireOwnedLockedSession(answerSessionId, openId);
+        if (AnswerStatus.ABANDONED.getCode() == session.getAnswerStatus()) {
+            return;
+        }
+        this.requireInProgress(session);
+        this.lambdaUpdate()
+                .set(AnswerSessionEntity::getAnswerStatus, AnswerStatus.ABANDONED.getCode())
+                .eq(AnswerSessionEntity::getId, session.getId())
+                .eq(AnswerSessionEntity::getAnswerStatus, AnswerStatus.IN_PROGRESS.getCode())
+                .eq(AnswerSessionEntity::getDeleted, NORMAL)
+                .update();
+        // 与提交保持答卷 → 配对的加锁顺序；受邀者退出后不能让发起者继续等待。
+        this.pairSessionMapper.update(null,
+                Wrappers.<PairSessionEntity>lambdaUpdate()
+                        .set(PairSessionEntity::getPairStatus, PairStatus.CANCELLED.getCode())
+                        .eq(PairSessionEntity::getPartnerAnswerSessionId, session.getId())
+                        .eq(PairSessionEntity::getPartnerOpenId, openId)
+                        .in(PairSessionEntity::getPairStatus,
+                                PairStatus.INITIATOR_DONE.getCode(), PairStatus.PARTNER_JOINED.getCode())
+                        .eq(PairSessionEntity::getDeleted, NORMAL));
     }
 
     @Override
@@ -416,12 +486,19 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
             selected.add(question.getId());
         }
         return questions.stream()
+                .filter(question -> selected.contains(question.getId()))
+                // 单选题排在前面，多选题统一排到最后，避免答题过程中题型穿插。
+                .sorted(Comparator.comparingInt(question ->
+                        QuestionType.SINGLE.getCode() == question.getQuestionType() ? 0 : 1))
                 .map(QuestionEntity::getId)
-                .filter(selected::contains)
                 .toList();
     }
 
     private AssessmentSessionResponse buildSessionResponse(AnswerSessionEntity session) {
+        return this.buildSessionResponse(session, false);
+    }
+
+    private AssessmentSessionResponse buildSessionResponse(AnswerSessionEntity session, boolean review) {
         TestVersionEntity version = this.requireVersion(session.getVersionId());
         List<AnswerSessionQuestionEntity> snapshots = this.listSnapshots(session.getId());
         List<Long> questionIds = snapshots.stream().map(AnswerSessionQuestionEntity::getQuestionId).toList();
@@ -434,6 +511,10 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 .collect(Collectors.groupingBy(
                         AnswerDetailEntity::getQuestionId,
                         Collectors.mapping(AnswerDetailEntity::getOptionId, Collectors.toCollection(LinkedHashSet::new))));
+        if (review && (snapshots.isEmpty() || new HashSet<>(questionIds).size() != snapshots.size()
+                || !new HashSet<>(questionIds).containsAll(selectedMap.keySet()))) {
+            throw new BusinessException(HttpStatus.CONFLICT.value(), "历史答卷内容缺失，无法回顾");
+        }
         List<AssessmentQuestionResponse> responses = new ArrayList<>(snapshots.size());
         int firstUnansweredIndex = snapshots.size();
         for (int index = 0; index < snapshots.size(); index++) {
@@ -448,6 +529,12 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
             }
             List<QuestionOptionEntity> questionOptions = optionMap.getOrDefault(
                     question.getId(), Collections.emptyList());
+            if (review && (!Objects.equals(question.getVersionId(), session.getVersionId())
+                    || questionOptions.isEmpty()
+                    || !questionOptions.stream().map(QuestionOptionEntity::getId).toList().containsAll(selectedIds)
+                    || (ENABLED == question.getRequiredFlag() && selectedIds.isEmpty()))) {
+                throw new BusinessException(HttpStatus.CONFLICT.value(), "历史题目或答案缺失，无法回顾");
+            }
             List<AssessmentQuestionOptionResponse> optionResponses = questionOptions.stream()
                     .map(option -> new AssessmentQuestionOptionResponse(
                             String.valueOf(option.getId()), option.getOptionCode(), option.getOptionText()))

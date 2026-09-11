@@ -11,16 +11,8 @@
   padding: 24rpx 28rpx 34rpx;
 }
 
-.result-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .result-card__summary {
-  min-width: 0;
-  flex: 1;
-  padding-right: 20rpx;
+  text-align: center;
 }
 
 .result-badge {
@@ -35,7 +27,8 @@
 
 .result-name {
   display: block;
-  margin-top: 6rpx;
+  margin-top: 36rpx;
+  margin-bottom: 28rpx;
   font-size: 46rpx;
   font-weight: 900;
 }
@@ -47,66 +40,12 @@
   font-size: 24rpx;
   font-weight: 800;
   line-height: 1.5;
+  text-align: left;
   white-space: pre-line;
 }
 
 .state-description text {
   display: block;
-}
-
-.result-face {
-  position: relative;
-  flex: 0 0 auto;
-  width: 136rpx;
-  height: 136rpx;
-  background: #ffdbac;
-  border: 5rpx solid #201b22;
-  border-radius: 50%;
-}
-
-.result-face__eye {
-  position: absolute;
-  top: 53rpx;
-  width: 17rpx;
-  height: 17rpx;
-  background: #201b22;
-  border-radius: 50%;
-}
-
-.result-face__eye--left {
-  left: 39rpx;
-}
-
-.result-face__eye--right {
-  right: 39rpx;
-}
-
-.result-face__cheek {
-  position: absolute;
-  top: 76rpx;
-  width: 20rpx;
-  height: 20rpx;
-  background: #f5b1c5;
-  border-radius: 50%;
-}
-
-.result-face__cheek--left {
-  left: 17rpx;
-}
-
-.result-face__cheek--right {
-  right: 17rpx;
-}
-
-.result-face__smile {
-  position: absolute;
-  top: 72rpx;
-  left: 50%;
-  width: 42rpx;
-  height: 24rpx;
-  border-bottom: 5rpx solid #201b22;
-  border-radius: 50%;
-  transform: translateX(-50%);
 }
 
 .score-row {

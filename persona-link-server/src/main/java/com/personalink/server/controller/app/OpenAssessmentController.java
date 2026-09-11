@@ -3,6 +3,7 @@ package com.personalink.server.controller.app;
 import lombok.RequiredArgsConstructor;
 
 import com.personalink.server.dto.AssessmentSessionResponse;
+import com.personalink.server.dto.AssessmentReviewResponse;
 import com.personalink.server.dto.CreateAssessmentRequest;
 import com.personalink.server.dto.ReportResponse;
 import com.personalink.server.dto.RestartAssessmentRequest;
@@ -32,6 +33,20 @@ public class OpenAssessmentController {
 
     private final AuthService authService;
     private final AssessmentService assessmentService;
+
+    /**
+     * 只读回顾本人已提交答卷，按原抽题顺序返回。
+     * @param authorization Bearer 业务会话令牌
+     * @param answerSessionId 历史答卷 ID
+     * @return 本人题目及已选答案
+     */
+    @GetMapping("/{answerSessionId}/review")
+    public ApiResponse<AssessmentReviewResponse> review(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @PathVariable Long answerSessionId) {
+        return ApiResponse.success(this.assessmentService.review(
+                this.authService.requireSession(authorization).openId(), answerSessionId));
+    }
 
     /**
      * 查询当前用户最近一份未完成答卷。
@@ -126,5 +141,19 @@ public class OpenAssessmentController {
             @Valid @RequestBody SubmitAssessmentRequest request) {
         String openId = this.authService.requireSession(authorization).openId();
         return ApiResponse.success(this.assessmentService.submit(openId, answerSessionId, request));
+    }
+
+    /**
+     * 幂等作废当前用户未完成的答卷，不创建新答卷。
+     * @param authorization Bearer 业务会话令牌
+     * @param answerSessionId 待作废答卷 ID
+     * @return 空响应
+     */
+    @PostMapping("/{answerSessionId}/abandon")
+    public ApiResponse<Void> abandon(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @PathVariable Long answerSessionId) {
+        this.assessmentService.abandon(this.authService.requireSession(authorization).openId(), answerSessionId);
+        return ApiResponse.success(null);
     }
 }

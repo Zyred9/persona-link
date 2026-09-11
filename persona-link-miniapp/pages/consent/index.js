@@ -47,8 +47,16 @@ Page({
       this.profileToken = wx.getStorageSync(TOKEN_STORAGE_KEY);
       this.setData({ step: 'profile', nickname: profile.nickname || '', avatarUrl: profile.avatarUrl || '', avatarImage: resolveImageUrl(profile.avatarUrl) });
       if (isProfileComplete(profile)) {
+        try {
+          await getApp().verifyConsent();
+          this.continueToApp();
+          return;
+        } catch (error) {
+          // 登录状态在校验中变化时回到登录步骤，其余情况才需要重新阅读协议。
+          if (this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) { this.showError(error); return; }
+        }
+        // 只有未同意或协议版本更新时才需要下载协议正文。
         await this.loadDocuments();
-        try { await getApp().verifyConsent(); this.continueToApp(); } catch (error) { /* 未同意或版本已更新，留在协议步骤。 */ }
       }
     } catch (error) { this.showError(error); }
     finally { if (!this.disposed) this.setData({ busy: false }); }

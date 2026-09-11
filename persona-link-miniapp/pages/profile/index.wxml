@@ -7,7 +7,7 @@
   bind:beforeleave="deactivateAccount"
   bind:afterleave="clearAccount"
 >
-  <scroll-view class="profile-account-scroll" scroll-y bindscrolltolower="loadMoreAccountRecords">
+  <scroll-view class="profile-account-scroll" bindscrolltolower="loadMoreAccountRecords">
     <account-center
       id="profile-account-center"
       embedded="{{true}}"

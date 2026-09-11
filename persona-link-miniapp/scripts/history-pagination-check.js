@@ -34,6 +34,10 @@ async function run() {
   assert.match(accountTemplate, /historyTab === 'pair' \? 'history-summary__item--active'/);
   assert.match(accountTemplate, /<block wx:if="\{\{historyTab === 'single'\}\}">/);
   assert.match(accountTemplate, /<block wx:if="\{\{historyTab === 'pair'\}\}">/);
+  assert.match(accountTemplate, /bindtouchstart="handleHistoryTouchStart"/);
+  assert.match(accountTemplate, /bindtouchend="handleHistoryTouchEnd"/);
+  assert.match(accountTemplate, /class="history-panel history-panel--single"/);
+  assert.match(accountTemplate, /class="history-panel history-panel--pair"/);
   assert.equal((accountTemplate.match(/class="history-cover"/g) || []).length, 2);
   assert.doesNotMatch(accountTemplate, /history-face/);
   const accountStyle = read('components/account-center/index.wxss');
@@ -42,6 +46,8 @@ async function run() {
   assert.match(coverStyle[0], /top: 50%/);
   assert.match(coverStyle[0], /transform: translateY\(-50%\)/);
   assert.doesNotMatch(accountStyle, /\.history-face/);
+  assert.match(accountStyle, /@keyframes history-panel-in-left/);
+  assert.match(accountStyle, /@keyframes history-panel-in-right/);
 
   const history = component();
   assert.equal(history.data.historyTab, 'single');
@@ -51,6 +57,15 @@ async function run() {
   assert.equal(history.data.historyTab, 'single');
   history.switchHistoryTab({ currentTarget: { dataset: { tab: 'invalid' } } });
   assert.equal(history.data.historyTab, 'single');
+  history.handleHistoryTouchStart({ touches: [{ clientX: 240, clientY: 120 }] });
+  history.handleHistoryTouchEnd({ changedTouches: [{ clientX: 120, clientY: 128 }] });
+  assert.equal(history.data.historyTab, 'pair', '左滑必须切换到双人记录');
+  history.handleHistoryTouchStart({ touches: [{ clientX: 120, clientY: 120 }] });
+  history.handleHistoryTouchEnd({ changedTouches: [{ clientX: 260, clientY: 132 }] });
+  assert.equal(history.data.historyTab, 'single', '右滑必须切换到单人记录');
+  history.handleHistoryTouchStart({ touches: [{ clientX: 240, clientY: 120 }] });
+  history.handleHistoryTouchEnd({ changedTouches: [{ clientX: 200, clientY: 320 }] });
+  assert.equal(history.data.historyTab, 'single', '纵向滚动不得切换页签');
 
   const restored = component();
   restored.data.currentView = 'profile';
@@ -68,8 +83,8 @@ async function run() {
 
   history.handlePairTap({ currentTarget: { dataset: { pairSessionId: 'pair 1', reportReady: false } } });
   history.handlePairTap({ currentTarget: { dataset: { pairSessionId: 'pair/2', reportReady: 'true' } } });
-  assert.equal(navigations[0], '/subpackages/pair/pages/wait/index?pairSessionId=pair%201');
-  assert.equal(navigations[1], '/subpackages/pair/pages/result/index?pairSessionId=pair%2F2');
+  assert.equal(navigations[0], '/subpackages/account/pages/review/index?pairSessionId=pair%201');
+  assert.equal(navigations[1], '/subpackages/account/pages/review/index?pairSessionId=pair%2F2');
 
   const first = history.loadRecords();
   await history.loadMoreRecords(); assert.equal(requests.length, 1);
@@ -149,10 +164,10 @@ async function run() {
   requests.at(-1).resolve(pairPage(30, 3)); await pairLate;
   assert.equal(pairs.data.pairRecords.length, 20);
 
-  for (const [file, handler, selector] of [
-    ['pages/home/index', 'loadMoreAccountRecords', '#home-account-center'],
-    ['pages/profile/index', 'loadMoreAccountRecords', '#profile-account-center'],
-    ['subpackages/account/pages/history/index', 'onReachBottom', '#history-account-center']
+  for (const [file, handler, selector, scrollPattern] of [
+    ['pages/home/index', 'loadMoreAccountRecords', '#home-account-center', /bindscrolltolower="loadMoreAccountRecords"/],
+    ['pages/profile/index', 'loadMoreAccountRecords', '#profile-account-center', /bindscrolltolower="loadMoreAccountRecords"/],
+    ['subpackages/account/pages/history/index', 'loadMore', '#history-account-center', /bindscrolltolower="loadMore"/]
   ]) {
     let entry;
     vm.runInNewContext(read(`${file}.js`), { Page: (value) => { entry = value; }, require: () => ({}) });
@@ -160,9 +175,16 @@ async function run() {
     entry[handler].call({ data: { containerVisible: true, containerMode: 'account', accountVisible: true },
       selectComponent(id) { assert.equal(id, selector); return { loadMoreRecords() { triggered++; } }; } });
     assert.equal(triggered, 1);
-    if (handler !== 'onReachBottom') assert.match(read(`${file}.wxml`), /bindscrolltolower="loadMoreAccountRecords"/);
-    else assert.ok(read(`${file}.wxml`).includes(`id="${selector.slice(1)}"`));
+    assert.match(read(`${file}.wxml`), scrollPattern);
+    assert.ok(read(`${file}.wxml`).includes(`id="${selector.slice(1)}"`));
   }
+  const historyPageConfig = JSON.parse(read('subpackages/account/pages/history/index.json'));
+  assert.equal(historyPageConfig.enablePullDownRefresh, false, '测试记录页不允许下拉刷新');
+  assert.equal(historyPageConfig.disableScroll, true, '测试记录页不允许页面回弹');
+  const historyPageTemplate = read('subpackages/account/pages/history/index.wxml');
+  assert.match(historyPageTemplate, /enhanced="\{\{true\}\}"/);
+  assert.match(historyPageTemplate, /bounces="\{\{false\}\}"/);
+  assert.match(historyPageTemplate, /bindscrolltolower="loadMore"/);
   const sql = read('../persona-link-server/src/main/resources/mapper/ReportMapper.xml');
   assert.match(sql, /ORDER BY r.generated_at DESC, r.id DESC/);
   for (const query of ['selectHistory', 'countHistory']) {
@@ -176,6 +198,6 @@ async function run() {
   const pairHistory = pairSql.match(/<select id="selectHistory"[\s\S]*?<\/select>/)[0];
   assert.match(reportHistory, /v\.cover_url/);
   assert.match(pairHistory, /v\.cover_url/);
-  console.log('HISTORY_PAGINATION_CHECK_OK tabs/pair-navigation/covers-centered/single+pair/paging/retry/dedup/stale/delete/failure-isolation/three-entry-wiring/order');
+  console.log('HISTORY_PAGINATION_CHECK_OK tabs/swipe/panel-animation/no-pull-down/scroll-view/pair-navigation/covers-centered/single+pair/paging/retry/dedup/stale/delete/failure-isolation/three-entry-wiring/order');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

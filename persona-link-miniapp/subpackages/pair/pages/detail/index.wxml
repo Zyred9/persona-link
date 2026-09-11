@@ -1,2 +1,2 @@
 <app-nav-bar title="测试详情" show-back="{{true}}"></app-nav-bar>
-<test-detail test-id="{{testId}}" test-type="{{2}}"></test-detail>
+<test-detail test-id="{{testId}}" test-type="{{2}}" bind:back="backToHome"></test-detail>

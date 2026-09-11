@@ -1,10 +1,11 @@
-const { requestData, authenticatedRequestData, authenticatedUploadData, createIdempotencyKey, readProfileCache, writeProfileCache, TOKEN_STORAGE_KEY } = require('../../utils/request');
+const { requestData, authenticatedRequestData, authenticatedUploadData, createIdempotencyKey, readProfileCache, writeProfileCache, fetchProfile, TOKEN_STORAGE_KEY } = require('../../utils/request');
 const { resolveImageUrl, resolvePreviewUrl } = require('../../utils/image');
 
 const HISTORY_SECTIONS = {
   single: { prefix: 'history', records: 'records', total: 'total', totalLabel: 'totalLabel', id: 'reportId', url: 'reports' },
   pair: { prefix: 'pairHistory', records: 'pairRecords', total: 'pairTotal', totalLabel: 'pairTotalLabel', id: 'pairSessionId', url: 'pairs' }
 };
+const HISTORY_SWIPE_MIN_DISTANCE = 60;
 const PROFILE_VIEW = 'profile';
 const VIEW_TITLES = {
   profile: '我的',
@@ -46,7 +47,6 @@ function formatHistoryRecord(record, kind) {
   if (kind === 'single') return Object.assign({}, record, {
     reportId: String(record.reportId),
     coverImage: resolveImageUrl(record.coverUrl),
-    previewUrl: resolvePreviewUrl(record.coverUrl),
     resultName: record.resultName || record.resultCode || '测试结果',
     generatedAt: formatGeneratedAt(record.generatedAt),
     versionLabel: record.versionNo ? `V${record.versionNo}` : ''
@@ -56,7 +56,6 @@ function formatHistoryRecord(record, kind) {
   return Object.assign({}, record, {
     pairSessionId: String(record.pairSessionId),
     coverImage: resolveImageUrl(record.coverUrl),
-    previewUrl: resolvePreviewUrl(record.coverUrl),
     resultText: labels[status] || '查看配对进度',
     meta: `${formatGeneratedAt(record.createdAt)}${record.versionNo ? ` · V${record.versionNo}` : ''}`,
     reportReady: status === 4,
@@ -127,6 +126,7 @@ Component({
     },
     detached() {
       this.componentAttached = false;
+      this.pairResultRequest = null;
       this.profileEpoch = (this.profileEpoch || 0) + 1;
       this.feedbackEpoch = (this.feedbackEpoch || 0) + 1;
       this.historyRequestVersion = (this.historyRequestVersion || 0) + 1;
@@ -137,6 +137,7 @@ Component({
   pageLifetimes: {
     hide() {
       this.pageHidden = true;
+      this.pairResultRequest = null;
       this.feedbackEpoch = (this.feedbackEpoch || 0) + 1;
       this.clearFeedbackRedirect();
     },
@@ -153,6 +154,7 @@ Component({
       const currentView = normalizeView(view);
       if (currentView !== PROFILE_VIEW) this.profileEpoch = (this.profileEpoch || 0) + 1;
       if (this.data.currentView === 'history' && 'history' !== currentView) {
+        this.pairResultRequest = null;
         this.historyRequestVersion = (this.historyRequestVersion || 0) + 1;
       }
       if (this.data.currentView === 'feedback' && 'feedback' !== currentView) {
@@ -212,7 +214,7 @@ Component({
       this.profileToken = '';
       this.setData({ profileState: 'loading', profileError: '', nickname: '', avatarUrl: '', avatarImage: '', draftNickname: '', profileSaving: false, avatarUploading: false });
       try {
-        const profile = await authenticatedRequestData({ url: '/api/miniapp/profile', sessionBound: true });
+        const profile = await fetchProfile();
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
         if (!profile || typeof profile !== 'object') throw new Error('用户资料响应异常');
         this.profileToken = wx.getStorageSync(TOKEN_STORAGE_KEY);
@@ -288,10 +290,30 @@ Component({
     },
 
     switchHistoryTab(event) {
-      const historyTab = event.currentTarget.dataset.tab;
+      this.setHistoryTab(event.currentTarget.dataset.tab);
+    },
+
+    setHistoryTab(historyTab) {
       if (HISTORY_SECTIONS[historyTab] && historyTab !== this.data.historyTab) {
         this.setData({ historyTab });
       }
+    },
+
+    handleHistoryTouchStart(event) {
+      const touch = event.touches && event.touches[0];
+      if (!touch) return;
+      this.historyTouchStart = { x: touch.clientX, y: touch.clientY };
+    },
+
+    handleHistoryTouchEnd(event) {
+      const start = this.historyTouchStart;
+      this.historyTouchStart = null;
+      const touch = event.changedTouches && event.changedTouches[0];
+      if (!start || !touch) return;
+      const deltaX = touch.clientX - start.x;
+      const deltaY = touch.clientY - start.y;
+      if (Math.abs(deltaX) < HISTORY_SWIPE_MIN_DISTANCE || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+      this.setHistoryTab(deltaX < 0 ? 'pair' : 'single');
     },
 
     loadMoreRecords() {
@@ -361,7 +383,21 @@ Component({
       }
     },
 
+    previewCover(event) {
+      const url = resolvePreviewUrl(event.currentTarget.dataset.url);
+      if (url) wx.previewImage({ current: url, urls: [url] });
+    },
+
     handleRecordTap(event) {
+      const answerSessionId = String(event.currentTarget.dataset.answerSessionId || '');
+      if (!answerSessionId) {
+        wx.showToast({ title: '历史答卷暂不可用', icon: 'none' });
+        return;
+      }
+      wx.navigateTo({ url: `/subpackages/account/pages/review/index?answerSessionId=${encodeURIComponent(answerSessionId)}` });
+    },
+
+    openRecordResult(event) {
       const reportId = String(event.currentTarget.dataset.reportId || '');
       if (!reportId) return;
       wx.navigateTo({
@@ -369,21 +405,38 @@ Component({
       });
     },
 
-    previewCover(event) {
-      const url = event.currentTarget.dataset.url;
-      if (!url) return;
-      wx.previewImage({ urls: [url], current: url });
-    },
-
     handlePairTap(event) {
       const pairSessionId = String(event.currentTarget.dataset.pairSessionId || '');
       if (!pairSessionId) return;
-      const reportReady = true === event.currentTarget.dataset.reportReady
-        || 'true' === event.currentTarget.dataset.reportReady;
-      const path = reportReady ? 'result' : 'wait';
-      wx.navigateTo({
-        url: `/subpackages/pair/pages/${path}/index?pairSessionId=${encodeURIComponent(pairSessionId)}`
-      });
+      wx.navigateTo({ url: `/subpackages/account/pages/review/index?pairSessionId=${encodeURIComponent(pairSessionId)}` });
+    },
+
+    async openPairResult(event) {
+      const pairSessionId = String(event.currentTarget.dataset.pairSessionId || '');
+      if (!pairSessionId || this.pairResultRequest) return;
+      const resultUrl = `/subpackages/pair/pages/result/index?pairSessionId=${encodeURIComponent(pairSessionId)}`;
+      if (true === event.currentTarget.dataset.reportReady || 'true' === event.currentTarget.dataset.reportReady) {
+        wx.navigateTo({ url: resultUrl });
+        return;
+      }
+      const request = this.pairResultRequest = {};
+      const active = () => this.pairResultRequest === request && this.componentAttached
+        && !this.pageHidden && this.data.currentView === 'history';
+      try {
+        // 列表状态可能过时，以最新配对状态决定是否进入报告。
+        const pair = await authenticatedRequestData({ url: `/api/miniapp/pairs/${encodeURIComponent(pairSessionId)}`, sessionBound: true });
+        if (!active()) return;
+        if (Number(pair.pairStatus) !== 4) {
+          const status = Number(pair.pairStatus);
+          wx.showToast({ title: status === 5 || status === 6 ? '本次配对已失效' : status === 3 ? '报告生成中，请稍后查看' : '等待对方完成作答', icon: 'none' });
+          return;
+        }
+        wx.navigateTo({ url: resultUrl });
+      } catch (error) {
+        if (active()) wx.showToast({ title: error.message || '配对状态加载失败', icon: 'none' });
+      } finally {
+        if (this.pairResultRequest === request) this.pairResultRequest = null;
+      }
     },
 
     deleteRecord(event) {

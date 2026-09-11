@@ -112,6 +112,28 @@ class AssessmentServiceImplTest {
         }
     }
 
+    @Test
+    void drawQuestionIdsShouldPlaceMultipleChoiceLast() {
+        AssessmentServiceImpl service = new AssessmentServiceImpl(
+                null, null, null, null, null, null, null, null, null, null, null, new ObjectMapper(), null);
+        QuestionEntity multipleFirst = this.question(30L, 11L, 1);
+        multipleFirst.setQuestionType(QuestionType.MULTIPLE.getCode());
+        QuestionEntity multipleLast = this.question(40L, 14L, 4);
+        multipleLast.setQuestionType(QuestionType.MULTIPLE.getCode());
+        List<QuestionEntity> questions = List.of(
+                multipleFirst,
+                this.question(10L, 12L, 2),
+                this.question(20L, 13L, 3),
+                multipleLast);
+        List<Long> expected = List.of(10L, 20L, 30L, 40L);
+
+        for (int index = 0; index < 20; index++) {
+            List<Long> questionIds = ReflectionTestUtils.invokeMethod(
+                    service, "drawQuestionIds", 4, List.of(), questions, List.of());
+            assertEquals(expected, questionIds);
+        }
+    }
+
     private QuestionEntity question(Long id, Long dimensionId, int questionNo) {
         QuestionEntity question = new QuestionEntity();
         question.setId(id);

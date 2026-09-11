@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "协议说明",
+  "enablePullDownRefresh": true,
   "usingComponents": {
     "app-nav-bar": "/components/app-nav-bar/index"
   }

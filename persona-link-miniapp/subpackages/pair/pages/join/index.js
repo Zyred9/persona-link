@@ -1,9 +1,11 @@
-const { authenticatedRequestData, createIdempotencyKey } = require('../../../../utils/request');
+const { requestData, authenticatedRequestData, createIdempotencyKey } = require('../../../../utils/request');
+const { resolveImageUrl } = require('../../../../utils/image');
 
 const PAIR_SESSION_KEY = 'personaPairSession';
 
 Page({
   data: {
+    joinHeroImageUrl: '',
     pairCode: '',
     errorMessage: '',
     joining: false
@@ -13,6 +15,21 @@ Page({
     if (options.code) {
       this.setData({ pairCode: String(options.code).trim().toUpperCase().slice(0, 5) });
     }
+    this.loadJoinHeroImage();
+  },
+
+  async loadJoinHeroImage() {
+    try {
+      const config = await requestData({ url: '/api/miniapp/pairs/config' });
+      this.setData({ joinHeroImageUrl: resolveImageUrl(config && config.joinHeroImageUrl) });
+    } catch (error) {
+      // 配置读取失败时保持隐藏头图，不阻塞加入流程。
+      this.setData({ joinHeroImageUrl: '' });
+    }
+  },
+
+  handleJoinHeroImageError() {
+    this.setData({ joinHeroImageUrl: '' });
   },
 
   updatePairCode(event) {

@@ -50,8 +50,12 @@ vm.runInNewContext(source, {
 function createInstance(data) {
   const instance = {
     data: Object.assign({}, definition.data, data),
+    events: [],
     setData(patch) {
       Object.assign(this.data, patch);
+    },
+    triggerEvent(name) {
+      this.events.push(name);
     }
   };
   Object.entries(definition.methods).forEach(([name, method]) => {
@@ -96,9 +100,29 @@ async function main() {
         '未配置详情图应使用默认整图，不能回退到首页封面');
     }
   }
+  const swipe = createInstance({ testId: '12', testType: 1 });
+  swipe.handleSwipeStart({ touches: [{ clientX: 120, clientY: 200 }] });
+  swipe.handleSwipeEnd({ changedTouches: [{ clientX: 260, clientY: 210 }] });
+  assert.deepStrictEqual(swipe.events, ['back'], '左向右滑动必须触发返回首页');
+  swipe.handleSwipeStart({ touches: [{ clientX: 260, clientY: 200 }] });
+  swipe.handleSwipeEnd({ changedTouches: [{ clientX: 120, clientY: 210 }] });
+  assert.deepStrictEqual(swipe.events, ['back'], '从右向左滑动不得返回');
+  swipe.handleSwipeStart({ touches: [{ clientX: 120, clientY: 200 }] });
+  swipe.handleSwipeEnd({ changedTouches: [{ clientX: 140, clientY: 320 }] });
+  assert.deepStrictEqual(swipe.events, ['back'], '纵向滑动不得触发返回');
+
   const template = fs.readFileSync(path.join(__dirname, '../components/test-detail/index.wxml'), 'utf8');
   assert.strictEqual((template.match(/src="{{test.imageUrl}}" mode="widthFix"/g) || []).length, 2,
     '单人和双人详情图均应完整等比例展示');
+  assert.match(template, /bindtouchstart="handleSwipeStart"/);
+  assert.match(template, /bindtouchend="handleSwipeEnd"/);
+  assert.match(fs.readFileSync(path.join(__dirname, '../pages/home/index.wxml'), 'utf8'),
+    /bind:back="closeTestDetail"/, '首页详情必须把滑动返回接到关闭详情');
+  for (const file of ['subpackages/test/pages/detail/index', 'subpackages/pair/pages/detail/index']) {
+    assert.match(fs.readFileSync(path.join(__dirname, `../${file}.wxml`), 'utf8'),
+      /bind:back="backToHome"/, `${file} 必须把滑动返回接到首页`);
+    assert.match(fs.readFileSync(path.join(__dirname, `../${file}.js`), 'utf8'), /backToHome\s*\(/);
+  }
 
   console.log('TEST_DETAIL_RACE_CHECK_OK');
 }

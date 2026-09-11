@@ -8,6 +8,7 @@ import com.personalink.server.dto.AppConfigQuery;
 import com.personalink.server.dto.AppConfigSaveRequest;
 import com.personalink.server.dto.MiniappConfigResponse;
 import com.personalink.server.dto.PageResponse;
+import com.personalink.server.dto.PairConfigResponse;
 import com.personalink.server.exception.BusinessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -26,14 +27,24 @@ import java.util.Objects;
 public class AppConfigServiceImpl extends ServiceImpl<AppConfigMapper, AppConfigEntity> implements AppConfigService {
     /** 小程序首页标题图配置键。 */
     private static final String HOME_TITLE_IMAGE_URL = "miniapp.home.title_image_url";
+    /** 加入双人测试页头图配置键。 */
+    private static final String PAIR_JOIN_HERO_IMAGE_URL = "miniapp.pair.join_hero_image_url";
 
     @Override
     public HomeConfigResponse readHomeConfig() {
+        return new HomeConfigResponse(this.readConfigValue(HOME_TITLE_IMAGE_URL));
+    }
+
+    @Override
+    public PairConfigResponse readPairConfig() {
+        return new PairConfigResponse(this.readConfigValue(PAIR_JOIN_HERO_IMAGE_URL));
+    }
+
+    private String readConfigValue(String configKey) {
         AppConfigEntity config = this.getOne(Wrappers.<AppConfigEntity>lambdaQuery()
-                .eq(AppConfigEntity::getConfigKey, HOME_TITLE_IMAGE_URL)
+                .eq(AppConfigEntity::getConfigKey, configKey)
                 .eq(AppConfigEntity::getDeleted, 0), false);
-        return new HomeConfigResponse(Objects.isNull(config) || Objects.isNull(config.getConfigValue())
-                ? "" : config.getConfigValue());
+        return Objects.isNull(config) || Objects.isNull(config.getConfigValue()) ? "" : config.getConfigValue();
     }
 
     @Override

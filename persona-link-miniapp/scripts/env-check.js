@@ -15,11 +15,11 @@ function resolve(envVersion, stored = '') {
   vm.runInNewContext(source, sandbox);
   return sandbox.module.exports.getApiBaseUrl();
 }
-assert.equal(resolve('develop'), 'http://192.168.8.128:8080');
+assert.equal(resolve('develop'), 'http://192.168.0.23:8080');
 assert.equal(resolve('develop', 'http://localhost:9000/'), 'http://localhost:9000');
 for (const env of ['trial', 'release']) {
-  assert.equal(resolve(env), 'https://seeyoume.vip:8080');
-  assert.equal(resolve(env, 'http://localhost:9000/'), 'https://seeyoume.vip:8080');
+  assert.equal(resolve(env), env === 'trial' ? 'http://45.77.4.60:8080' : 'https://persona.seeyoume.vip');
+  assert.equal(resolve(env, 'http://localhost:9000/'), env === 'trial' ? 'http://45.77.4.60:8080' : 'https://persona.seeyoume.vip');
 }
 assert.throws(() => resolve('unknown'), /尚未配置 API 地址/);
 console.log('ENV_CHECK_OK development/trial/release/cache-isolation');

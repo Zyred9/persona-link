@@ -65,12 +65,13 @@
 </block>
 
 <block wx:elif="{{currentView === 'history'}}">
-  <view class="paper-page history-page">
+  <view class="paper-page history-page" bindtouchstart="handleHistoryTouchStart" bindtouchend="handleHistoryTouchEnd">
     <view class="history-summary">
       <view class="history-summary__item {{historyTab === 'single' ? 'history-summary__item--active' : ''}}" data-tab="single" bindtap="switchHistoryTab">单人测试 {{historyState === 'error' ? '加载失败' : totalLabel}}</view>
       <view class="history-summary__item {{historyTab === 'pair' ? 'history-summary__item--active' : ''}}" data-tab="pair" bindtap="switchHistoryTab">双人配对 {{pairHistoryState === 'error' ? '加载失败' : pairTotalLabel}}</view>
     </view>
     <block wx:if="{{historyTab === 'single'}}">
+    <view class="history-panel history-panel--single">
     <text class="paper-section-title history-section-title">测试报告</text>
     <page-state wx:if="{{historyState === 'loading'}}" type="loading" title="单人记录正在加载"></page-state>
     <page-state wx:elif="{{historyState === 'error'}}" type="error" title="单人记录加载失败" description="{{historyErrorDescription}}" action-text="重新加载" bind:action="retrySingleHistory"></page-state>
@@ -81,15 +82,17 @@
           wx:key="reportId"
           class="paper-card history-record history-record--single"
           data-report-id="{{item.reportId}}"
+          data-answer-session-id="{{item.answerSessionId}}"
           bindtap="handleRecordTap"
         >
-          <image wx:if="{{item.coverImage}}" class="history-cover" src="{{item.coverImage}}" mode="aspectFill" aria-label="题型封面" data-url="{{item.previewUrl}}" catchtap="previewCover"></image>
+          <image wx:if="{{item.coverImage}}" class="history-cover" src="{{item.coverImage}}" mode="aspectFill" aria-label="预览题型封面" data-url="{{item.coverUrl}}" catchtap="previewCover"></image>
           <view wx:else class="history-cover history-cover--empty">封面</view>
           <view class="history-record__copy">
             <text class="history-record__title">{{item.title}}</text>
             <text class="history-record__result">{{item.resultName}}</text>
             <text class="history-record__meta">{{item.generatedAt}}{{item.versionLabel ? ' · ' + item.versionLabel : ''}}</text>
           </view>
+          <button class="history-record__more" data-report-id="{{item.reportId}}" catchtap="openRecordResult" aria-label="查看测试结果">···</button>
         </view>
 
       <view class="history-pagination">
@@ -99,8 +102,10 @@
         <text wx:else>已加载全部单人记录</text>
       </view>
     </block>
+    </view>
     </block>
     <block wx:if="{{historyTab === 'pair'}}">
+    <view class="history-panel history-panel--pair">
     <text class="paper-section-title history-section-title">双人配对</text>
     <page-state wx:if="{{pairHistoryState === 'loading'}}" type="loading" title="双人记录正在加载"></page-state>
     <page-state wx:elif="{{pairHistoryState === 'error'}}" type="error" title="双人记录加载失败" description="{{pairHistoryErrorDescription}}" action-text="重新加载" bind:action="retryPairHistory"></page-state>
@@ -114,13 +119,14 @@
           data-report-ready="{{item.reportReady}}"
           bindtap="handlePairTap"
         >
-          <image wx:if="{{item.coverImage}}" class="history-cover" src="{{item.coverImage}}" mode="aspectFill" aria-label="题型封面" data-url="{{item.previewUrl}}" catchtap="previewCover"></image>
+          <image wx:if="{{item.coverImage}}" class="history-cover" src="{{item.coverImage}}" mode="aspectFill" aria-label="预览题型封面" data-url="{{item.coverUrl}}" catchtap="previewCover"></image>
           <view wx:else class="history-cover history-cover--empty">封面</view>
           <view class="history-record__copy">
             <text class="history-record__title">{{item.title}}</text>
             <text class="history-record__result">{{item.resultText}}</text>
-            <text class="history-record__meta">{{item.meta}} · {{item.reportReady ? '查看报告' : '查看进度'}}</text>
+            <text class="history-record__meta">{{item.meta}} · 查看作答</text>
           </view>
+          <button class="history-record__more" data-pair-session-id="{{item.pairSessionId}}" data-report-ready="{{item.reportReady}}" catchtap="openPairResult" aria-label="查看双人测试结果">···</button>
         </view>
 
       <view class="history-pagination">
@@ -130,6 +136,7 @@
         <text wx:else>已加载全部双人记录</text>
       </view>
     </block>
+    </view>
     </block>
   </view>
 </block>
@@ -161,7 +168,7 @@
     <text class="paper-section-title">协议与隐私</text>
 
     <button class="paper-card settings-row" bindtap="openPrivacy">
-      <text>隐私与数据</text>
+      <text>数据管理</text>
       <text class="settings-row__arrow">›</text>
     </button>
     <button class="paper-card settings-row" data-type="userAgreement" bindtap="openLegal">

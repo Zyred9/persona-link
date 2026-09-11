@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "加入双人测试",
+  "enablePullDownRefresh": false,
+  "disableScroll": true,
   "usingComponents": {
     "app-nav-bar": "/components/app-nav-bar/index"
   }

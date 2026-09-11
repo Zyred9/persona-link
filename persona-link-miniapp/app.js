@@ -64,18 +64,24 @@ App({
     const epoch = this.consentEpoch || 0;
     this.consentCheck = (async () => {
       try {
-        const { onboardingProfile, isProfileComplete, TOKEN_STORAGE_KEY, writeProfileCache } = require('./utils/request');
+        const request = require('./utils/request');
+        const { onboardingProfile, isProfileComplete, primeProfileCache, TOKEN_STORAGE_KEY, writeProfileCache } = request;
         const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
         if (!token) throw new Error('请先点击微信登录');
-        const profile = await onboardingProfile();
-        if (!isProfileComplete(profile)) throw new Error('请先设置微信头像和昵称');
-        writeProfileCache(token, profile.nickname, profile.avatarUrl);
-        const accepted = wx.getStorageSync('personaLinkConsentedDocuments');
-        const versions = await require('./utils/request').requestData({
-          url: '/api/miniapp/legal-documents/versions', silentUnauthorized: true
-        });
+        // 资料完整性与协议版本互不依赖，并发校验，避免两次串行网络往返。
+        const [profile, versions] = await Promise.all([
+          onboardingProfile(),
+          request.requestData({
+            url: '/api/miniapp/legal-documents/versions', silentUnauthorized: true
+          })
+        ]);
         if (epoch !== (this.consentEpoch || 0)) throw new Error('协议状态已变化，请重试');
         if (token !== wx.getStorageSync(TOKEN_STORAGE_KEY)) throw new Error('登录状态已变化，请重新登录');
+        if (!isProfileComplete(profile)) throw new Error('请先设置微信头像和昵称');
+        writeProfileCache(token, profile.nickname, profile.avatarUrl);
+        // 本次校验已拉取资料，账户中心可直接复用，避免同一次进入重复请求。
+        primeProfileCache(token, profile);
+        const accepted = wx.getStorageSync('personaLinkConsentedDocuments');
         const current = wx.getStorageSync(CONSENT_STORAGE_KEY) === CONSENT_VERSION
           && wx.getStorageSync('personaLinkConsentToken') === token
           && Array.isArray(accepted) && Array.isArray(versions)

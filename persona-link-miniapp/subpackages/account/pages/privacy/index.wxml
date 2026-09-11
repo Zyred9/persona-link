@@ -1,4 +1,4 @@
-<app-nav-bar title="隐私与数据" show-back="{{true}}"></app-nav-bar>
+<app-nav-bar title="数据管理" show-back="{{true}}"></app-nav-bar>
 
 <view class="paper-page privacy-page">
   <view class="paper-card privacy-intro">

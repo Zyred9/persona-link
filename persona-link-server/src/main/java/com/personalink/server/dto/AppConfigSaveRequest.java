@@ -2,6 +2,7 @@ package com.personalink.server.dto;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.personalink.server.util.MiniappImageUrlUtil;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -20,11 +21,17 @@ public record AppConfigSaveRequest(
     public AppConfigSaveRequest {
         configName = Objects.isNull(configName) ? null : configName.trim();
         remark = Objects.isNull(remark) ? "" : remark.trim();
-        if ("miniapp.home.title_image_url".equals(configKey)) {
-            configValue = new HomeConfigSaveRequest(configValue).titleImageUrl();
+        if (isMiniappImageKey(configKey)) {
+            configValue = MiniappImageUrlUtil.normalize(configValue);
         } else if ("miniapp.version".equals(configKey) && Objects.nonNull(configValue)) {
             configValue = configValue.trim();
         }
+    }
+
+    /** 与小程序展示图片共用归一化与校验规则的配置键。 */
+    private static boolean isMiniappImageKey(String configKey) {
+        return "miniapp.home.title_image_url".equals(configKey)
+                || "miniapp.pair.join_hero_image_url".equals(configKey);
     }
 
     @AssertTrue(message = "配置值与类型不匹配，数字须为有效数字，布尔须为true/false，JSON须为完整JSON")
@@ -46,11 +53,11 @@ public record AppConfigSaveRequest(
         }
     }
 
-    @AssertTrue(message = "首页标题图必须为字符串类型的有效图片地址，版本号必须为1至32字符的非空字符串")
+    @AssertTrue(message = "小程序图片配置必须为字符串类型的有效图片地址，版本号必须为1至32字符的非空字符串")
     public boolean isBusinessValueValid() {
-        if ("miniapp.home.title_image_url".equals(configKey)) {
+        if (isMiniappImageKey(configKey)) {
             return Integer.valueOf(1).equals(valueType) && configValue.length() <= 1024
-                    && new HomeConfigSaveRequest(configValue).isTitleImageUrlValid();
+                    && MiniappImageUrlUtil.isValid(configValue);
         }
         if ("miniapp.version".equals(configKey)) {
             return Integer.valueOf(1).equals(valueType) && Objects.nonNull(configValue)

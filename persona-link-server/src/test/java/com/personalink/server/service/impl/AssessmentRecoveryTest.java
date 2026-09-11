@@ -7,6 +7,7 @@ import com.personalink.server.dto.DimensionScoreResponse;
 import com.personalink.server.dto.RestartAssessmentRequest;
 import com.personalink.server.dto.SaveAnswerRequest;
 import com.personalink.server.entity.*;
+import com.personalink.server.enums.AnswerStatus;
 import com.personalink.server.exception.BusinessException;
 import com.personalink.server.mapper.*;
 import jakarta.validation.Validation;
@@ -118,6 +119,34 @@ class AssessmentRecoveryTest {
         assertThrows(BusinessException.class, () -> this.service.saveAnswer("stranger", 10L,
                 new SaveAnswerRequest("40", List.of())));
         verifyNoInteractions(this.pairs, this.details, this.versions);
+    }
+
+    @Test
+    void abandonOnlyChangesOwnedUnfinishedSessionAndCancelsItsPendingPair() {
+        this.service.abandon("owner", 10L);
+        verify(this.answers).selectOne(argThat(query -> query.getSqlSegment().contains("FOR UPDATE")));
+        verify(this.answers).update(isNull(), argThat(query -> {
+            String sql = query.getSqlSegment();
+            return sql.contains("id") && sql.contains("answer_status") && sql.contains("deleted");
+        }));
+        verify(this.pairs).update(isNull(), argThat(query -> {
+            String sql = query.getSqlSegment();
+            return sql.contains("partner_answer_session_id") && sql.contains("partner_open_id")
+                    && sql.contains("pair_status") && sql.contains("deleted");
+        }));
+        verifyNoInteractions(this.details, this.snapshots, this.versions);
+        verify(this.answers, never()).insertIgnore(any());
+    }
+
+    @Test
+    void abandonRetryIsIdempotentAndForeignOrCompletedSessionsAreRejected() {
+        this.answer.setAnswerStatus(AnswerStatus.ABANDONED.getCode());
+        this.service.abandon("owner", 10L);
+        assertThrows(BusinessException.class, () -> this.service.abandon("stranger", 10L));
+        this.answer.setAnswerStatus(AnswerStatus.REPORT_READY.getCode());
+        assertThrows(BusinessException.class, () -> this.service.abandon("owner", 10L));
+        verify(this.answers, never()).update(isNull(), any());
+        verifyNoInteractions(this.pairs, this.details, this.snapshots);
     }
 
     @Test

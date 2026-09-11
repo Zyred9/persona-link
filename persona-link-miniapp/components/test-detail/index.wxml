@@ -1,4 +1,8 @@
-<view class="paper-page detail-page {{testType === 2 ? 'detail-page--pair' : ''}}">
+<view
+  class="paper-page detail-page {{testType === 2 ? 'detail-page--pair' : ''}}"
+  bindtouchstart="handleSwipeStart"
+  bindtouchend="handleSwipeEnd"
+>
   <page-state
     wx:if="{{state === 'loading'}}"
     type="loading"
@@ -15,7 +19,7 @@
   ></page-state>
 
   <block wx:elif="{{testType === 2}}">
-    <image class="pair-detail-hero" src="{{test.imageUrl}}" mode="widthFix"></image>
+    <image class="pair-detail-hero paper-card" src="{{test.imageUrl}}" mode="widthFix"></image>
 
     <view class="pair-detail-tags">
       <text class="pair-detail-tag pair-detail-tag--yellow">双人独立作答</text>
@@ -45,7 +49,7 @@
   </block>
 
   <block wx:else>
-    <image class="single-detail-hero" src="{{test.imageUrl}}" mode="widthFix"></image>
+    <image class="single-detail-hero paper-card" src="{{test.imageUrl}}" mode="widthFix"></image>
 
     <view class="detail-tags">
       <text class="detail-tag detail-tag--yellow">{{test.categoryName}}</text>

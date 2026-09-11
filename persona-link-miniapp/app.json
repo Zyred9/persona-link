@@ -12,6 +12,7 @@
         "pages/settings/index",
         "pages/privacy/index",
         "pages/history/index",
+        "pages/review/index",
         "pages/feedback/index"
       ]
     },

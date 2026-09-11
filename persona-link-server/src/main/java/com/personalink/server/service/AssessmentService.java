@@ -2,6 +2,7 @@ package com.personalink.server.service;
 
 import com.baomidou.mybatisplus.spring.service.IService;
 import com.personalink.server.dto.AssessmentSessionResponse;
+import com.personalink.server.dto.AssessmentReviewResponse;
 import com.personalink.server.dto.CreateAssessmentRequest;
 import com.personalink.server.dto.ReportHistoryResponse;
 import com.personalink.server.dto.ReportResponse;
@@ -22,9 +23,15 @@ public interface AssessmentService extends IService<AnswerSessionEntity> {
 
     AssessmentSessionResponse resume(String openId, Long answerSessionId);
 
+    AssessmentReviewResponse review(String openId, Long answerSessionId);
+
+    AssessmentReviewResponse reviewPair(String openId, Long pairSessionId);
+
     void saveAnswer(String openId, Long answerSessionId, SaveAnswerRequest request);
 
     AssessmentSessionResponse restart(String openId, Long answerSessionId, RestartAssessmentRequest request);
+
+    void abandon(String openId, Long answerSessionId);
 
     ReportResponse submit(String openId, Long answerSessionId, SubmitAssessmentRequest request);
 

@@ -1,4 +1,6 @@
 {
+  "enablePullDownRefresh": false,
+  "disableScroll": true,
   "usingComponents": {
     "app-nav-bar": "/components/app-nav-bar/index",
     "quiz-runner": "/components/quiz-runner/index"

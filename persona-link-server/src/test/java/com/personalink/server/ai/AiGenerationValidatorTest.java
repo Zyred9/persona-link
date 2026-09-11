@@ -45,9 +45,24 @@ class AiGenerationValidatorTest {
                 validQuestion.options());
 
         assertDoesNotThrow(() -> AiGenerationValidator.validateQuestionBatch(
-                new AiGeneratedQuestionBatch(List.of(validQuestion)), Set.of("D1"), 1, 1));
+                new AiGeneratedQuestionBatch(List.of(validQuestion)), Set.of("D1"), 1, 1, List.of()));
         assertThrows(IllegalArgumentException.class, () -> AiGenerationValidator.validateQuestionBatch(
-                new AiGeneratedQuestionBatch(List.of(invalidQuestion)), Set.of("D1"), 1, 1));
+                new AiGeneratedQuestionBatch(List.of(invalidQuestion)), Set.of("D1"), 1, 1, List.of()));
+    }
+
+    @Test
+    void validateQuestionBatchShouldRequireMultipleChoiceSelectAll() {
+        AiGeneratedQuestion validQuestion = new AiGeneratedQuestion(
+                2, null, 2, 2, 1, "以下哪些描述符合你？", 1, 1,
+                List.of(new AiGeneratedOption("A", "描述一", "D1", 1, 2),
+                        new AiGeneratedOption("B", "描述二", "D1", 1, 1)));
+        AiGeneratedQuestion partialRange = new AiGeneratedQuestion(
+                2, null, 1, 2, 1, "以下哪些描述符合你？", 1, 1, validQuestion.options());
+
+        assertDoesNotThrow(() -> AiGenerationValidator.validateQuestionBatch(
+                new AiGeneratedQuestionBatch(List.of(validQuestion)), Set.of("D1"), 1, 1, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> AiGenerationValidator.validateQuestionBatch(
+                new AiGeneratedQuestionBatch(List.of(partialRange)), Set.of("D1"), 1, 1, List.of()));
     }
 
     @Test

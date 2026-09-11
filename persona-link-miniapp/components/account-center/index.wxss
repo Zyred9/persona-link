@@ -208,6 +208,30 @@
 
 .history-page {
   padding-top: 22rpx;
+  min-height: 0;
+}
+
+.history-panel {
+  animation-duration: 220ms;
+  animation-timing-function: ease-out;
+}
+
+.history-panel--single {
+  animation-name: history-panel-in-left;
+}
+
+.history-panel--pair {
+  animation-name: history-panel-in-right;
+}
+
+@keyframes history-panel-in-left {
+  from { opacity: 0; transform: translateX(-56rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes history-panel-in-right {
+  from { opacity: 0; transform: translateX(56rpx); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .history-summary {
@@ -278,9 +302,14 @@
 }
 
 .history-record__more {
-  position: absolute;
-  top: 26rpx;
-  right: 22rpx;
+  display: flex;
+  flex: 0 0 72rpx;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  height: 88rpx;
+  margin: 0 0 0 8rpx;
+  padding: 0;
   font-size: 30rpx;
   font-weight: 900;
   letter-spacing: 5rpx;

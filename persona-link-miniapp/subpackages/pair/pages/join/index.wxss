@@ -1,5 +1,7 @@
 @import "../../common.wxss";
 
+page { height: 100%; overflow: hidden; }
+
 .join-page {
   display: flex;
   min-height: calc(100vh - 120rpx);
@@ -8,13 +10,8 @@
 }
 
 .join-hero {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 222rpx;
-  font-size: 56rpx;
-  font-weight: 900;
-  background: #e6d8ff;
+  display: block;
+  width: 100%;
 }
 
 .join-title {

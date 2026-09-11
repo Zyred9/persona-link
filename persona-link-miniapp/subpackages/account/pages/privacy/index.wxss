@@ -1,3 +1,5 @@
+page { height: 100%; overflow: hidden; }
+
 .privacy-page {
   padding-top: 46rpx;
 }

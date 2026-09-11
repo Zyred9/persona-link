@@ -95,7 +95,7 @@ onBeforeUnmount(() => { disposed = true })
 <template>
   <section class="config-view">
     <header><div><h1>通用配置</h1><p>管理小程序及系统的公共配置项</p></div><button :disabled="busy" @click="openEditor()">＋ 新增配置</button></header>
-    <p class="help">小程序「设置 → 版本信息」读取 <code>miniapp.version</code>（字符串，如 1.0.0），保存后下次进入设置生效。首页标题图也可在「首页配置」上传修改。</p>
+    <p class="help">小程序「设置 → 版本信息」读取 <code>miniapp.version</code>（字符串，如 1.0.0），保存后下次进入设置生效。首页标题图也可在「首页配置」上传修改。加入双人测试页头图读取 <code>miniapp.pair.join_hero_image_url</code>（字符串，填写图片地址），留空或图片加载失败时隐藏。</p>
     <p v-if="notice && !showEditor" class="notice" role="status">{{ notice }}</p>
     <form class="filters" @submit.prevent="load(1)"><input v-model="keyword" :disabled="busy" aria-label="搜索配置键或名称" placeholder="搜索配置键或名称" /><button :disabled="busy">查询</button><button type="button" :disabled="busy || !selected.length" @click="removeSelected">删除选中（{{ selected.length }}）</button></form>
     <div class="table-card" :aria-busy="busy">

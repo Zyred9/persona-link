@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const source = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+const event = (runner, optionId) => ({ currentTarget: { dataset: { questionToken: runner.data.questionToken, optionId } } });
 
 function setup(answerType = 1, pairSessionId = null, required = true, answerStatus = 1) {
   let definition;
@@ -28,7 +29,7 @@ function setup(answerType = 1, pairSessionId = null, required = true, answerStat
     }
   });
   const runner = { ...definition.methods, data: { ...definition.data },
-    setData(patch) { Object.assign(this.data, patch); }, triggerEvent(name, detail) { events.push({ name, detail }); } };
+    setData(patch, callback) { Object.assign(this.data, patch); if (callback) callback(); }, triggerEvent(name, detail) { events.push({ name, detail }); } };
   runner.start({ answerSessionId: 'answer', flow: 'wrong-url-flow', assessment: {
     answerSessionId: 'answer', answerType, pairSessionId, answerStatus,
     questions: [{ questionId: 'q', questionType: 1, required, minSelectCount: 1, maxSelectCount: 1,
@@ -40,37 +41,37 @@ function setup(answerType = 1, pairSessionId = null, required = true, answerStat
 async function main() {
   for (const [type, pair, expected] of [[1, null, '/test/pages/result/'], [2, null, '/pair/pages/invite/'], [2, 'pair', '/pair/pages/wait/']]) {
     const test = setup(type, pair);
-    await test.runner.continueTest();
+    await test.runner.continueTest(event(test.runner));
     assert.equal(test.runner.data.submissionPending, true);
-    test.runner.chooseOption({ currentTarget: { dataset: { optionId: 'b' } } });
+    test.runner.chooseOption(event(test.runner, 'b'));
     assert.equal(test.runner.data.selectedOptionIds[0], 'a', '提交结果不明时禁止改答案');
-    await test.runner.continueTest();
+    await test.runner.continueTest(event(test.runner));
     assert.deepEqual(test.calls.map(c => c.method), ['PUT', 'POST', 'POST']);
     assert.equal(test.calls[1].data.submitRequestId, test.calls[2].data.submitRequestId);
     assert.ok(test.events.at(-1).detail.url.includes(expected));
     test.runner.navigationFailed();
-    await test.runner.continueTest();
+    await test.runner.continueTest(event(test.runner));
     assert.equal(test.calls.at(-1).method, 'POST', '导航失败后仍可恢复');
     const reopened = setup(type, pair, true, 3);
-    await reopened.runner.continueTest();
-    await reopened.runner.continueTest();
+    await reopened.runner.continueTest(event(reopened.runner));
+    await reopened.runner.continueTest(event(reopened.runner));
     assert.equal(reopened.calls[0].method, 'POST', '重入已完成答卷不再保存答案');
     assert.ok(reopened.events.at(-1).detail.url.includes(expected));
   }
   const optional = setup(1, null, false);
-  optional.runner.chooseOption({ currentTarget: { dataset: { optionId: 'a' } } });
-  optional.runner.chooseOption({ currentTarget: { dataset: { optionId: 'a' } } });
+  optional.runner.chooseOption(event(optional.runner, 'a'));
+  optional.runner.chooseOption(event(optional.runner, 'a'));
   assert.equal(optional.runner.data.selectedOptionIds.length, 0, '可选单选可清空');
-  await optional.runner.continueTest();
+  await optional.runner.continueTest(event(optional.runner));
   assert.equal(optional.calls[0].data.optionIds.length, 0, '跳过题目提交空选项');
   const required = setup();
   required.runner.data.selectedOptionIds = [];
-  await required.runner.continueTest();
+  await required.runner.continueTest(event(required.runner));
   assert.equal(required.calls.length, 0, '必答题不得跳过');
   const stale = setup();
   let rejectSubmit;
   stale.setSubmitReply(() => new Promise((resolve, reject) => { rejectSubmit = reject; }));
-  const previousSubmit = stale.runner.continueTest();
+  const previousSubmit = stale.runner.continueTest(event(stale.runner));
   await new Promise(setImmediate);
   stale.runner.start({ answerSessionId: 'new', assessment: {
     ...stale.runner.assessment, answerSessionId: 'new', answerStatus: 3
@@ -84,9 +85,10 @@ async function main() {
     Page(d) { home = d; }, require: () => ({}), wx: { showModal() { confirms++; } }
   });
   home.data.currentAssessment = { answerSessionId: 'partner', canRestart: false };
-  await home.restartAssessment();
-  assert.equal(confirms, 0, '受邀者不可进入重开流程');
-  assert.ok(source('pages/home/index.wxml').includes('wx:if="{{currentAssessment.canRestart}}"'));
+  home.setData = (patch) => Object.assign(home.data, patch);
+  home.abandonAssessment();
+  assert.equal(confirms, 1, '受邀者也可以确认作废，不再重新创建答卷');
+  assert.ok(source('pages/home/index.wxml').includes('bindtap="abandonAssessment"'));
   for (const file of ['components/test-detail/index.js', 'components/account-center/index.js']) {
     let component;
     let destination;

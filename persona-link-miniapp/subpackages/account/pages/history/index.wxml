@@ -1,1 +1,3 @@
-<account-center initial-view="history" id="history-account-center"></account-center>
+<scroll-view class="history-scroll" scroll-y enhanced="{{true}}" bounces="{{false}}" bindscrolltolower="loadMore">
+  <account-center initial-view="history" id="history-account-center"></account-center>
+</scroll-view>

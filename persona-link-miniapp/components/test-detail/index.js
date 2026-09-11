@@ -6,6 +6,8 @@ const {
 const { trackEvent } = require('../../utils/analytics');
 const { resolveImageUrl } = require('../../utils/image');
 
+const DETAIL_SWIPE_MIN_DISTANCE = 60;
+
 Component({
   options: {
     styleIsolation: 'apply-shared'
@@ -148,6 +150,24 @@ Component({
 
     retry() {
       this.loadTest(this.data.testId);
+    },
+
+    handleSwipeStart(event) {
+      const touch = event.touches && event.touches[0];
+      if (!touch) return;
+      this.swipeStart = { x: touch.clientX, y: touch.clientY };
+    },
+
+    handleSwipeEnd(event) {
+      const start = this.swipeStart;
+      this.swipeStart = null;
+      const touch = event.changedTouches && event.changedTouches[0];
+      if (!start || !touch) return;
+      const deltaX = touch.clientX - start.x;
+      const deltaY = touch.clientY - start.y;
+      // 从左向右滑动且横向位移占优时返回，避免和纵向滚动冲突。
+      if (deltaX < DETAIL_SWIPE_MIN_DISTANCE || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+      this.triggerEvent('back');
     },
 
     joinPair() {

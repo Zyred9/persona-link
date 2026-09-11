@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 
 import com.personalink.server.dto.CreatePairRequest;
 import com.personalink.server.dto.JoinPairRequest;
+import com.personalink.server.dto.PairConfigResponse;
 import com.personalink.server.dto.PairCreateResponse;
 import com.personalink.server.dto.PairReportResponse;
 import com.personalink.server.dto.PairSessionResponse;
@@ -14,7 +15,10 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestParam;
+import com.personalink.server.service.AppConfigService;
 import com.personalink.server.service.PairAssessmentService;
+import com.personalink.server.service.AssessmentService;
+import com.personalink.server.dto.AssessmentReviewResponse;
 import com.personalink.server.service.impl.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -37,6 +41,31 @@ public class MiniappPairController {
 
     private final AuthService authService;
     private final PairAssessmentService pairAssessmentService;
+    private final AssessmentService assessmentService;
+    private final AppConfigService appConfigService;
+
+    /**
+     * 读取双人测试展示配置，无需登录。
+     * @return 加入页头图地址，空值表示不展示
+     */
+    @GetMapping("/config")
+    public ApiResponse<PairConfigResponse> config() {
+        return ApiResponse.success(this.appConfigService.readPairConfig());
+    }
+
+    /**
+     * 回顾配对参与者的已提交答案，对方未提交时不返回对方答案。
+     * @param authorization Bearer 业务会话令牌
+     * @param pairSessionId 配对会话 ID
+     * @return 本人优先的只读答卷列表
+     */
+    @GetMapping("/{pairSessionId}/review")
+    public ApiResponse<AssessmentReviewResponse> review(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @PathVariable Long pairSessionId) {
+        return ApiResponse.success(this.assessmentService.reviewPair(
+                this.authService.requireSession(authorization).openId(), pairSessionId));
+    }
 
     /**
      * 分页查询当前用户可见的双人测试记录，最新创建记录在前。

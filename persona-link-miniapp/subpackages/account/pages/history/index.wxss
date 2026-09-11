@@ -1,1 +1,6 @@
 /* 页面样式由 account-center 组件统一维护。 */
+page { height: 100%; overflow: hidden; }
+
+.history-scroll {
+  height: 100vh;
+}

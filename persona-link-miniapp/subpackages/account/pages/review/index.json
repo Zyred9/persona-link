@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "作答回顾",
+  "enablePullDownRefresh": false,
+  "disableScroll": true,
+  "usingComponents": {
+    "app-nav-bar": "/components/app-nav-bar/index",
+    "page-state": "/components/page-state/index"
+  }
+}

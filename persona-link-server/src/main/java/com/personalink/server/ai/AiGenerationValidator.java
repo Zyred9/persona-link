@@ -90,7 +90,8 @@ public final class AiGenerationValidator {
     public static void validateQuestionBatch(AiGeneratedQuestionBatch batch,
                                              Set<String> dimensionCodes,
                                              int firstQuestionNo,
-                                             int expectedCount) {
+                                             int expectedCount,
+                                             List<String> existingQuestionTexts) {
         if (Objects.isNull(batch) || Objects.isNull(batch.questions())
                 || batch.questions().size() != expectedCount) {
             throw invalid("本批题目数量与要求不一致");
@@ -103,6 +104,8 @@ public final class AiGenerationValidator {
                 .collect(Collectors.toMap(AiGeneratedQuestion::questionNo, Function.identity(), (left, right) -> {
                     throw invalid("本批题号重复");
                 }));
+        Set<String> questionTexts = existingQuestionTexts.stream()
+                .map(text -> text.trim().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
         for (int index = 0; index < expectedCount; index++) {
             int questionNo = firstQuestionNo + index;
             AiGeneratedQuestion question = questionMap.get(questionNo);
@@ -110,6 +113,10 @@ public final class AiGenerationValidator {
                 throw invalid("本批题号必须连续");
             }
             validateQuestion(question, dimensionCodes);
+            if (!questionTexts.add(question.questionText().trim().toLowerCase(Locale.ROOT))) {
+                throw invalid("第 " + questionNo + " 题题干与已生成题目或本批题目重复："
+                        + question.questionText() + "，请更换题干，不要仅调整大小写或空格");
+            }
         }
     }
 
@@ -132,11 +139,9 @@ public final class AiGenerationValidator {
                 throw invalid("单选题维度或选择数量无效");
             }
         } else if (Integer.valueOf(MULTIPLE).equals(question.questionType())) {
-            if (hasText(question.dimensionCode()) || Objects.isNull(question.minSelectCount())
-                    || Objects.isNull(question.maxSelectCount()) || question.minSelectCount() < 1
-                    || question.minSelectCount() > question.maxSelectCount()
-                    || question.maxSelectCount() > question.options().size()) {
-                throw invalid("多选题维度或选择数量无效");
+            if (hasText(question.dimensionCode()) || !Integer.valueOf(2).equals(question.minSelectCount())
+                    || !Integer.valueOf(question.options().size()).equals(question.maxSelectCount())) {
+                throw invalid("多选题必须最少选择 2 项且最多全选");
             }
         } else {
             throw invalid("题目类型无效");

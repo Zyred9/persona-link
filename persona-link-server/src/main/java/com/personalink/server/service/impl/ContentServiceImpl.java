@@ -45,6 +45,7 @@ import com.personalink.server.mapper.TestMapper;
 import com.personalink.server.mapper.TestVersionMapper;
 import com.personalink.server.service.ContentService;
 import com.personalink.server.exception.BusinessException;
+import com.personalink.server.exception.AiQuestionTextConflictException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -509,15 +510,23 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
         Set<String> questionTexts = requests.stream().map(QuestionSaveRequest::questionText)
                 .map(String::trim).collect(Collectors.toSet());
         if (questionTexts.size() != requests.size()) {
-            throw this.badRequest("AI 生成题目内容不能重复");
+            throw new AiQuestionTextConflictException("AI 生成题目内容不能重复，请重新生成当前批次");
         }
-        long duplicateCount = this.questionMapper.selectCount(Wrappers.<QuestionEntity>lambdaQuery()
+        long duplicateNumberCount = this.questionMapper.selectCount(Wrappers.<QuestionEntity>lambdaQuery()
                 .eq(QuestionEntity::getVersionId, versionId)
-                .and(wrapper -> wrapper.in(QuestionEntity::getQuestionNo, questionNos)
-                        .or().in(QuestionEntity::getQuestionText, questionTexts))
+                .in(QuestionEntity::getQuestionNo, questionNos)
                 .eq(QuestionEntity::getDeleted, NORMAL));
-        if (duplicateCount > 0) {
-            throw this.badRequest("AI 生成题号或题目内容已存在");
+        if (duplicateNumberCount > 0) {
+            throw this.badRequest("AI 生成题号已存在，请检查题库与任务进度");
+        }
+        List<QuestionEntity> duplicateQuestions = this.questionMapper.selectList(Wrappers.<QuestionEntity>lambdaQuery()
+                .eq(QuestionEntity::getVersionId, versionId)
+                .in(QuestionEntity::getQuestionText, questionTexts)
+                .eq(QuestionEntity::getDeleted, NORMAL));
+        if (!duplicateQuestions.isEmpty()) {
+            throw new AiQuestionTextConflictException("AI 生成题目内容已存在，请更换题干："
+                    + duplicateQuestions.stream().map(QuestionEntity::getQuestionText)
+                    .collect(Collectors.joining("；")));
         }
         Set<Long> dimensionIds = this.listDimensions(versionId).stream()
                 .map(ScoreDimensionEntity::getId).collect(Collectors.toSet());
@@ -887,9 +896,8 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
                     errors.add("第 " + question.getQuestionNo() + " 题单选数量必须为 1");
                 }
             } else if (MULTIPLE == question.getQuestionType()) {
-                if (question.getMinSelectCount() < 1 || question.getMinSelectCount() > question.getMaxSelectCount()
-                        || question.getMaxSelectCount() > questionOptions.size()) {
-                    errors.add("第 " + question.getQuestionNo() + " 题多选数量范围无效");
+                if (question.getMinSelectCount() != 2 || question.getMaxSelectCount() != questionOptions.size()) {
+                    errors.add("第 " + question.getQuestionNo() + " 题多选题必须最少选择 2 项且最多全选");
                 }
                 if (questionOptions.stream().anyMatch(option -> !dimensionIds.contains(option.getDimensionId()))) {
                     errors.add("第 " + question.getQuestionNo() + " 题存在未绑定有效维度的选项");
@@ -987,10 +995,10 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
                 throw this.badRequest("单选题必须绑定有效维度，且选择数量固定为 1");
             }
         } else if (MULTIPLE == request.questionType()) {
-            if (request.minSelectCount() > request.maxSelectCount()
-                    || request.maxSelectCount() > request.options().size()
+            if (request.minSelectCount() != 2
+                    || request.maxSelectCount() != request.options().size()
                     || request.options().stream().anyMatch(option -> !dimensionIds.contains(option.dimensionId()))) {
-                throw this.badRequest("多选题选择数量或选项维度无效");
+                throw this.badRequest("多选题必须最少选择 2 项且最多全选，并绑定有效选项维度");
             }
         } else {
             throw this.badRequest("题目类型无效");

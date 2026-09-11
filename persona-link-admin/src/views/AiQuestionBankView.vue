@@ -390,6 +390,7 @@ function addOption() {
   if (readOnly || savingQuestion.value) return
   if (currentQuestion.value.options.length < 8) {
     currentQuestion.value.options.push({ text: '', dimensionId: currentQuestion.value.dimensionId, score: 0 })
+    if (currentQuestion.value.type === 2) currentQuestion.value.maxSelect = currentQuestion.value.options.length
     markQuestionDirty()
   }
 }
@@ -398,6 +399,7 @@ function removeOption(index: number) {
   if (readOnly || savingQuestion.value) return
   if (currentQuestion.value.options.length > 2) {
     currentQuestion.value.options.splice(index, 1)
+    if (currentQuestion.value.type === 2) currentQuestion.value.maxSelect = currentQuestion.value.options.length
     markQuestionDirty()
   }
 }
@@ -416,8 +418,9 @@ function changeQuestionType() {
   } else {
     const defaultDimensionId = currentQuestion.value.dimensionId || dimensions[0]?.id || 0
     currentQuestion.value.options.forEach((option) => { option.dimensionId ||= defaultDimensionId })
-    currentQuestion.value.minSelect = Math.max(1, currentQuestion.value.minSelect)
-    currentQuestion.value.maxSelect = Math.min(currentQuestion.value.options.length, Math.max(currentQuestion.value.minSelect, currentQuestion.value.maxSelect))
+    // 多选题固定最少 2 项、最多全选。
+    currentQuestion.value.minSelect = 2
+    currentQuestion.value.maxSelect = currentQuestion.value.options.length
   }
   markQuestionDirty()
 }
@@ -428,8 +431,8 @@ async function saveQuestion() {
     notice.value = '请补全题目和选项内容。'
     return
   }
-  if (currentQuestion.value.type === 2 && (currentQuestion.value.minSelect < 1 || currentQuestion.value.maxSelect > currentQuestion.value.options.length || currentQuestion.value.minSelect > currentQuestion.value.maxSelect)) {
-    notice.value = '多选题的选择数量范围无效。'
+  if (currentQuestion.value.type === 2 && (currentQuestion.value.minSelect !== 2 || currentQuestion.value.maxSelect !== currentQuestion.value.options.length)) {
+    notice.value = '多选题必须最少选择 2 项且最多全选。'
     return
   }
   if (currentQuestion.value.type === 1 && !dimensions.some((dimension) => dimension.id === currentQuestion.value.dimensionId)) {
@@ -684,8 +687,8 @@ function mapQuestion(question: Question): AiQuestion {
     text: question.questionText,
     type: question.questionType as 1 | 2,
     dimensionId,
-    minSelect: question.minSelectCount,
-    maxSelect: question.maxSelectCount,
+    minSelect: question.questionType === 2 ? 2 : 1,
+    maxSelect: question.questionType === 2 ? question.options.length : 1,
     options: question.options.map((option) => ({ id: option.id, text: option.optionText, dimensionId: option.dimensionId ?? question.dimensionId ?? dimensionId, score: option.scoreValue })),
   }
 }
@@ -877,7 +880,7 @@ onUnmounted(() => {
           <h2>题目与选项</h2>
           <label><span>题目内容</span><input v-model="currentQuestion.text" maxlength="500" :disabled="readOnly || savingQuestion" @input="markQuestionDirty" /></label>
           <div class="editor-fields" :class="{ single: currentQuestion.type === 2 }"><label><span>题型</span><select v-model.number="currentQuestion.type" :disabled="readOnly || savingQuestion" @change="changeQuestionType"><option :value="1">单选题</option><option :value="2">多选题</option></select></label><label v-if="currentQuestion.type === 1"><span>计分维度</span><select v-model.number="currentQuestion.dimensionId" :disabled="readOnly || savingQuestion" @change="markQuestionDirty"><option v-for="item in dimensions" :key="item.id" :value="item.id">{{ item.name }}</option></select></label></div>
-          <div v-if="currentQuestion.type === 2" class="selection-range"><label><span>最少选择</span><input v-model.number="currentQuestion.minSelect" type="number" min="1" :max="currentQuestion.options.length" :disabled="readOnly || savingQuestion" @input="markQuestionDirty" /></label><label><span>最多选择</span><input v-model.number="currentQuestion.maxSelect" type="number" :min="currentQuestion.minSelect" :max="currentQuestion.options.length" :disabled="readOnly || savingQuestion" @input="markQuestionDirty" /></label></div>
+          <div v-if="currentQuestion.type === 2" class="selection-range"><label><span>最少选择</span><input :value="2" type="number" disabled /></label><label><span>最多选择</span><input :value="currentQuestion.options.length" type="number" disabled /></label></div>
           <div class="options-table" :class="{ 'single-score': currentQuestion.type === 1 }"><header><span>选项</span><span>答案内容</span><span v-if="currentQuestion.type === 2">计分维度</span><span>分值</span><span>操作</span></header><div v-for="(option, index) in currentQuestion.options" :key="index"><b>{{ String.fromCharCode(65 + index) }}</b><input v-model="option.text" :disabled="readOnly || savingQuestion" @input="markQuestionDirty" /><select v-if="currentQuestion.type === 2" v-model.number="option.dimensionId" aria-label="计分维度" :disabled="readOnly || savingQuestion" @change="markQuestionDirty"><option v-for="item in dimensions" :key="item.id" :value="item.id">{{ item.name }}</option></select><input v-model.number="option.score" type="number" step="1" :disabled="readOnly || savingQuestion" @input="markQuestionDirty" /><button :disabled="readOnly || savingQuestion" @click="removeOption(index)">删除</button></div></div>
           <footer><button class="outline-button" :disabled="readOnly || savingQuestion" @click="addOption">＋ 添加选项</button><button class="save-button" :disabled="readOnly || savingQuestion" @click="saveQuestion">{{ savingQuestion ? '保存中…' : '保存题目' }}</button></footer>
         </article>

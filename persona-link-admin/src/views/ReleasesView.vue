@@ -167,11 +167,11 @@ function resultText(value: unknown): string {
 watch(selectedTestId, loadVersions)
 onMounted(async () => {
   try {
-    const firstPage = await getTests({ page: 1, size: 100 })
+    const firstPage = await getTests({ page: 1, size: 100, status: 1 })
     const pageCount = Math.ceil(firstPage.total / Math.max(1, firstPage.size))
     const remainingPages = await Promise.all(Array.from(
       { length: Math.max(0, pageCount - 1) },
-      (_, index) => getTests({ page: index + 2, size: 100 }),
+      (_, index) => getTests({ page: index + 2, size: 100, status: 1 }),
     ))
     tests.value = [firstPage, ...remainingPages].flatMap((page) => page.records)
     selectedTestId.value = tests.value[0]?.id ?? null

@@ -1,7 +1,13 @@
 <app-nav-bar title="加入双人测试" show-back="{{true}}"></app-nav-bar>
 
 <view class="paper-page join-page">
-  <view class="paper-card join-hero">我 × TA</view>
+  <image
+    wx:if="{{joinHeroImageUrl}}"
+    class="paper-card join-hero"
+    src="{{joinHeroImageUrl}}"
+    mode="widthFix"
+    binderror="handleJoinHeroImageError"
+  ></image>
 
   <text class="join-title">双人关系角色测试</text>
   <text class="join-copy">你将独立完成 30 道单选题。对方无法看到你的答案，双方完成后才会生成报告。</text>

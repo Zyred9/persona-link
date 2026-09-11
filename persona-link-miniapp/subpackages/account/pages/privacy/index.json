@@ -1,5 +1,7 @@
 {
-  "navigationBarTitleText": "隐私与数据",
+  "navigationBarTitleText": "数据管理",
+  "enablePullDownRefresh": false,
+  "disableScroll": true,
   "usingComponents": {
     "app-nav-bar": "/components/app-nav-bar/index"
   }

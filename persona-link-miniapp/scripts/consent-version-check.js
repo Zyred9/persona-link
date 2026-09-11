@@ -18,7 +18,7 @@ const wx = {
 vm.runInNewContext(source('app.js'), {
   App(d) { app = d; }, wx,
   getCurrentPages: () => [currentPage],
-  require: () => ({ TOKEN_STORAGE_KEY: 'personaLinkBusinessToken', onboardingProfile: async () => ({ nickname: '名字', avatarUrl: '/avatar' }), isProfileComplete: () => true, writeProfileCache: () => {}, requestData: () => { checks++; return reply(); } })
+  require: () => ({ TOKEN_STORAGE_KEY: 'personaLinkBusinessToken', onboardingProfile: async () => ({ nickname: '名字', avatarUrl: '/avatar' }), isProfileComplete: () => true, writeProfileCache: () => {}, primeProfileCache: () => {}, requestData: () => { checks++; return reply(); } })
 });
 const requestModule = { exports: {} };
 vm.runInNewContext(source('utils/request.js'), {

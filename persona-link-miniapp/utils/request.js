@@ -186,6 +186,25 @@ function writeProfileCache(token, nickname, avatarUrl) {
   }
 }
 
+let primedProfile = null;
+
+// 协议校验刚拉取到完整资料时暂存一次，供账户中心复用，避免同一次进入重复请求。
+function primeProfileCache(token, profile) {
+  if (token && profile) primedProfile = { token, profile };
+}
+
+async function fetchProfile() {
+  const app = typeof getApp === 'function' ? getApp() : null;
+  if (app && app.verifyConsent) await app.verifyConsent();
+  const token = await ensureSession();
+  if (primedProfile && primedProfile.token === token) {
+    const profile = primedProfile.profile;
+    primedProfile = null;
+    return profile;
+  }
+  return requestData({ url: '/api/miniapp/profile', sessionBound: true, silentUnauthorized: true });
+}
+
 async function authenticatedRequestData(options) {
   const app = typeof getApp === 'function' ? getApp() : null;
   if (app && app.verifyConsent) await app.verifyConsent();
@@ -271,6 +290,8 @@ module.exports = {
   isProfileComplete,
   readProfileCache,
   writeProfileCache,
+  primeProfileCache,
+  fetchProfile,
   invalidateTestRecordRequests() { testRecordsGeneration += 1; },
   request,
   requestData,

@@ -1,7 +1,6 @@
 const {
   request,
   authenticatedRequestData,
-  createIdempotencyKey,
   TOKEN_STORAGE_KEY
 } = require('../../utils/request');
 const { trackEvent } = require('../../utils/analytics');
@@ -33,6 +32,7 @@ Page({
     allTests: [],
     tests: [],
     currentAssessment: null,
+    abandoningAssessment: false,
     containerVisible: false,
     containerMode: '',
     detailVisible: false,
@@ -77,21 +77,34 @@ Page({
     }
   },
 
+  blockContainerScroll() {},
+
   async loadCurrentAssessment() {
+    if (this.data.abandoningAssessment) return;
+    const version = this.currentAssessmentVersion = (this.currentAssessmentVersion || 0) + 1;
     try {
       const currentAssessment = await authenticatedRequestData({
         url: '/api/miniapp/assessments/current'
       });
+      if (version !== this.currentAssessmentVersion) return;
       this.setData({ currentAssessment: currentAssessment || null });
     } catch (error) {
+      if (version !== this.currentAssessmentVersion) return;
       this.setData({ currentAssessment: null });
     }
   },
 
   async loadHome() {
-    this.setData({ state: 'loading' });
+    const requestVersion = (this.requestVersion || 0) + 1;
+    this.requestVersion = requestVersion;
+    if (this.data.state !== 'ready') {
+      this.setData({ state: 'loading' });
+    }
     try {
       const response = await request({ url: '/api/miniapp/home' });
+      if (this.requestVersion !== requestVersion) {
+        return;
+      }
       if (!response || response.code !== 0 || !response.data) {
         throw new Error(response && response.message ? response.message : '首页配置加载失败');
       }
@@ -118,6 +131,9 @@ Page({
         tests: filterTests(allTests, selectedCategoryId)
       });
     } catch (error) {
+      if (this.requestVersion !== requestVersion) {
+        return;
+      }
       this.setData({ state: 'error' });
     }
   },
@@ -239,6 +255,7 @@ Page({
   },
 
   continueAssessment() {
+    if (this.data.abandoningAssessment) return;
     const assessment = this.data.currentAssessment;
     if (!assessment || !assessment.answerSessionId) {
       return;
@@ -334,27 +351,37 @@ Page({
     this.clearTestDetail();
   },
 
-  async restartAssessment() {
+  abandonAssessment() {
     const assessment = this.data.currentAssessment;
-    if (!assessment || !assessment.answerSessionId || assessment.canRestart === false) {
+    if (!assessment || !assessment.answerSessionId || this.data.abandoningAssessment) {
       return;
     }
+    this.currentAssessmentVersion = (this.currentAssessmentVersion || 0) + 1;
+    this.setData({ abandoningAssessment: true });
     wx.showModal({
-      title: '重新开始测试？',
-      content: '当前未完成答卷会被放弃，已保存的答案不会带入新答卷。',
+      title: '作废本次测试？',
+      content: Number(assessment.answerType) === 2
+        ? '作废后不能继续本次答卷。如已加入双人配对，本次配对也将取消。不会创建新答卷。'
+        : '作废后不能继续本次答卷，不会创建新答卷，也不会影响已完成的测试记录。',
+      confirmText: '作废',
+      confirmColor: '#ff6f65',
       success: async (result) => {
-        if (!result.confirm) return;
         try {
-          const restarted = await authenticatedRequestData({
-            url: `/api/miniapp/assessments/${encodeURIComponent(assessment.answerSessionId)}/restart`,
+          if (!result.confirm) return;
+          await authenticatedRequestData({
+            url: `/api/miniapp/assessments/${encodeURIComponent(assessment.answerSessionId)}/abandon`,
             method: 'POST',
-            data: { createRequestId: createIdempotencyKey('restart') }
+            sessionBound: true
           });
-          this.openQuiz(restarted);
+          this.setData({ currentAssessment: null });
+          wx.showToast({ title: '本次测试已作废', icon: 'none' });
         } catch (error) {
-          wx.showToast({ title: error.message || '重新开始失败', icon: 'none' });
+          wx.showToast({ title: error.message || '作废失败，请重试', icon: 'none' });
+        } finally {
+          this.setData({ abandoningAssessment: false });
         }
-      }
+      },
+      fail: () => this.setData({ abandoningAssessment: false })
     });
   }
 });

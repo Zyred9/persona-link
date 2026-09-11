@@ -1,4 +1,4 @@
-<view class="paper-page quiz-page">
+<view class="paper-page quiz-page {{questionSlideClass}}" bindtouchstart="handleQuizTouchStart" bindtouchend="handleQuizTouchEnd">
   <page-state
     wx:if="{{state === 'loading'}}"
     type="loading"
@@ -31,6 +31,7 @@
         wx:key="optionId"
         class="{{item.selected ? 'quiz-option quiz-option--selected' : 'quiz-option'}}"
         data-option-id="{{item.optionId}}"
+        data-question-token="{{questionToken}}"
         disabled="{{saving || submissionPending}}"
         bindtap="chooseOption"
       >
@@ -39,14 +40,24 @@
       </button>
     </view>
 
-    <view class="quiz-actions">
-      <button class="paper-button quiz-actions__button" disabled="{{saving || submissionPending}}" bindtap="goPrevious">上一题</button>
+    <view class="quiz-footer">
       <button
-        class="paper-button paper-button--primary quiz-actions__button"
-        loading="{{saving}}"
+        wx:if="{{allAnswered && !isLast && !submissionPending}}"
+        class="paper-button quiz-submit-all"
+        data-question-token="{{questionToken}}"
         disabled="{{saving}}"
-        bindtap="continueTest"
-      >{{saving ? '保存中' : (submissionPending ? '重试查看结果' : (isLast ? '查看结果' : (!required && selectedOptionIds.length === 0 ? '跳过' : '继续')))}}</button>
+        bindtap="submitDirect"
+      >直接交卷</button>
+      <view class="quiz-actions">
+        <button class="paper-button quiz-actions__button" data-question-token="{{questionToken}}" disabled="{{saving || submissionPending}}" bindtap="goPrevious">上一题</button>
+        <button
+          class="paper-button paper-button--primary quiz-actions__button"
+          loading="{{saving}}"
+          data-question-token="{{questionToken}}"
+          disabled="{{saving}}"
+          bindtap="continueTest"
+        >{{saving ? '保存中' : (submissionPending ? '重试交卷' : (isLast ? '交卷' : (!required && selectedOptionIds.length === 0 ? '跳过' : '继续')))}}</button>
+      </view>
     </view>
   </block>
 </view>

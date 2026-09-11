@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -128,6 +129,41 @@ class DeepSeekClientTest {
             assertTrue(body.path("messages").path(1).path("content").asText()
                     .contains("上一次生成结果未通过服务端校验"));
             assertEquals("D1", setup.dimensions().get(0).dimensionCode());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void questionPromptShouldContainExistingTextsAndCorrectionFeedback() throws Exception {
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        ObjectNode response = this.objectMapper.createObjectNode();
+        ObjectNode choice = response.putArray("choices").addObject();
+        choice.put("finish_reason", "stop");
+        choice.putObject("message").put("content", "{\"questions\":[]}");
+        byte[] bytes = this.objectMapper.writeValueAsBytes(response);
+        server.createContext("/chat/completions", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        try {
+            this.properties.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+            this.properties.setApiKey("test-key");
+            DeepSeekClient client = new DeepSeekClient(this.properties, this.objectMapper);
+            List<String> existing = List.of("面对陌生挑战时你会？", "题干包含\"引号\"与\n换行");
+            client.generateQuestionBatch("model", "主题", 1, "要求", List.of(), 21, 10, existing,
+                    "第21题重复，请更换场景");
+            String prompt = this.objectMapper.readTree(requestBody.get()).path("messages").path(1)
+                    .path("content").asText();
+            assertTrue(prompt.contains(this.objectMapper.writeValueAsString(existing)));
+            assertTrue(prompt.contains("本批题干不得互相重复"));
+            assertTrue(prompt.contains("第21题重复，请更换场景"));
+            assertTrue(prompt.contains("questionNo 从 21 到 30"));
         } finally {
             server.stop(0);
         }
