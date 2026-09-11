@@ -6,6 +6,7 @@ import com.personalink.server.dto.CreatePairRequest;
 import com.personalink.server.dto.JoinPairRequest;
 import com.personalink.server.dto.PairConfigResponse;
 import com.personalink.server.dto.PairCreateResponse;
+import com.personalink.server.dto.PairInviteResponse;
 import com.personalink.server.dto.PairReportResponse;
 import com.personalink.server.dto.PairSessionResponse;
 import com.personalink.server.dto.ApiResponse;
@@ -111,6 +112,21 @@ public class MiniappPairController {
             @Valid @RequestBody JoinPairRequest request) {
         String openId = this.authService.requireSession(authorization).openId();
         return ApiResponse.success(this.pairAssessmentService.join(openId, request));
+    }
+
+    /**
+     * 按邀请码查询当前用户与该邀请的关系，供分享消息重复点击时自动分流。
+     *
+     * @param authorization Bearer 业务会话令牌
+     * @param inviteToken 邀请码
+     * @return 当前用户的角色、配对状态与是否可加入
+     */
+    @GetMapping("/invite/{inviteToken}")
+    public ApiResponse<PairInviteResponse> invite(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @PathVariable String inviteToken) {
+        String openId = this.authService.requireSession(authorization).openId();
+        return ApiResponse.success(this.pairAssessmentService.invite(openId, inviteToken));
     }
 
     /**

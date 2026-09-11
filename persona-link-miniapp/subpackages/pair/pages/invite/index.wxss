@@ -70,3 +70,12 @@
   font-weight: 800;
   text-align: center;
 }
+
+.invite-joined-note {
+  display: block;
+  margin-top: 54rpx;
+  color: #6e6671;
+  font-size: 23rpx;
+  font-weight: 800;
+  text-align: center;
+}

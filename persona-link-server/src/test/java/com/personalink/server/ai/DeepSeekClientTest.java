@@ -117,12 +117,12 @@ class DeepSeekClientTest {
             this.client = new DeepSeekClient(this.properties, this.objectMapper);
 
             AiGeneratedSetup setup = this.client.generateSetup(
-                    "deepseek-v4-flash", "沟通方式", 2, "轻松、有趣",
+                    "deepseek-flash", "沟通方式", 2, "轻松、有趣",
                     "维度 D1 的结果区间存在断档或重叠");
             JsonNode body = this.objectMapper.readTree(requestBody.get());
 
             assertEquals("Bearer test-key", authorization.get());
-            assertEquals("deepseek-v4-flash", body.path("model").asText());
+            assertEquals("deepseek-flash", body.path("model").asText());
             assertEquals("disabled", body.path("thinking").path("type").asText());
             assertEquals("json_object", body.path("response_format").path("type").asText());
             assertFalse(body.path("stream").asBoolean());

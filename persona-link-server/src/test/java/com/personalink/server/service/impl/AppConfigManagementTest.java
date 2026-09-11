@@ -1,7 +1,10 @@
 package com.personalink.server.service.impl;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.personalink.server.dto.AppConfigQuery;
 import com.personalink.server.dto.AppConfigSaveRequest;
 import com.personalink.server.entity.AppConfigEntity;
 import com.personalink.server.exception.BusinessException;
@@ -9,8 +12,11 @@ import com.personalink.server.mapper.AppConfigMapper;
 import jakarta.validation.Validation;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -51,6 +57,24 @@ class AppConfigManagementTest {
             assertEquals("https://example.com/pair.png", new AppConfigSaveRequest("miniapp.pair.join_hero_image_url",
                     " HTTPS://example.com/pair.png ", 1, "双人头图", null).configValue());
         }
+    }
+
+    @Test
+    void genericConfigListExcludesHomeTitleImageManagedByDedicatedPage() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), AppConfigEntity.class);
+        var mapper = mock(AppConfigMapper.class);
+        var service = new AppConfigServiceImpl();
+        ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        when(mapper.selectCount(any())).thenReturn(0L);
+        service.pageConfigs(new AppConfigQuery());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Wrapper<AppConfigEntity>> captor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(mapper).selectCount(captor.capture());
+        Wrapper<AppConfigEntity> wrapper = captor.getValue();
+        assertTrue(wrapper.getSqlSegment().contains("config_key"));
+        Map<String, Object> params = ((AbstractWrapper<AppConfigEntity, ?, ?>) wrapper).getParamNameValuePairs();
+        assertTrue(params.containsValue("miniapp.home.title_image_url"));
+        assertFalse(params.containsValue("miniapp.pair.join_hero_image_url"));
     }
 
     @Test

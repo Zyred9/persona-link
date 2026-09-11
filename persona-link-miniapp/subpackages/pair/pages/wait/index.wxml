@@ -1,6 +1,14 @@
 <app-nav-bar title="配对进度" show-back="{{true}}"></app-nav-bar>
 
 <view class="paper-page wait-page">
+  <image
+    wx:if="{{joinHeroImageUrl}}"
+    class="paper-card wait-hero"
+    src="{{joinHeroImageUrl}}"
+    mode="widthFix"
+    binderror="handleJoinHeroImageError"
+  ></image>
+
   <page-state wx:if="{{state === 'loading'}}" type="loading" title="配对状态正在加载"></page-state>
   <page-state wx:elif="{{state === 'error'}}" type="error" title="配对状态加载失败" description="{{errorDescription}}" action-text="重新加载" bind:action="refreshStatus"></page-state>
   <block wx:else>
@@ -29,8 +37,18 @@
 
   <view class="wait-actions">
     <button
-      wx:if="{{!reportReady}}"
+      wx:if="{{canReshare}}"
       class="paper-button paper-button--primary"
+      open-type="share"
+    >分享</button>
+    <button
+      wx:if="{{canReshare}}"
+      class="paper-button wait-copy"
+      bindtap="copyPairCode"
+    >复制配对码 {{inviteCode}}</button>
+    <button
+      wx:if="{{!reportReady}}"
+      class="paper-button {{canReshare ? 'wait-refresh' : 'paper-button--primary'}}"
       bindtap="refreshStatus"
     >刷新状态</button>
     <button

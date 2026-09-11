@@ -22,9 +22,12 @@
     <text class="invite-title">把配对邀请发给 TA</text>
     <text class="invite-copy">对方完成自己的答题后，一起查看报告</text>
 
-    <view class="invite-code">{{pairCode}}</view>
-    <button class="paper-button invite-copy-button" bindtap="copyPairCode">复制配对码</button>
-    <button class="paper-button paper-button--primary invite-share-button" open-type="share">发送给微信好友</button>
+    <block wx:if="{{shareable}}">
+      <view class="invite-code">{{pairCode}}</view>
+      <button class="paper-button invite-copy-button" bindtap="copyPairCode">复制配对码</button>
+      <button class="paper-button paper-button--primary invite-share-button" open-type="share">发送给微信好友</button>
+    </block>
+    <text wx:else class="invite-joined-note">对方已加入，无需再次分享</text>
   </view>
 
   <text class="invite-note">邀请好友一起完成双人测试</text>

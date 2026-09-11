@@ -63,7 +63,9 @@ public class AppConfigServiceImpl extends ServiceImpl<AppConfigMapper, AppConfig
     @Override
     public PageResponse<AppConfigEntity> pageConfigs(AppConfigQuery query) {
         var wrapper = Wrappers.<AppConfigEntity>lambdaQuery()
-                .eq(AppConfigEntity::getDeleted, 0);
+                .eq(AppConfigEntity::getDeleted, 0)
+                // 首页标题图由「首页配置」专用页面维护，通用配置列表不重复展示。
+                .ne(AppConfigEntity::getConfigKey, HOME_TITLE_IMAGE_URL);
         if (Objects.nonNull(query.getKeyword()) && !query.getKeyword().isBlank()) {
             wrapper.and(condition -> condition.like(AppConfigEntity::getConfigKey, query.getKeyword())
                     .or().like(AppConfigEntity::getConfigName, query.getKeyword()));

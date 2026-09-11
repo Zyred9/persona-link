@@ -114,7 +114,7 @@
         <view
           wx:for="{{pairRecords}}"
           wx:key="pairSessionId"
-          class="paper-card history-record history-record--pair {{item.waiting ? 'history-record--waiting' : ''}}"
+          class="paper-card history-record history-record--pair {{item.waiting ? 'history-record--waiting' : ''}} {{item.invalid ? 'history-record--invalid' : ''}}"
           data-pair-session-id="{{item.pairSessionId}}"
           data-report-ready="{{item.reportReady}}"
           bindtap="handlePairTap"
@@ -126,7 +126,8 @@
             <text class="history-record__result">{{item.resultText}}</text>
             <text class="history-record__meta">{{item.meta}} · 查看作答</text>
           </view>
-          <button class="history-record__more" data-pair-session-id="{{item.pairSessionId}}" data-report-ready="{{item.reportReady}}" catchtap="openPairResult" aria-label="查看双人测试结果">···</button>
+          <button wx:if="{{item.canReshare}}" class="history-record__invite" data-pair-session-id="{{item.pairSessionId}}" catchtap="resharePair" aria-label="邀请好友完成配对">邀请好友</button>
+          <button wx:else class="history-record__more" data-pair-session-id="{{item.pairSessionId}}" data-report-ready="{{item.reportReady}}" catchtap="openPairResult" aria-label="查看双人测试结果">···</button>
         </view>
 
       <view class="history-pagination">

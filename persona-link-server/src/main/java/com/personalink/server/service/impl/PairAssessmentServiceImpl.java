@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personalink.server.dto.CreatePairRequest;
 import com.personalink.server.dto.JoinPairRequest;
 import com.personalink.server.dto.PairCreateResponse;
+import com.personalink.server.dto.PairInviteResponse;
 import com.personalink.server.dto.PairReportResponse;
 import com.personalink.server.dto.PairSessionResponse;
 import com.personalink.server.dto.PairHistoryResponse;
@@ -247,6 +248,40 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PairInviteResponse invite(String openId, String inviteToken) {
+        if (Objects.isNull(inviteToken) || inviteToken.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST.value(), "邀请码不能为空");
+        }
+        PairSessionEntity pair = this.lambdaQuery()
+                .eq(PairSessionEntity::getInviteTokenHash,
+                        this.hashToken(inviteToken.trim().toUpperCase(Locale.ROOT)))
+                .eq(PairSessionEntity::getDeleted, NORMAL)
+                .one();
+        if (Objects.isNull(pair)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.value(), "邀请不存在");
+        }
+        int status = pair.getPairStatus();
+        if (PairStatus.INITIATOR_DONE.getCode() == status
+                && pair.getExpiresAt().isBefore(LocalDateTime.now())) {
+            status = PairStatus.EXPIRED.getCode();
+        }
+        boolean initiator = Objects.equals(pair.getInitiatorOpenId(), openId);
+        boolean partner = Objects.equals(pair.getPartnerOpenId(), openId);
+        if (!initiator && !partner) {
+            // 非参与者只暴露是否可加入，不返回配对 ID 和答卷 ID。
+            return new PairInviteResponse(null, status, null, null,
+                    PairStatus.INITIATOR_DONE.getCode() == status, pair.getExpiresAt());
+        }
+        Long ownAnswerSessionId = initiator
+                ? pair.getInitiatorAnswerSessionId() : pair.getPartnerAnswerSessionId();
+        return new PairInviteResponse(String.valueOf(pair.getId()), status,
+                initiator ? "INITIATOR" : "PARTNER",
+                Objects.isNull(ownAnswerSessionId) ? null : String.valueOf(ownAnswerSessionId),
+                false, pair.getExpiresAt());
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public PairSessionResponse getStatus(String openId, Long pairSessionId) {
         PairSessionEntity pair = this.requireOwnedPair(pairSessionId, openId);
@@ -260,7 +295,8 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
                     .update();
             pair.setPairStatus(PairStatus.EXPIRED.getCode());
         }
-        return this.toResponse(pair, openId);
+        // 发起者等待加入期间返回邀请令牌，供测试记录与配对进度页重新分享。
+        return this.toResponse(pair, openId, true);
     }
 
     @Override
@@ -317,6 +353,10 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
     }
 
     private PairSessionResponse toResponse(PairSessionEntity pair, String openId) {
+        return this.toResponse(pair, openId, false);
+    }
+
+    private PairSessionResponse toResponse(PairSessionEntity pair, String openId, boolean exposeInviteToken) {
         PairReportEntity report = this.pairReportMapper.selectOne(
                 Wrappers.<PairReportEntity>lambdaQuery()
                         .eq(PairReportEntity::getPairSessionId, pair.getId())
@@ -326,6 +366,12 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
                 && pair.getExpiresAt().isBefore(LocalDateTime.now())) {
             status = PairStatus.EXPIRED.getCode();
         }
+        // 邀请令牌由发起者 OpenID 与创建请求号确定性生成，等待加入期间可安全重算返回。
+        String inviteToken = exposeInviteToken
+                && PairStatus.INITIATOR_DONE.getCode() == status
+                && Objects.equals(pair.getInitiatorOpenId(), openId)
+                ? this.generateInviteToken(pair.getInitiatorOpenId(), pair.getCreateRequestId())
+                : null;
         return new PairSessionResponse(
                 String.valueOf(pair.getId()),
                 status,
@@ -334,7 +380,8 @@ public class PairAssessmentServiceImpl extends ServiceImpl<PairSessionMapper, Pa
                 Objects.isNull(pair.getPartnerAnswerSessionId())
                         ? null : String.valueOf(pair.getPartnerAnswerSessionId()),
                 Objects.isNull(report) ? null : String.valueOf(report.getId()),
-                pair.getExpiresAt());
+                pair.getExpiresAt(),
+                inviteToken);
     }
 
     private String generateInviteToken(String openId, String createRequestId) {

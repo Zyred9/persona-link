@@ -10,7 +10,7 @@ public class DeepSeekProperties {
 
     private String baseUrl = "https://api.deepseek.com";
     private String apiKey;
-    private String model = "deepseek-v4-flash";
+    private String model = "deepseek-flash";
     private int connectTimeoutMillis = 10000;
     private int readTimeoutMillis = 120000;
 

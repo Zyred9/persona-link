@@ -60,7 +60,9 @@ function formatHistoryRecord(record, kind) {
     meta: `${formatGeneratedAt(record.createdAt)}${record.versionNo ? ` · V${record.versionNo}` : ''}`,
     reportReady: status === 4,
     waiting: status < 4,
-    invalid: status === 5 || status === 6
+    invalid: status === 5 || status === 6,
+    // 对方加入后邀请链接不再可用，只有等待加入期间才展示重新分享入口。
+    canReshare: status === 1
   });
 }
 
@@ -409,6 +411,12 @@ Component({
       const pairSessionId = String(event.currentTarget.dataset.pairSessionId || '');
       if (!pairSessionId) return;
       wx.navigateTo({ url: `/subpackages/account/pages/review/index?pairSessionId=${encodeURIComponent(pairSessionId)}` });
+    },
+
+    resharePair(event) {
+      const pairSessionId = String(event.currentTarget.dataset.pairSessionId || '');
+      if (!pairSessionId) return;
+      wx.navigateTo({ url: `/subpackages/pair/pages/wait/index?pairSessionId=${encodeURIComponent(pairSessionId)}` });
     },
 
     async openPairResult(event) {

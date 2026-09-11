@@ -57,17 +57,17 @@ class AiQuestionGenerationWorkerTest {
         DeepSeekClient deepSeekClient = mock(DeepSeekClient.class);
         AiGeneratedSetup invalid = this.setup(40, 50);
         AiGeneratedSetup valid = this.setup(50, 50);
-        when(deepSeekClient.generateSetup(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        when(deepSeekClient.generateSetup(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), anyString())).thenReturn(invalid, valid);
         AiQuestionGenerationWorker worker = new AiQuestionGenerationWorker(
                 null, null, deepSeekClient, null);
 
         AiGeneratedSetup result = worker.generateValidSetup(
-                2L, "deepseek-v4-flash", "勇气测试", 1, "生成 100 道题");
+                2L, "deepseek-flash", "勇气测试", 1, "生成 100 道题");
 
         assertEquals(valid, result);
         ArgumentCaptor<String> feedbackCaptor = ArgumentCaptor.forClass(String.class);
-        verify(deepSeekClient, times(2)).generateSetup(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        verify(deepSeekClient, times(2)).generateSetup(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), feedbackCaptor.capture());
         assertEquals("", feedbackCaptor.getAllValues().get(0));
         assertTrue(feedbackCaptor.getAllValues().get(1).contains("断档或重叠"));
@@ -77,7 +77,7 @@ class AiQuestionGenerationWorkerTest {
     void generateValidSetupShouldRetryInvalidJsonResponse() {
         DeepSeekClient deepSeekClient = mock(DeepSeekClient.class);
         AiGeneratedSetup valid = this.setup(50, 50);
-        when(deepSeekClient.generateSetup(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        when(deepSeekClient.generateSetup(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), anyString()))
                 .thenThrow(new BusinessException(HttpStatus.BAD_GATEWAY, 50232,
                         "DeepSeek 返回的数据格式不合法"))
@@ -86,10 +86,10 @@ class AiQuestionGenerationWorkerTest {
                 null, null, deepSeekClient, null);
 
         AiGeneratedSetup result = worker.generateValidSetup(
-                2L, "deepseek-v4-flash", "勇气测试", 1, "生成 100 道题");
+                2L, "deepseek-flash", "勇气测试", 1, "生成 100 道题");
 
         assertEquals(valid, result);
-        verify(deepSeekClient, times(2)).generateSetup(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        verify(deepSeekClient, times(2)).generateSetup(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), anyString());
     }
 
@@ -97,7 +97,7 @@ class AiQuestionGenerationWorkerTest {
     void generateValidSetupShouldRetryTemporaryDeepSeekFailure() {
         DeepSeekClient deepSeekClient = mock(DeepSeekClient.class);
         AiGeneratedSetup valid = this.setup(50, 50);
-        when(deepSeekClient.generateSetup(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        when(deepSeekClient.generateSetup(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), anyString()))
                 .thenThrow(new BusinessException(HttpStatus.BAD_GATEWAY, 50231,
                         "DeepSeek 服务暂不可用，请稍后重试"))
@@ -106,10 +106,10 @@ class AiQuestionGenerationWorkerTest {
                 null, null, deepSeekClient, null);
 
         AiGeneratedSetup result = worker.generateValidSetup(
-                2L, "deepseek-v4-flash", "勇气测试", 1, "生成 100 道题");
+                2L, "deepseek-flash", "勇气测试", 1, "生成 100 道题");
 
         assertEquals(valid, result);
-        verify(deepSeekClient, times(2)).generateSetup(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        verify(deepSeekClient, times(2)).generateSetup(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), anyString());
     }
 
@@ -118,20 +118,20 @@ class AiQuestionGenerationWorkerTest {
         DeepSeekClient deepSeekClient = mock(DeepSeekClient.class);
         AiGeneratedQuestionBatch invalid = this.questionBatch("unknown");
         AiGeneratedQuestionBatch valid = this.questionBatch("bravery");
-        when(deepSeekClient.generateQuestionBatch(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        when(deepSeekClient.generateQuestionBatch(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), eq(List.of(new AiGeneratedDimension("bravery", "勇气", 0))),
                 eq(1), eq(1), eq(List.of()), anyString())).thenReturn(invalid, valid);
         AiQuestionGenerationWorker worker = new AiQuestionGenerationWorker(
                 null, null, deepSeekClient, null);
 
         AiGeneratedQuestionBatch result = worker.generateValidQuestionBatch(
-                2L, "deepseek-v4-flash", "勇气测试", 1, "生成 100 道题",
+                2L, "deepseek-flash", "勇气测试", 1, "生成 100 道题",
                 List.of(new AiGeneratedDimension("bravery", "勇气", 0)), Set.of("bravery"), 1, 1,
                 List.of(), batch -> { });
 
         assertEquals(valid, result);
         ArgumentCaptor<String> feedbackCaptor = ArgumentCaptor.forClass(String.class);
-        verify(deepSeekClient, times(2)).generateQuestionBatch(eq("deepseek-v4-flash"), eq("勇气测试"), eq(1),
+        verify(deepSeekClient, times(2)).generateQuestionBatch(eq("deepseek-flash"), eq("勇气测试"), eq(1),
                 eq("生成 100 道题"), eq(List.of(new AiGeneratedDimension("bravery", "勇气", 0))),
                 eq(1), eq(1), eq(List.of()), feedbackCaptor.capture());
         assertTrue(feedbackCaptor.getAllValues().get(1).contains("单选题维度或选择数量无效"));

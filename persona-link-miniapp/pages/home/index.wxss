@@ -32,6 +32,10 @@
   margin-top: 28rpx;
 }
 
+.all-test-grid {
+  margin-top: 56rpx;
+}
+
 .home-test-card__image {
   display: block;
   width: 100%;
@@ -40,7 +44,7 @@
 .category-list {
   display: flex;
   gap: 28rpx;
-  margin: 28rpx 0 0;
+  margin: 56rpx 0 0;
   overflow-x: auto;
   padding: 0;
   white-space: nowrap;

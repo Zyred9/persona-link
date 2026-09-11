@@ -5,6 +5,12 @@
   padding-top: 50rpx;
 }
 
+.wait-hero {
+  display: block;
+  width: 100%;
+  margin-bottom: 44rpx;
+}
+
 .wait-status-card {
   display: flex;
   align-items: center;
@@ -97,6 +103,8 @@
   margin-top: auto;
 }
 
+.wait-copy,
+.wait-refresh,
 .wait-cancel {
   margin-top: 18rpx;
 }

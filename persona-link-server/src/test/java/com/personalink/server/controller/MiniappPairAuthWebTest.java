@@ -51,7 +51,8 @@ class MiniappPairAuthWebTest {
 
     @Test
     void anonymousPairHistoryAndDetailReturnUnauthorizedWithoutDatabaseAccess() throws Exception {
-        for (String path : new String[]{"/api/miniapp/pairs", "/api/miniapp/pairs/1", "/api/miniapp/pairs/1/review"}) {
+        for (String path : new String[]{"/api/miniapp/pairs", "/api/miniapp/pairs/1", "/api/miniapp/pairs/1/review",
+                "/api/miniapp/pairs/invite/ABCDE"}) {
             this.mockMvc.perform(get(path))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value(40102));

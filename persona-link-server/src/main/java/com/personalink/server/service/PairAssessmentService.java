@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.spring.service.IService;
 import com.personalink.server.dto.CreatePairRequest;
 import com.personalink.server.dto.JoinPairRequest;
 import com.personalink.server.dto.PairCreateResponse;
+import com.personalink.server.dto.PairInviteResponse;
 import com.personalink.server.dto.PairReportResponse;
 import com.personalink.server.dto.PairSessionResponse;
 import com.personalink.server.dto.PairHistoryResponse;
@@ -20,6 +21,8 @@ public interface PairAssessmentService extends IService<PairSessionEntity> {
     PairCreateResponse create(String openId, CreatePairRequest request);
 
     PairSessionResponse join(String openId, JoinPairRequest request);
+
+    PairInviteResponse invite(String openId, String inviteToken);
 
     PairSessionResponse getStatus(String openId, Long pairSessionId);
 

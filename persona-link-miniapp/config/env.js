@@ -1,5 +1,5 @@
 const API_BASE_URLS = {
-  develop: 'http://192.168.0.23:8080',
+  develop: 'http://192.168.8.128:8080',
   trial: 'https://persona.sanmao.online',
   release: 'https://persona.sanmao.online',
 };

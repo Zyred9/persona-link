@@ -315,6 +315,22 @@
   letter-spacing: 5rpx;
 }
 
+.history-record__invite {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 58rpx;
+  margin: 0 0 0 12rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  font-size: 22rpx;
+  font-weight: 900;
+  background: #ffd867;
+  border: 3rpx solid #201b22;
+  border-radius: 999rpx;
+}
+
 .history-record__title {
   font-size: 27rpx;
   font-weight: 900;
@@ -330,6 +346,10 @@
 .history-record--single .history-record__result,
 .history-record--waiting .history-record__result {
   color: #ff7469;
+}
+
+.history-record--invalid .history-record__result {
+  color: #817d81;
 }
 
 .history-record__meta {
