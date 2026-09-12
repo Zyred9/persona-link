@@ -21,7 +21,7 @@ Page({
     this.loadJoinHeroImage();
   },
 
-  // 分享消息可被重复点击：已加入的用户直接进入答题或作答回顾，未加入的保留手动加入表单。
+  // 分享消息可被重复点击：报告生成后搭子直接进结果页，已配对的非搭子回首页，未加入的保留手动加入表单。
   async resolveInvite() {
     const pairCode = this.data.pairCode;
     if (!PAIR_CODE_PATTERN.test(pairCode)) return;
@@ -44,13 +44,20 @@ Page({
     if (!invite || typeof invite !== 'object') return;
     const pairSessionId = invite.pairSessionId ? String(invite.pairSessionId) : '';
     const pairStatus = Number(invite.pairStatus);
-    if (invite.myRole === 'INITIATOR' && pairSessionId) {
-      wx.redirectTo({ url: `/subpackages/pair/pages/wait/index?pairSessionId=${encodeURIComponent(pairSessionId)}` });
+    // 邀请已失效或已取消，任何点击者都没有可继续的流程，统一回首页。
+    if (pairStatus === 5 || pairStatus === 6) {
+      getApp().returnToHome();
       return;
     }
-    if (invite.myRole === 'PARTNER' && pairSessionId) {
-      if (pairStatus === 5 || pairStatus === 6) {
-        this.setData({ errorMessage: '本次配对已失效', inviteBlocked: true });
+    const isParticipant = (invite.myRole === 'INITIATOR' || invite.myRole === 'PARTNER') && !!pairSessionId;
+    if (isParticipant) {
+      // 报告已生成，搭子重复点击分享消息直接进入结果页。
+      if (pairStatus === 4) {
+        wx.redirectTo({ url: `/subpackages/pair/pages/result/index?pairSessionId=${encodeURIComponent(pairSessionId)}` });
+        return;
+      }
+      if (invite.myRole === 'INITIATOR') {
+        wx.redirectTo({ url: `/subpackages/pair/pages/wait/index?pairSessionId=${encodeURIComponent(pairSessionId)}` });
         return;
       }
       if (pairStatus === 2 && invite.answerSessionId) {
@@ -62,11 +69,9 @@ Page({
       wx.redirectTo({ url: `/subpackages/account/pages/review/index?pairSessionId=${encodeURIComponent(pairSessionId)}` });
       return;
     }
+    // 非搭子：仅未配对且可加入时保留加入表单，其余已配对场景统一回首页。
     if (!invite.joinable) {
-      this.setData({
-        errorMessage: pairStatus === 5 || pairStatus === 6 ? '本次配对已失效' : '邀请已被加入',
-        inviteBlocked: true
-      });
+      getApp().returnToHome();
     }
   },
 

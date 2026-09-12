@@ -45,7 +45,6 @@ import com.personalink.server.mapper.TestMapper;
 import com.personalink.server.mapper.TestVersionMapper;
 import com.personalink.server.service.ContentService;
 import com.personalink.server.exception.BusinessException;
-import com.personalink.server.exception.AiQuestionTextConflictException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -495,7 +494,7 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void appendGeneratedQuestions(Long versionId,
+    public int appendGeneratedQuestions(Long versionId,
                                          List<QuestionSaveRequest> requests,
                                          Long operatorId) {
         this.requireDraftVersionForUpdate(versionId);
@@ -507,11 +506,6 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
         if (questionNos.size() != requests.size()) {
             throw this.badRequest("AI 生成题号不能重复");
         }
-        Set<String> questionTexts = requests.stream().map(QuestionSaveRequest::questionText)
-                .map(String::trim).collect(Collectors.toSet());
-        if (questionTexts.size() != requests.size()) {
-            throw new AiQuestionTextConflictException("AI 生成题目内容不能重复，请重新生成当前批次");
-        }
         long duplicateNumberCount = this.questionMapper.selectCount(Wrappers.<QuestionEntity>lambdaQuery()
                 .eq(QuestionEntity::getVersionId, versionId)
                 .in(QuestionEntity::getQuestionNo, questionNos)
@@ -519,15 +513,13 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
         if (duplicateNumberCount > 0) {
             throw this.badRequest("AI 生成题号已存在，请检查题库与任务进度");
         }
-        List<QuestionEntity> duplicateQuestions = this.questionMapper.selectList(Wrappers.<QuestionEntity>lambdaQuery()
-                .eq(QuestionEntity::getVersionId, versionId)
-                .in(QuestionEntity::getQuestionText, questionTexts)
-                .eq(QuestionEntity::getDeleted, NORMAL));
-        if (!duplicateQuestions.isEmpty()) {
-            throw new AiQuestionTextConflictException("AI 生成题目内容已存在，请更换题干："
-                    + duplicateQuestions.stream().map(QuestionEntity::getQuestionText)
-                    .collect(Collectors.joining("；")));
+        Set<Integer> conflictingNos = new java.util.HashSet<>(
+                this.questionMapper.selectConflictingGeneratedQuestionNos(versionId, requests));
+        requests = requests.stream().filter(request -> !conflictingNos.contains(request.questionNo())).toList();
+        if (requests.isEmpty()) {
+            return 0;
         }
+        questionNos = requests.stream().map(QuestionSaveRequest::questionNo).collect(Collectors.toSet());
         Set<Long> dimensionIds = this.listDimensions(versionId).stream()
                 .map(ScoreDimensionEntity::getId).collect(Collectors.toSet());
         requests.forEach(request -> this.validateQuestionContent(request, dimensionIds));
@@ -549,6 +541,7 @@ public class ContentServiceImpl extends ServiceImpl<TestMapper, TestEntity> impl
         this.optionMapper.insertBatch(options);
         this.writeAudit(BIZ_VERSION, versionId, ACTION_UPDATE, null, questions,
                 operatorId, "AI 批量生成题目");
+        return questions.size();
     }
 
     @Override

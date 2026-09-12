@@ -37,7 +37,7 @@ public interface ContentService extends IService<TestEntity> {
     TestVersionResponse updateVersion(Long versionId, TestVersionSaveRequest request, Long operatorId);
     List<QuestionResponse> listQuestions(Long versionId);
     QuestionResponse createQuestion(Long versionId, QuestionSaveRequest request, Long operatorId);
-    void appendGeneratedQuestions(Long versionId, List<QuestionSaveRequest> requests, Long operatorId);
+    int appendGeneratedQuestions(Long versionId, List<QuestionSaveRequest> requests, Long operatorId);
     QuestionResponse updateQuestion(Long questionId, QuestionSaveRequest request, Long operatorId);
     void deleteQuestion(Long questionId, Long operatorId);
     ResultConfigResponse getResultConfig(Long versionId);

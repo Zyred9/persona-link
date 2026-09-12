@@ -26,7 +26,7 @@ public class AiGenerationTaskEntity extends BaseAssessmentEntity {
     private Integer currentBatchNo;
     /** 总批次数。 */
     private Integer totalBatchCount;
-    /** 已完成批次数。 */
+    /** 首轮已处理批次数，失败题在首轮结束后补齐。 */
     private Integer completedBatchCount;
     /** 已生成题目数。 */
     private Integer generatedQuestionCount;

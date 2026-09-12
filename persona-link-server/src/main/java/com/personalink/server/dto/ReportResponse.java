@@ -10,5 +10,6 @@ public record ReportResponse(
         String answerSessionId,
         String resultCode,
         JsonNode resultSnapshot,
-        LocalDateTime generatedAt) {
+        LocalDateTime generatedAt,
+        String shareToken) {
 }

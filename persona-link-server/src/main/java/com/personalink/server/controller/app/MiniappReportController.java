@@ -33,18 +33,20 @@ public class MiniappReportController {
     private final AssessmentService assessmentService;
 
     /**
-     * 查询当前用户的个人报告详情。
+     * 查询个人报告详情；携带有效分享令牌时任何登录用户可读，本人仍走广告解锁。
      *
      * @param authorization Bearer 业务会话令牌
      * @param reportId 报告 ID
+     * @param shareToken 分享令牌，仅分享链接携带
      * @return 报告生成时的固定快照
      */
     @GetMapping("/{reportId}")
     public ApiResponse<ReportResponse> detail(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @PathVariable Long reportId) {
+            @PathVariable Long reportId,
+            @RequestParam(value = "shareToken", required = false) String shareToken) {
         String openId = this.authService.requireSession(authorization).openId();
-        return ApiResponse.success(this.assessmentService.getReport(openId, reportId));
+        return ApiResponse.success(this.assessmentService.getReport(openId, reportId, shareToken));
     }
 
     /**

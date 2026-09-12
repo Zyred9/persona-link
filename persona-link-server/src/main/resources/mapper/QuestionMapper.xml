@@ -1,6 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.personalink.server.mapper.QuestionMapper">
+    <!-- 与 schema.sql 的题干排序规则一致，同时排除已有题干与本批较小题号的等价题干。 -->
+    <select id="selectConflictingGeneratedQuestionNos" resultType="java.lang.Integer">
+        WITH candidates AS (
+            <foreach collection="items" item="item" separator=" UNION ALL ">
+                SELECT #{item.questionNo} AS question_no,
+                       CONVERT(#{item.questionText} USING utf8mb4) COLLATE utf8mb4_0900_ai_ci AS question_text
+            </foreach>
+        )
+        SELECT candidate.question_no
+        FROM candidates candidate
+        WHERE EXISTS (
+            SELECT 1 FROM t_question existing
+            WHERE existing.version_id = #{versionId} AND existing.deleted = 0
+              AND existing.question_text = candidate.question_text
+        ) OR EXISTS (
+            SELECT 1 FROM candidates earlier
+            WHERE earlier.question_no &lt; candidate.question_no
+              AND earlier.question_text = candidate.question_text
+        )
+    </select>
     <insert id="insertBatch">
         INSERT INTO t_question
             (version_id, question_type, dimension_id, min_select_count, max_select_count,

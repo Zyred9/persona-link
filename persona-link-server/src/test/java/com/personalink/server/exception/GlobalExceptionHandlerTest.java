@@ -2,11 +2,13 @@ package com.personalink.server.exception;
 
 import com.personalink.server.dto.ApiResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,5 +51,16 @@ class GlobalExceptionHandlerTest {
         assertEquals(400, typeMismatch.getStatusCode().value());
         assertNotNull(typeMismatch.getBody());
         assertEquals("page: 参数类型错误", typeMismatch.getBody().message());
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingStaticResource() {
+        ResponseEntity<ApiResponse<Void>> response = new GlobalExceptionHandler()
+                .handleNoResourceFoundException(new NoResourceFoundException(HttpMethod.GET, "/favicon.ico"));
+
+        assertEquals(404, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals(404, response.getBody().code());
+        assertEquals("资源不存在", response.getBody().message());
     }
 }

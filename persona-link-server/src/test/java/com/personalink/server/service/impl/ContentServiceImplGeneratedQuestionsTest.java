@@ -54,13 +54,8 @@ class ContentServiceImplGeneratedQuestionsTest {
         assertTrue(numberConflict.getMessage().contains("题号已存在"));
 
         when(questions.selectCount(any())).thenReturn(0L);
-        QuestionEntity existing = new QuestionEntity();
-        existing.setQuestionText("Cafe");
-        when(questions.selectList(any())).thenReturn(List.of(existing));
-        AiQuestionTextConflictException textConflict = assertThrows(AiQuestionTextConflictException.class,
-                () -> service.appendGeneratedQuestions(7L, requests, 1L));
-        assertTrue(textConflict.getMessage().contains("Cafe"));
-        assertEquals(400, textConflict.getCode());
+        when(questions.selectConflictingGeneratedQuestionNos(7L, requests)).thenReturn(List.of(21));
+        assertEquals(0, service.appendGeneratedQuestions(7L, requests, 1L));
         verify(questions, never()).insertBatch(anyList());
     }
 }

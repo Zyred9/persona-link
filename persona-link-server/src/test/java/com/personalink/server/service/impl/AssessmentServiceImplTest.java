@@ -9,10 +9,13 @@ import com.personalink.server.enums.QuestionType;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AssessmentServiceImplTest {
 
@@ -35,7 +38,7 @@ class AssessmentServiceImplTest {
                 null, null, null, null, null, null, null, null, reports, null, null, new ObjectMapper(), access);
         ReflectionTestUtils.setField(service, "baseMapper", answers);
         org.junit.jupiter.api.Assertions.assertThrows(com.personalink.server.exception.BusinessException.class,
-                () -> service.getReport("owner", 1L));
+                () -> service.getReport("owner", 1L, null));
         org.mockito.Mockito.doThrow(denied).when(access).requireRead("owner", 2, 3L);
         var pairs = new PairAssessmentServiceImpl(null, null, null, null, null, null, new ObjectMapper(), access);
         org.junit.jupiter.api.Assertions.assertThrows(com.personalink.server.exception.BusinessException.class,
@@ -80,36 +83,102 @@ class AssessmentServiceImplTest {
         report.setAnswerSessionId(2L);
         report.setResultCode("DOG");
         report.setResultSnapshot("{\"resultName\":\"认真小狗型\",\"deepResult\":{\"text\":\"locked\"}}");
+        report.setReportNo("report-no-123");
 
         ReportResponse response = ReflectionTestUtils.invokeMethod(service, "toReportResponse", report);
 
         assertFalse(response.resultSnapshot().has("deepResult"));
         assertEquals("认真小狗型", response.resultSnapshot().path("resultName").asText());
+        assertEquals("report-no-123", response.shareToken());
     }
 
     @Test
-    void drawQuestionIdsShouldKeepConfiguredQuestionOrder() {
+    void shareTokenAllowsAnyViewerButKeepsOwnerAdGate() {
+        var access = org.mockito.Mockito.mock(com.personalink.server.service.ReportAccessService.class);
+        var reports = org.mockito.Mockito.mock(com.personalink.server.mapper.ReportMapper.class);
+        var answers = org.mockito.Mockito.mock(com.personalink.server.mapper.AnswerSessionMapper.class);
+        ReportEntity report = new ReportEntity();
+        report.setId(1L);
+        report.setAnswerSessionId(2L);
+        report.setResultCode("DOG");
+        report.setResultSnapshot("{\"resultName\":\"认真小狗型\"}");
+        report.setReportNo("report-no-123");
+        var answer = new com.personalink.server.entity.AnswerSessionEntity();
+        answer.setOpenId("owner");
+        org.mockito.Mockito.when(reports.selectById(1L)).thenReturn(report);
+        org.mockito.Mockito.when(answers.selectById(2L)).thenReturn(answer);
+        AssessmentServiceImpl service = new AssessmentServiceImpl(
+                null, null, null, null, null, null, null, null, reports, null, null, new ObjectMapper(), access);
+        ReflectionTestUtils.setField(service, "baseMapper", answers);
+
+        ReportResponse shared = service.getReport("guest", 1L, "report-no-123");
+        assertEquals("认真小狗型", shared.resultSnapshot().path("resultName").asText());
+        assertEquals("report-no-123", shared.shareToken());
+        org.mockito.Mockito.verify(access, org.mockito.Mockito.never())
+                .requireRead(org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyLong());
+
+        org.junit.jupiter.api.Assertions.assertThrows(com.personalink.server.exception.BusinessException.class,
+                () -> service.getReport("guest", 1L, "invalid-token"));
+
+        var denied = new com.personalink.server.exception.BusinessException(
+                org.springframework.http.HttpStatus.FORBIDDEN, 40301, "locked");
+        org.mockito.Mockito.doThrow(denied).when(access).requireRead("owner", 1, 1L);
+        org.junit.jupiter.api.Assertions.assertThrows(com.personalink.server.exception.BusinessException.class,
+                () -> service.getReport("owner", 1L, "report-no-123"));
+    }
+
+    @Test
+    void ownerReadReturnsReportNumberAsShareToken() {
+        var access = org.mockito.Mockito.mock(com.personalink.server.service.ReportAccessService.class);
+        var reports = org.mockito.Mockito.mock(com.personalink.server.mapper.ReportMapper.class);
+        var answers = org.mockito.Mockito.mock(com.personalink.server.mapper.AnswerSessionMapper.class);
+        ReportEntity report = new ReportEntity();
+        report.setId(1L);
+        report.setAnswerSessionId(2L);
+        report.setResultCode("DOG");
+        report.setResultSnapshot("{\"resultName\":\"认真小狗型\"}");
+        report.setReportNo("report-no-123");
+        var answer = new com.personalink.server.entity.AnswerSessionEntity();
+        answer.setOpenId("owner");
+        org.mockito.Mockito.when(reports.selectById(1L)).thenReturn(report);
+        org.mockito.Mockito.when(answers.selectById(2L)).thenReturn(answer);
+        AssessmentServiceImpl service = new AssessmentServiceImpl(
+                null, null, null, null, null, null, null, null, reports, null, null, new ObjectMapper(), access);
+        ReflectionTestUtils.setField(service, "baseMapper", answers);
+
+        ReportResponse response = service.getReport("owner", 1L, null);
+
+        assertEquals("report-no-123", response.shareToken(), "本人读取复用报告编号作为分享令牌");
+    }
+
+    @Test
+    void drawQuestionIdsShouldDrawRandomQuestionsInRandomOrder() {
         AssessmentServiceImpl service = new AssessmentServiceImpl(
                 null, null, null, null, null, null, null, null, null, null, null, new ObjectMapper(), null);
         List<QuestionEntity> questions = List.of(
                 this.question(30L, 11L, 1),
                 this.question(10L, 12L, 2),
                 this.question(20L, 13L, 3));
-        List<Long> configuredOrder = questions.stream().map(QuestionEntity::getId).toList();
         List<ScoreDimensionEntity> dimensions = List.of(
                 this.dimension(13L),
                 this.dimension(12L),
                 this.dimension(11L));
+        Set<Long> allQuestionIds = Set.of(30L, 10L, 20L);
+        Set<List<Long>> orders = new HashSet<>();
 
-        for (int index = 0; index < 20; index++) {
+        for (int index = 0; index < 50; index++) {
             List<Long> questionIds = ReflectionTestUtils.invokeMethod(
                     service, "drawQuestionIds", 3, dimensions, questions, List.of());
-            assertEquals(configuredOrder, questionIds);
+            assertEquals(allQuestionIds, new HashSet<>(questionIds));
+            orders.add(questionIds);
 
             List<Long> selectedQuestionIds = ReflectionTestUtils.invokeMethod(
                     service, "drawQuestionIds", 2, List.of(), questions, List.of());
-            assertEquals(configuredOrder.stream().filter(selectedQuestionIds::contains).toList(), selectedQuestionIds);
+            assertEquals(2, new HashSet<>(selectedQuestionIds).size());
+            assertTrue(allQuestionIds.containsAll(selectedQuestionIds));
         }
+        assertTrue(orders.size() > 1, "抽题顺序应随机，不能固定为配置顺序");
     }
 
     @Test
@@ -125,13 +194,17 @@ class AssessmentServiceImplTest {
                 this.question(10L, 12L, 2),
                 this.question(20L, 13L, 3),
                 multipleLast);
-        List<Long> expected = List.of(10L, 20L, 30L, 40L);
+        Set<List<Long>> orders = new HashSet<>();
 
-        for (int index = 0; index < 20; index++) {
+        for (int index = 0; index < 50; index++) {
             List<Long> questionIds = ReflectionTestUtils.invokeMethod(
                     service, "drawQuestionIds", 4, List.of(), questions, List.of());
-            assertEquals(expected, questionIds);
+            assertEquals(Set.of(10L, 20L, 30L, 40L), new HashSet<>(questionIds));
+            assertTrue(Set.of(10L, 20L).containsAll(questionIds.subList(0, 2)));
+            assertTrue(Set.of(30L, 40L).containsAll(questionIds.subList(2, 4)));
+            orders.add(questionIds);
         }
+        assertTrue(orders.size() > 1, "同一题型内的抽题顺序应随机");
     }
 
     private QuestionEntity question(Long id, Long dimensionId, int questionNo) {

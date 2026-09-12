@@ -22,7 +22,6 @@ import com.personalink.server.dto.TestVersionSaveRequest;
 import com.personalink.server.entity.AiGenerationTaskEntity;
 import com.personalink.server.enums.AiGenerationTaskStatus;
 import com.personalink.server.exception.BusinessException;
-import com.personalink.server.exception.AiQuestionTextConflictException;
 import com.personalink.server.mapper.AiGenerationTaskMapper;
 import com.personalink.server.service.ContentService;
 import org.slf4j.Logger;
@@ -33,6 +32,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -100,23 +101,59 @@ public class AiQuestionGenerationWorker {
         if (dimensionCodes.isEmpty()) {
             throw new IllegalStateException("AI 计分维度未成功落库");
         }
-        while (task.getGeneratedQuestionCount() < task.getTargetQuestionCount()) {
+        Map<Integer, String> failures = new HashMap<>();
+        while (task.getCompletedBatchCount() < task.getTotalBatchCount()) {
             int batchNo = task.getCompletedBatchCount() + 1;
-            int firstQuestionNo = task.getGeneratedQuestionCount() + 1;
+            int firstQuestionNo = (batchNo - 1) * BATCH_SIZE + 1;
             int questionCount = Math.min(BATCH_SIZE,
-                    task.getTargetQuestionCount() - task.getGeneratedQuestionCount());
-            this.markCurrentBatch(taskId, batchNo);
-            List<String> existingQuestionTexts = this.contentService.listQuestions(task.getVersionId()).stream()
-                    .map(QuestionResponse::questionText).toList();
-            List<ScoreDimensionResponse> savedDimensions = version.dimensions();
-            this.generateValidQuestionBatch(taskId, task.getModelName(),
-                    test.getTestName(), test.getTestType(), task.getPromptText(), dimensions, dimensionCodes,
-                    firstQuestionNo, questionCount, existingQuestionTexts,
-                    batch -> this.persistQuestionBatch(taskId, batchNo,
-                            this.toQuestionRequests(batch, savedDimensions)));
+                    task.getTargetQuestionCount() - firstQuestionNo + 1);
+            this.generateRange(task, test, version.dimensions(), dimensions, dimensionCodes,
+                    firstQuestionNo, questionCount, true, failures);
             task = this.requireTask(taskId);
         }
+        // 首轮先走完所有题号；每轮遍历全部缺号，避免某一道持续失败阻塞后面的补题。
+        while (task.getGeneratedQuestionCount() < task.getTargetQuestionCount()) {
+            Set<Integer> savedNos = this.contentService.listQuestions(task.getVersionId()).stream()
+                    .map(QuestionResponse::questionNo).collect(Collectors.toSet());
+            for (int first = 1; first <= task.getTargetQuestionCount(); first++) {
+                if (savedNos.contains(first)) {
+                    continue;
+                }
+                int count = 1;
+                while (count < BATCH_SIZE && first + count <= task.getTargetQuestionCount()
+                        && !savedNos.contains(first + count)) {
+                    count++;
+                }
+                this.generateRange(task, test, version.dimensions(), dimensions, dimensionCodes,
+                        first, count, false, failures);
+                task = this.requireTask(taskId);
+                first += count - 1;
+            }
+        }
         this.markPendingReview(taskId);
+    }
+
+    private void generateRange(AiGenerationTaskEntity task, TestResponse test,
+                               List<ScoreDimensionResponse> savedDimensions,
+                               List<AiGeneratedDimension> dimensions, Set<String> dimensionCodes,
+                               int firstQuestionNo, int questionCount, boolean firstPass,
+                               Map<Integer, String> failures) {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new IllegalStateException("AI 生成任务已中断，可重试继续补题");
+        }
+        int batchNo = (firstQuestionNo - 1) / BATCH_SIZE + 1;
+        this.markCurrentBatch(task.getId(), batchNo);
+        List<String> existingTexts = this.contentService.listQuestions(task.getVersionId()).stream()
+                .map(QuestionResponse::questionText).toList();
+        if (!firstPass) {
+            for (int no = firstQuestionNo; no < firstQuestionNo + questionCount; no++) {
+                failures.putIfAbsent(no, "该题此前未成功保存，请换用不同场景并严格遵循题目格式和计分规则");
+            }
+        }
+        this.generateValidQuestionBatch(task.getId(), task.getModelName(), test.getTestName(), test.getTestType(),
+                task.getPromptText(), dimensions, dimensionCodes, firstQuestionNo, questionCount, existingTexts, failures,
+                batch -> this.persistQuestionBatch(task.getId(), batchNo,
+                        this.toQuestionRequests(batch, savedDimensions), firstPass));
     }
 
     AiGeneratedSetup generateValidSetup(Long taskId,
@@ -127,7 +164,7 @@ public class AiQuestionGenerationWorker {
         return this.generateWithValidation(taskId, "维度和结果规则",
                 feedback -> this.deepSeekClient.generateSetup(
                         modelName, testName, testType, promptText, feedback),
-                AiGenerationValidator::validateSetup, setup -> { });
+                AiGenerationValidator::validateSetup, "");
     }
 
     AiGeneratedQuestionBatch generateValidQuestionBatch(Long taskId,
@@ -140,35 +177,64 @@ public class AiQuestionGenerationWorker {
                                                          int firstQuestionNo,
                                                          int questionCount,
                                                          List<String> existingQuestionTexts,
+                                                         Map<Integer, String> failures,
                                                          Consumer<AiGeneratedQuestionBatch> persistBatch) {
-        return this.generateWithValidation(taskId, "题目批次 " + firstQuestionNo + "-"
-                        + (firstQuestionNo + questionCount - 1),
-                feedback -> this.deepSeekClient.generateQuestionBatch(modelName, testName, testType, promptText,
-                        dimensions, firstQuestionNo, questionCount, existingQuestionTexts, feedback),
-                batch -> {
-                    AiGenerationValidator.validateQuestionBatch(
-                            batch, dimensionCodes, firstQuestionNo, questionCount, existingQuestionTexts);
-                    return batch;
-                }, persistBatch);
+        String previousFailures = failures.entrySet().stream()
+                .filter(entry -> entry.getKey() >= firstQuestionNo && entry.getKey() < firstQuestionNo + questionCount)
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> "第" + entry.getKey() + "题：" + entry.getValue()).collect(Collectors.joining("；"));
+        AiGeneratedQuestionBatch generated;
+        try {
+            generated = this.generateWithValidation(taskId, "题目批次 " + firstQuestionNo,
+                    feedback -> this.deepSeekClient.generateQuestionBatch(modelName, testName, testType, promptText,
+                            dimensions, firstQuestionNo, questionCount, existingQuestionTexts, feedback),
+                    Function.identity(), previousFailures);
+        } catch (BusinessException exception) {
+            if (exception.getCode() != INVALID_AI_RESPONSE_CODE) {
+                throw exception;
+            }
+            LOGGER.warn("[AI题库] 本批返回格式无效，任务ID：{}，起始题号：{}，已延后补题", taskId, firstQuestionNo);
+            generated = new AiGeneratedQuestionBatch(List.of());
+        }
+        List<AiGeneratedQuestion> accepted = new ArrayList<>();
+        List<String> excludedTexts = new ArrayList<>(existingQuestionTexts);
+        List<AiGeneratedQuestion> candidates = Objects.isNull(generated) || Objects.isNull(generated.questions())
+                ? List.of() : generated.questions();
+        for (int questionNo = firstQuestionNo; questionNo < firstQuestionNo + questionCount; questionNo++) {
+            int expectedNo = questionNo;
+            List<AiGeneratedQuestion> matches = candidates.stream().filter(Objects::nonNull)
+                    .filter(question -> Integer.valueOf(expectedNo).equals(question.questionNo())).toList();
+            try {
+                AiGenerationValidator.validateQuestionBatch(new AiGeneratedQuestionBatch(matches),
+                        dimensionCodes, expectedNo, 1, excludedTexts);
+                accepted.add(matches.get(0));
+                excludedTexts.add(matches.get(0).questionText());
+                failures.remove(questionNo);
+            } catch (IllegalArgumentException exception) {
+                failures.put(questionNo, exception.getMessage());
+                LOGGER.warn("[AI题库] 题目校验失败，任务ID：{}，题号：{}，已延后补题：{}",
+                        taskId, questionNo, exception.getMessage());
+            }
+        }
+        AiGeneratedQuestionBatch result = new AiGeneratedQuestionBatch(accepted);
+        persistBatch.accept(result);
+        return result;
     }
 
     private <T> T generateWithValidation(Long taskId,
                                          String contentName,
                                          Function<String, T> generator,
                                          Function<T, T> validator,
-                                         Consumer<T> persister) {
-        String validationFeedback = "";
+                                         String initialFeedback) {
+        String validationFeedback = initialFeedback;
         for (int attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
-            boolean persisting = false;
+            if (Thread.currentThread().isInterrupted()) {
+                throw new IllegalStateException("AI 生成任务已中断，可重试继续补题");
+            }
             try {
-                T result = validator.apply(generator.apply(validationFeedback));
-                persisting = true;
-                // SQL 判重更宽时，必须等待整批事务回滚后再生成；其它持久化故障直接失败。
-                persister.accept(result);
-                return result;
+                return validator.apply(generator.apply(validationFeedback));
             } catch (RuntimeException exception) {
-                if ((persisting && !(exception instanceof AiQuestionTextConflictException))
-                        || !this.isRetryableGenerationError(exception) || attempt == MAX_GENERATION_ATTEMPTS) {
+                if (!this.isRetryableGenerationError(exception) || attempt == MAX_GENERATION_ATTEMPTS) {
                     throw exception;
                 }
                 validationFeedback = exception.getMessage();
@@ -181,7 +247,6 @@ public class AiQuestionGenerationWorker {
 
     private boolean isRetryableGenerationError(RuntimeException exception) {
         return exception instanceof IllegalArgumentException
-                || exception instanceof AiQuestionTextConflictException
                 || (exception instanceof BusinessException businessException
                 && (businessException.getCode() == RETRYABLE_AI_SERVICE_CODE
                 || businessException.getCode() == INVALID_AI_RESPONSE_CODE));
@@ -234,7 +299,6 @@ public class AiQuestionGenerationWorker {
                     .set(AiGenerationTaskEntity::getCurrentBatchNo, batchNo)
                     .eq(AiGenerationTaskEntity::getId, taskId)
                     .eq(AiGenerationTaskEntity::getTaskStatus, AiGenerationTaskStatus.GENERATING.getCode())
-                    .eq(AiGenerationTaskEntity::getCompletedBatchCount, batchNo - 1)
                     .eq(AiGenerationTaskEntity::getDeleted, NORMAL));
             if (updated != 1) {
                 throw new IllegalStateException("AI 生成任务批次状态已变化");
@@ -244,22 +308,23 @@ public class AiQuestionGenerationWorker {
 
     private void persistQuestionBatch(Long taskId,
                                       int batchNo,
-                                      List<QuestionSaveRequest> questions) {
+                                      List<QuestionSaveRequest> questions,
+                                      boolean firstPass) {
         this.transactionTemplate.executeWithoutResult(status -> {
             AiGenerationTaskEntity task = this.requireGeneratingTaskForUpdate(taskId);
-            if (task.getCompletedBatchCount() >= batchNo) {
+            if (firstPass && task.getCompletedBatchCount() >= batchNo) {
                 return;
             }
-            if (task.getCompletedBatchCount() != batchNo - 1) {
+            if (firstPass && task.getCompletedBatchCount() != batchNo - 1) {
                 throw new IllegalStateException("AI 生成任务批次提交顺序错误");
             }
-            this.contentService.appendGeneratedQuestions(
+            int savedCount = questions.isEmpty() ? 0 : this.contentService.appendGeneratedQuestions(
                     task.getVersionId(), questions, task.getOperatorId());
             AiGenerationTaskEntity update = new AiGenerationTaskEntity();
             update.setId(taskId);
             update.setCurrentBatchNo(batchNo);
-            update.setCompletedBatchCount(batchNo);
-            update.setGeneratedQuestionCount(task.getGeneratedQuestionCount() + questions.size());
+            update.setCompletedBatchCount(firstPass ? batchNo : task.getCompletedBatchCount());
+            update.setGeneratedQuestionCount(task.getGeneratedQuestionCount() + savedCount);
             this.taskMapper.updateById(update);
         });
     }

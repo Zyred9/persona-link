@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理器。
@@ -74,6 +75,14 @@ public class GlobalExceptionHandler {
             ConstraintViolationException exception) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure(HttpStatus.BAD_REQUEST.value(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFoundException(
+            NoResourceFoundException exception) {
+        // 浏览器与爬虫会探测 favicon.ico、robots.txt 等静态资源，不属于系统异常，不记录堆栈。
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.failure(HttpStatus.NOT_FOUND.value(), "资源不存在"));
     }
 
     @ExceptionHandler(Exception.class)

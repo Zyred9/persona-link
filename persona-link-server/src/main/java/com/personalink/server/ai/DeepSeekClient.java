@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.personalink.server.config.DeepSeekProperties;
 import com.personalink.server.dto.AiGeneratedDimension;
+import com.personalink.server.dto.AiGeneratedQuestion;
 import com.personalink.server.dto.AiGeneratedQuestionBatch;
 import com.personalink.server.dto.AiGeneratedSetup;
 import com.personalink.server.exception.BusinessException;
@@ -23,6 +24,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 /** DeepSeek 题库生成远程客户端。 */
@@ -154,10 +156,31 @@ public class DeepSeekClient {
                     || !content.isTextual() || !StringUtils.hasText(content.textValue())) {
                 throw this.invalidResponse();
             }
+            if (AiGeneratedQuestionBatch.class.equals(responseType)) {
+                return responseType.cast(this.parseQuestionBatch(content.textValue()));
+            }
             return this.objectMapper.readValue(content.textValue(), responseType);
         } catch (JsonProcessingException exception) {
             throw this.invalidResponse();
         }
+    }
+
+    private AiGeneratedQuestionBatch parseQuestionBatch(String content) throws JsonProcessingException {
+        JsonNode candidates = this.objectMapper.readTree(content).path("questions");
+        if (!candidates.isArray()) {
+            throw this.invalidResponse();
+        }
+        List<AiGeneratedQuestion> questions = new ArrayList<>();
+        for (JsonNode candidate : candidates) {
+            try {
+                // 单题字段类型错误不丢弃整批，缺失题号交由 Worker 在后续补齐。
+                questions.add(this.objectMapper.treeToValue(candidate, AiGeneratedQuestion.class));
+            } catch (JsonProcessingException exception) {
+                LOGGER.warn("[AI题库] 题目字段解析失败，题号：{}，已跳过等待补题",
+                        candidate.path("questionNo").asText());
+            }
+        }
+        return new AiGeneratedQuestionBatch(questions);
     }
 
     private <T> T request(String modelName, String userPrompt, Class<T> responseType) {

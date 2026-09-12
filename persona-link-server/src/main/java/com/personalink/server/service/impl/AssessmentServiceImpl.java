@@ -27,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -309,13 +311,22 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ReportResponse getReport(String openId, Long reportId) {
+    public ReportResponse getReport(String openId, Long reportId, String shareToken) {
         ReportEntity report = this.reportMapper.selectById(reportId);
         if (Objects.isNull(report)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.value(), "报告不存在");
         }
-        this.requireOwnedSession(report.getAnswerSessionId(), openId);
-        this.reportAccessService.requireRead(openId, ReportKind.SINGLE.getCode(), reportId);
+        AnswerSessionEntity session = this.getById(report.getAnswerSessionId());
+        if (Objects.isNull(session)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.value(), "答卷不存在");
+        }
+        boolean owner = Objects.equals(session.getOpenId(), openId);
+        if (owner) {
+            // 本人仍走原有广告解锁门槛。
+            this.reportAccessService.requireRead(openId, ReportKind.SINGLE.getCode(), reportId);
+        } else if (!this.matchesShareToken(report, shareToken)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, HttpStatus.NOT_FOUND.value(), "报告不存在");
+        }
         return this.toReportResponse(report);
     }
 
@@ -485,9 +496,9 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
             }
             selected.add(question.getId());
         }
-        return questions.stream()
+        // 以洗牌顺序输出，保证每次抽题的题目顺序都随机；stable sorted 落单在前、多选在后，避免题型穿插。
+        return shuffled.stream()
                 .filter(question -> selected.contains(question.getId()))
-                // 单选题排在前面，多选题统一排到最后，避免答题过程中题型穿插。
                 .sorted(Comparator.comparingInt(question ->
                         QuestionType.SINGLE.getCode() == question.getQuestionType() ? 0 : 1))
                 .map(QuestionEntity::getId)
@@ -970,7 +981,7 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
     private ReportResponse toSubmissionResponse(String openId, ReportEntity report) {
         if (!this.reportAccessService.canRead(openId, ReportKind.SINGLE.getCode(), report.getId())) {
             return new ReportResponse(String.valueOf(report.getId()),
-                    String.valueOf(report.getAnswerSessionId()), null, null, report.getGeneratedAt());
+                    String.valueOf(report.getAnswerSessionId()), null, null, report.getGeneratedAt(), null);
         }
         return this.toReportResponse(report);
     }
@@ -985,7 +996,17 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
                 String.valueOf(report.getAnswerSessionId()),
                 report.getResultCode(),
                 resultSnapshot,
-                report.getGeneratedAt());
+                report.getGeneratedAt(),
+                report.getReportNo());
+    }
+
+    private boolean matchesShareToken(ReportEntity report, String shareToken) {
+        if (Objects.isNull(shareToken) || shareToken.isBlank() || Objects.isNull(report.getReportNo())) {
+            return false;
+        }
+        byte[] expected = report.getReportNo().getBytes(StandardCharsets.UTF_8);
+        byte[] actual = shareToken.trim().getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(expected, actual);
     }
 
     private ReportHistoryResponse toHistoryResponse(ReportHistoryRow row) {

@@ -128,6 +128,7 @@ async function main() {
   // ===== join 页：分享消息重复点击自动分流 =====
   let joinDefinition;
   const joinRedirects = [];
+  const joinHomeReturns = [];
   let joinReplies = [];
   vm.runInNewContext(read('subpackages/pair/pages/join/index.js'), {
     Page(value) { joinDefinition = value; },
@@ -138,6 +139,7 @@ async function main() {
         authenticatedRequestData: async () => joinReplies.shift(),
         createIdempotencyKey: () => 'join-id'
       },
+    getApp: () => ({ returnToHome: () => joinHomeReturns.push(true) }),
     wx: {
       redirectTo: ({ url }) => joinRedirects.push(url),
       navigateTo() {},
@@ -154,8 +156,18 @@ async function main() {
 
   openJoin({ pairSessionId: '99', pairStatus: 4, myRole: 'PARTNER', answerSessionId: '77', joinable: false });
   await flush();
+  assert.equal(joinRedirects.at(-1), '/subpackages/pair/pages/result/index?pairSessionId=99',
+    '报告已生成后受邀者再次点击分享消息必须直接进入结果页');
+
+  openJoin({ pairSessionId: '99', pairStatus: 4, myRole: 'INITIATOR', answerSessionId: '10', joinable: false });
+  await flush();
+  assert.equal(joinRedirects.at(-1), '/subpackages/pair/pages/result/index?pairSessionId=99',
+    '报告已生成后发起者再次点击自己的分享消息必须直接进入结果页');
+
+  openJoin({ pairSessionId: '99', pairStatus: 3, myRole: 'PARTNER', answerSessionId: '77', joinable: false });
+  await flush();
   assert.equal(joinRedirects.at(-1), '/subpackages/account/pages/review/index?pairSessionId=99',
-    '对方已作答再次点击分享消息必须直接进入作答回顾');
+    '报告生成中受邀者保持进入作答回顾');
 
   openJoin({ pairSessionId: '99', pairStatus: 2, myRole: 'PARTNER', answerSessionId: '77', joinable: false });
   await flush();
@@ -174,10 +186,23 @@ async function main() {
   assert.equal(joinRedirects.length, count, '可加入时不跳转');
   assert.equal(open.data.inviteBlocked, false);
 
+  const homeCount = joinHomeReturns.length;
   const taken = openJoin({ pairSessionId: null, pairStatus: 2, myRole: null, joinable: false });
   await flush();
-  assert.equal(taken.data.inviteBlocked, true, '邀请已被加入必须禁用加入按钮');
-  assert.equal(taken.data.errorMessage, '邀请已被加入');
+  assert.equal(joinHomeReturns.length, homeCount + 1, '已配对的非搭子点击分享消息必须回首页');
+  assert.equal(taken.data.inviteBlocked, false, '回首页前不得再展示阻塞提示');
+
+  openJoin({ pairSessionId: null, pairStatus: 4, myRole: null, joinable: false });
+  await flush();
+  assert.equal(joinHomeReturns.length, homeCount + 2, '报告已生成时非搭子点击分享消息必须回首页');
+
+  openJoin({ pairSessionId: '99', pairStatus: 5, myRole: 'INITIATOR', answerSessionId: '10', joinable: false });
+  await flush();
+  assert.equal(joinHomeReturns.length, homeCount + 3, '邀请已失效时搭子点击分享消息必须回首页');
+
+  openJoin({ pairSessionId: null, pairStatus: 6, myRole: null, joinable: false });
+  await flush();
+  assert.equal(joinHomeReturns.length, homeCount + 4, '邀请已取消时非搭子点击分享消息必须回首页');
 
   const missing = openJoin(Promise.reject(Object.assign(new Error('邀请不存在'), { statusCode: 404 })));
   await flush();

@@ -35,7 +35,7 @@ public interface AssessmentService extends IService<AnswerSessionEntity> {
 
     ReportResponse submit(String openId, Long answerSessionId, SubmitAssessmentRequest request);
 
-    ReportResponse getReport(String openId, Long reportId);
+    ReportResponse getReport(String openId, Long reportId, String shareToken);
 
     PageResponse<ReportHistoryResponse> history(String openId, long page, long size);
 

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.personalink.server.config.DeepSeekProperties;
 import com.personalink.server.dto.AiGeneratedSetup;
+import com.personalink.server.dto.AiGeneratedQuestionBatch;
 import com.personalink.server.exception.BusinessException;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,47 @@ class DeepSeekClientTest {
 
         assertEquals("D1", setup.dimensions().get(0).dimensionCode());
         assertEquals("R1", setup.resultRules().get(0).resultCode());
+    }
+
+    @Test
+    void parseQuestionBatchShouldKeepValidQuestionWhenAnotherHasInvalidFieldType() throws Exception {
+        String content = """
+                {"questions":[
+                  {"questionNo":1,"options":[{"scoreValue":"bad"}]},
+                  {"questionType":1,"dimensionCode":"D1","minSelectCount":1,"maxSelectCount":1,
+                   "questionNo":2,"questionText":"有效题目","requiredFlag":1,"sortNo":2,
+                   "options":[{"optionCode":"A","optionText":"是","scoreValue":1},
+                              {"optionCode":"B","optionText":"否","scoreValue":0}]}
+                ]}
+                """;
+        ObjectNode root = this.objectMapper.createObjectNode();
+        ObjectNode choice = root.putArray("choices").addObject();
+        choice.put("finish_reason", "stop");
+        choice.putObject("message").put("content", content);
+
+        AiGeneratedQuestionBatch batch = this.client.parseResponse(
+                this.objectMapper.writeValueAsString(root), AiGeneratedQuestionBatch.class);
+
+        assertEquals(1, batch.questions().size());
+        assertEquals(2, batch.questions().get(0).questionNo());
+        assertEquals("有效题目", batch.questions().get(0).questionText());
+        assertEquals(2, batch.questions().get(0).options().size());
+    }
+
+    @Test
+    void parseQuestionBatchShouldRejectMalformedJsonAndNonArrayQuestions() throws Exception {
+        for (String content : List.of("{\"questions\":[", "{\"questions\":{}}")) {
+            ObjectNode root = this.objectMapper.createObjectNode();
+            ObjectNode choice = root.putArray("choices").addObject();
+            choice.put("finish_reason", "stop");
+            choice.putObject("message").put("content", content);
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> this.client.parseResponse(
+                            this.objectMapper.writeValueAsString(root), AiGeneratedQuestionBatch.class));
+
+            assertEquals(50232, exception.getCode());
+        }
     }
 
     @Test

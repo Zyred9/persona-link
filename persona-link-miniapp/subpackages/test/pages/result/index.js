@@ -38,6 +38,7 @@ Page({
 
   onLoad(options) {
     this.reportId = options.reportId || '';
+    this.shareToken = typeof options.shareToken === 'string' ? options.shareToken : '';
     const requestedView = VIEW_ALIASES[options.state] || options.state;
     const view = AVAILABLE_VIEWS.includes(requestedView) ? requestedView : 'result';
     this.setData({ view });
@@ -53,28 +54,60 @@ Page({
       this.setData({ state: 'error', errorDescription: '报告参数缺失，请从测试记录重新进入。' });
       return;
     }
+    // 分享链接访问：凭分享令牌直接读取报告，不经过广告解锁与归属校验。
+    if (this.shareToken) {
+      const version = this.reportVersion = (this.reportVersion || 0) + 1;
+      this.setData({ state: 'loading' });
+      try {
+        const report = await authenticatedRequestData({
+          url: `/api/miniapp/reports/${encodeURIComponent(this.reportId)}?shareToken=${encodeURIComponent(this.shareToken)}`
+        });
+        if (version !== this.reportVersion) return;
+        this.captureShareToken(report);
+        this.setData({ state: 'ready', result: prepareResult(report) });
+      } catch (error) {
+        if (version !== this.reportVersion) return;
+        this.setData({ state: 'error', errorDescription: error.message || '报告加载失败' });
+      }
+      return;
+    }
     if (!this.reportAccess) this.reportAccess = createReportAccess(this, `/api/miniapp/reports/${encodeURIComponent(this.reportId)}`);
     return this.reportAccess.run(async (active) => {
       const report = await authenticatedRequestData({
         url: `/api/miniapp/reports/${encodeURIComponent(this.reportId)}`
       });
-      if (active()) this.setData({ state: 'ready', result: prepareResult(report) });
+      if (!active()) return;
+      this.captureShareToken(report);
+      this.setData({ state: 'ready', result: prepareResult(report) });
     }, watch);
+  },
+
+  captureShareToken(report) {
+    const shareToken = report && typeof report.shareToken === 'string' ? report.shareToken : '';
+    if (shareToken) this.shareToken = shareToken;
   },
 
   watchAd() { return this.loadReport(true); },
 
-  onUnload() { if (this.reportAccess) this.reportAccess.dispose(); },
+  onUnload() {
+    this.reportVersion = (this.reportVersion || 0) + 1;
+    if (this.reportAccess) this.reportAccess.dispose();
+  },
   onHide() { if (this.reportAccess) this.reportAccess.setHidden(true); },
   onShow() { if (this.reportAccess) this.reportAccess.setHidden(false); },
 
   onShareAppMessage() {
     const result = this.data.result || {};
     trackEvent(5, '/subpackages/test/pages/result/index', this.reportId);
-    return {
-      title: result.shareText || (result.name ? `我的测试结果是：${result.name}` : '来测测你的个性类型'),
-      path: '/pages/home/index'
-    };
+    const title = result.shareText || (result.name ? `我的测试结果是：${result.name}` : '来测测你的个性类型');
+    if (this.reportId && this.shareToken) {
+      return {
+        title,
+        // 分享给任何人直接打开本报告，不再回首页。
+        path: `/subpackages/test/pages/result/index?reportId=${encodeURIComponent(this.reportId)}&shareToken=${encodeURIComponent(this.shareToken)}`
+      };
+    }
+    return { title, path: '/pages/home/index' };
   },
 
   retry() {
