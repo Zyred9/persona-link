@@ -47,7 +47,7 @@ public class MiniappPairController {
 
     /**
      * 读取双人测试展示配置，无需登录。
-     * @return 加入页头图地址，空值表示不展示
+     * @return 加入页及匹配进度页各状态头图地址，空值表示不展示
      */
     @GetMapping("/config")
     public ApiResponse<PairConfigResponse> config() {

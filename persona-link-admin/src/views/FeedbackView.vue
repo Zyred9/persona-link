@@ -49,6 +49,6 @@ onBeforeUnmount(() => { disposed = true })
 </template>
 
 <style scoped>
-.submitter{width:240px;user-select:text;word-break:break-all}.feedback-view table{min-width:960px}
+.submitter{width:240px;user-select:text;word-break:break-all}.feedback-view table{min-width:720px}
 .feedback-view{display:grid;gap:20px}.feedback-view header,footer,footer>div{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}h1{margin:0;font-size:38px}header p{color:#77707f}.table-card{overflow:auto;border:1.5px solid #27222b;border-radius:18px;background:#fffdf8}table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:650px}th,td{text-align:left;padding:18px;border-bottom:1px solid #e8e0d6;vertical-align:top;overflow-wrap:anywhere}th{background:#f3eaff}th:first-child{width:100px}th:last-child{width:200px}summary{cursor:pointer;line-height:1.7}.full-content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;background:#f8f4ed;padding:16px;border-radius:10px}.empty{text-align:center;padding:24px;color:#77707f}button,select{font:inherit;border:1.5px solid #27222b;border-radius:10px;padding:10px 16px;background:#fffdf8;color:#27222b}header button{background:#c9a7ff}button,select{cursor:pointer}button:disabled,select:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #8257bc;outline-offset:3px}.notice{padding:14px;background:#fff0ea;color:#a83c30;border-radius:10px}
 </style>

@@ -51,7 +51,7 @@ onMounted(async () => {
   <main class="admin-shell">
     <header class="top-header">
       <button class="menu-toggle" type="button" aria-label="打开导航" @click="menuOpen = !menuOpen">☰</button>
-      <RouterLink class="brand" to="/" @click="closeMenu"><span>♥</span> 心动测测 <b>· 运营后台</b></RouterLink>
+      <RouterLink class="brand" to="/" @click="closeMenu"><span>♥</span> 映见你我 <b>· 运营后台</b></RouterLink>
       <div class="operator">
         <span class="operator-face" aria-hidden="true">⌣</span>
         <span class="operator-name">{{ operatorName }}</span>

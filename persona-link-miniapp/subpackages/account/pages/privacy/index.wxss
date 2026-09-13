@@ -40,7 +40,6 @@ page { height: 100%; overflow: hidden; }
   text-align: left;
 }
 
-.privacy-row__value,
 .privacy-row__arrow {
   color: #817d81;
   font-size: 24rpx;

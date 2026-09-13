@@ -7,9 +7,10 @@ const PAIR_SESSION_KEY = 'personaPairSession';
 Page({
   data: {
     state: 'loading',
-    joinHeroImageUrl: '',
-    partnerCompleted: false,
-    partnerStatusText: '待完成',
+    waitingHeroImageUrl: '',
+    completedHeroImageUrl: '',
+    bothCompleted: false,
+    invalid: false,
     waitTitle: '等待对方完成',
     reportReady: false,
     canCancel: false,
@@ -21,22 +22,32 @@ Page({
   onLoad(options) {
     const stored = wx.getStorageSync(PAIR_SESSION_KEY) || {};
     this.pairSessionId = options.pairSessionId || stored.pairSessionId || '';
-    this.loadJoinHeroImage();
+    this.loadProgressImages();
   },
 
-  // 与加入页共用同一张配置头图，保持双人流程视觉一致。
-  async loadJoinHeroImage() {
+  async loadProgressImages() {
     try {
-      const config = await requestData({ url: '/api/miniapp/pairs/config' });
-      this.setData({ joinHeroImageUrl: resolveImageUrl(config && config.joinHeroImageUrl) });
+      const waitingKey = 'miniapp.pair.waiting_hero_image_url';
+      const completedKey = 'miniapp.pair.completed_hero_image_url';
+      const config = await requestData({
+        url: '/api/miniapp/config/values', data: { keys: [waitingKey, completedKey].join(',') }
+      });
+      this.setData({
+        waitingHeroImageUrl: resolveImageUrl(config && config[waitingKey]),
+        completedHeroImageUrl: resolveImageUrl(config && config[completedKey])
+      });
     } catch (error) {
       // 配置读取失败时保持隐藏头图，不阻塞配对进度。
-      this.setData({ joinHeroImageUrl: '' });
+      this.setData({ waitingHeroImageUrl: '', completedHeroImageUrl: '' });
     }
   },
 
-  handleJoinHeroImageError() {
-    this.setData({ joinHeroImageUrl: '' });
+  handleHeroImageError(event) {
+    const { field, url } = event.currentTarget.dataset;
+    // 忽略状态切换前旧图片的失败事件，避免清空新状态的头图。
+    if (['waitingHeroImageUrl', 'completedHeroImageUrl'].includes(field) && this.data[field] === url) {
+      this.setData({ [field]: '' });
+    }
   },
 
   onShow() {
@@ -55,15 +66,14 @@ Page({
       const pairStatus = Number(pair.pairStatus);
       const reportReady = pairStatus === 4;
       const invalid = pairStatus === 5 || pairStatus === 6;
-      const partnerCompleted = reportReady || pairStatus === 3 || pair.myRole === 'PARTNER';
-      const partnerStatusText = invalid ? '已失效' : partnerCompleted ? '已完成' : Number(pair.pairStatus) === 2 ? '作答中' : '待加入';
+      const bothCompleted = reportReady || pairStatus === 3;
       // 只有发起者等待对方加入期间才需要重新分享，对方加入后邀请链接不再可用。
       const inviteCode = typeof pair.inviteToken === 'string' ? pair.inviteToken : '';
       const canReshare = pairStatus === 1 && pair.myRole === 'INITIATOR' && !!inviteCode;
       this.setData({
         state: 'ready',
-        partnerCompleted,
-        partnerStatusText,
+        bothCompleted,
+        invalid,
         reportReady,
         canCancel: pairStatus === 1 || pairStatus === 2,
         canReshare,

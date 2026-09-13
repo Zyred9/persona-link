@@ -63,10 +63,13 @@ class MiniappPairAuthWebTest {
 
     @Test
     void publicPairConfigReturnsJoinHeroWithoutLogin() throws Exception {
-        when(this.appConfigService.readPairConfig()).thenReturn(new PairConfigResponse("https://example.com/pair.png"));
+        when(this.appConfigService.readPairConfig()).thenReturn(new PairConfigResponse("https://example.com/pair.png",
+                "https://example.com/waiting.png", "https://example.com/completed.png"));
         this.mockMvc.perform(get("/api/miniapp/pairs/config"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.joinHeroImageUrl").value("https://example.com/pair.png"));
+                .andExpect(jsonPath("$.data.joinHeroImageUrl").value("https://example.com/pair.png"))
+                .andExpect(jsonPath("$.data.waitingHeroImageUrl").value("https://example.com/waiting.png"))
+                .andExpect(jsonPath("$.data.completedHeroImageUrl").value("https://example.com/completed.png"));
         verify(this.appConfigService).readPairConfig();
         verifyNoInteractions(this.pairAssessmentService, this.assessmentService,
                 this.businessSessionService, this.wechatCode2SessionClient);

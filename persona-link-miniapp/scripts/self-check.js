@@ -76,10 +76,10 @@ const endpointContracts = [
   ['components/quiz-runner/index.js', '/answers'],
   ['subpackages/test/pages/result/index.js', '/api/miniapp/reports/'],
   ['subpackages/pair/pages/invite/index.js', '/api/miniapp/pairs'],
-  ['subpackages/pair/pages/join/index.js', '/api/miniapp/pairs/config'],
+  ['subpackages/pair/pages/join/index.js', '/api/miniapp/config/values'],
   ['subpackages/pair/pages/join/index.js', '/api/miniapp/pairs/join'],
   ['subpackages/pair/pages/join/index.js', '/api/miniapp/pairs/invite/'],
-  ['subpackages/pair/pages/wait/index.js', '/api/miniapp/pairs/config'],
+  ['subpackages/pair/pages/wait/index.js', '/api/miniapp/config/values'],
   ['subpackages/pair/pages/wait/index.js', '/cancel'],
   ['subpackages/pair/pages/result/index.js', '/report'],
   ['utils/analytics.js', '/api/miniapp/events/batch']

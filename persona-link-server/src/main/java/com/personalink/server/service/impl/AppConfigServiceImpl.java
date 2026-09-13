@@ -14,6 +14,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import com.personalink.server.entity.AppConfigEntity;
 import com.personalink.server.enums.AppConfigValueType;
 import com.personalink.server.mapper.AppConfigMapper;
@@ -22,13 +25,36 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 
-/** 通用配置存储；通过具体业务接口读取，避免向小程序暴露其他配置。 */
+/** 通用配置存储；小程序仅按公开白名单读取配置。 */
 @Service
 public class AppConfigServiceImpl extends ServiceImpl<AppConfigMapper, AppConfigEntity> implements AppConfigService {
     /** 小程序首页标题图配置键。 */
     private static final String HOME_TITLE_IMAGE_URL = "miniapp.home.title_image_url";
     /** 加入双人测试页头图配置键。 */
     private static final String PAIR_JOIN_HERO_IMAGE_URL = "miniapp.pair.join_hero_image_url";
+    /** 匹配进度页一方完成时的头图配置键。 */
+    private static final String PAIR_WAITING_HERO_IMAGE_URL = "miniapp.pair.waiting_hero_image_url";
+    /** 匹配进度页双方完成时的头图配置键。 */
+    private static final String PAIR_COMPLETED_HERO_IMAGE_URL = "miniapp.pair.completed_hero_image_url";
+    /** 仅允许匿名读取这些展示配置，禁止泄露后台或服务端配置。 */
+    private static final Set<String> PUBLIC_KEYS = Set.of("miniapp.version", HOME_TITLE_IMAGE_URL,
+            PAIR_JOIN_HERO_IMAGE_URL, PAIR_WAITING_HERO_IMAGE_URL, PAIR_COMPLETED_HERO_IMAGE_URL);
+
+    @Override
+    public Map<String, String> readPublicValues(List<String> keys) {
+        if (!keys.stream().allMatch(PUBLIC_KEYS::contains)) {
+            throw new BusinessException(400, "请求包含不允许公开读取的配置键");
+        }
+        Map<String, String> values = new HashMap<>();
+        keys.forEach(key -> values.put(key, ""));
+        List<AppConfigEntity> rows = this.list(Wrappers.<AppConfigEntity>lambdaQuery()
+                .in(AppConfigEntity::getConfigKey, keys)
+                .eq(AppConfigEntity::getDeleted, 0));
+        for (AppConfigEntity row : rows) {
+            values.put(row.getConfigKey(), Objects.isNull(row.getConfigValue()) ? "" : row.getConfigValue());
+        }
+        return values;
+    }
 
     @Override
     public HomeConfigResponse readHomeConfig() {
@@ -37,7 +63,11 @@ public class AppConfigServiceImpl extends ServiceImpl<AppConfigMapper, AppConfig
 
     @Override
     public PairConfigResponse readPairConfig() {
-        return new PairConfigResponse(this.readConfigValue(PAIR_JOIN_HERO_IMAGE_URL));
+        Map<String, String> values = this.readPublicValues(List.of(PAIR_JOIN_HERO_IMAGE_URL,
+                PAIR_WAITING_HERO_IMAGE_URL, PAIR_COMPLETED_HERO_IMAGE_URL));
+        return new PairConfigResponse(values.getOrDefault(PAIR_JOIN_HERO_IMAGE_URL, ""),
+                values.getOrDefault(PAIR_WAITING_HERO_IMAGE_URL, ""),
+                values.getOrDefault(PAIR_COMPLETED_HERO_IMAGE_URL, ""));
     }
 
     private String readConfigValue(String configKey) {

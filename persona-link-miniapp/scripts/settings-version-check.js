@@ -19,8 +19,9 @@ async function run() {
   for (const [version, expected] of [['2.3.4', 'V2.3.4'], [' V3.0.0-beta ', 'V3.0.0-beta'], ['', '未配置'], [null, '未配置']]) {
     const pending = component.loadVersionLabel();
     assert.equal(component.data.versionLabel, '加载中...');
-    assert.equal(requests.at(-1).options.url, '/api/miniapp/config');
-    requests.at(-1).resolve({ version });
+    assert.equal(requests.at(-1).options.url, '/api/miniapp/config/values');
+    assert.equal(requests.at(-1).options.data.keys, 'miniapp.version');
+    requests.at(-1).resolve({ 'miniapp.version': version });
     await pending;
     assert.equal(component.data.versionLabel, expected);
   }
@@ -31,20 +32,20 @@ async function run() {
   const earlier = component.loadVersionLabel();
   const oldRequest = requests.at(-1);
   const latest = component.loadVersionLabel();
-  requests.at(-1).resolve({ version: '5.0.0' });
+  requests.at(-1).resolve({ 'miniapp.version': '5.0.0' });
   await latest;
-  oldRequest.resolve({ version: '4.0.0' });
+  oldRequest.resolve({ 'miniapp.version': '4.0.0' });
   await earlier;
   assert.equal(component.data.versionLabel, 'V5.0.0', '旧响应不能覆盖最新配置');
   const detached = component.loadVersionLabel();
   component.componentAttached = false;
-  requests.at(-1).resolve({ version: '6.0.0' });
+  requests.at(-1).resolve({ 'miniapp.version': '6.0.0' });
   await detached;
   assert.equal(component.data.versionLabel, '加载中...', '组件销毁后不更新状态');
   component.componentAttached = true;
   const left = component.loadVersionLabel();
   component.data.currentView = 'profile';
-  requests.at(-1).resolve({ version: '7.0.0' });
+  requests.at(-1).resolve({ 'miniapp.version': '7.0.0' });
   await left;
   assert.equal(component.data.versionLabel, '加载中...', '离开设置后忽略响应');
   let opened = 0;

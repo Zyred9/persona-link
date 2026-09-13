@@ -293,7 +293,7 @@ Component({
       if (this.flow === 'pair-initiator') {
         url = `/subpackages/pair/pages/invite/index?answerSessionId=${encodeURIComponent(this.answerSessionId)}`;
       } else if (this.flow === 'pair-partner') {
-        url = `/subpackages/pair/pages/wait/index?pairSessionId=${encodeURIComponent(this.pairSessionId)}`;
+        url = `/subpackages/pair/pages/result/index?pairSessionId=${encodeURIComponent(this.pairSessionId)}`;
       } else {
         if (!report || !report.reportId) throw new Error('报告生成失败');
         url = `/subpackages/test/pages/result/index?reportId=${encodeURIComponent(report.reportId)}`;

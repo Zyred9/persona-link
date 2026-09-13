@@ -54,10 +54,6 @@ button::after {
   background: #ff7469;
 }
 
-.paper-muted {
-  color: #6e6671;
-}
-
 .paper-section-title {
   margin: 36rpx 0 18rpx;
   color: #7f7a7f;

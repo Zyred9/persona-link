@@ -18,7 +18,9 @@ vm.runInNewContext(fs.readFileSync(path.join(root, 'subpackages/pair/pages/join/
     if (moduleName.endsWith('/image')) return { resolveImageUrl };
     if (moduleName.endsWith('/request')) {
       return {
-        requestData: async () => {
+        requestData: async (request) => {
+          assert.equal(request.url, '/api/miniapp/config/values');
+          assert.equal(request.data.keys, 'miniapp.pair.join_hero_image_url');
           if (failConfig) throw new Error('network');
           return config;
         },
@@ -34,7 +36,7 @@ page.setData = function(value) { Object.assign(this.data, value); };
 async function run() {
   assert.equal(page.data.joinHeroImageUrl, '', '初始加载必须隐藏头图');
   for (const value of [undefined, null, '', 'https://example.com/pair.png', '/uploads/pair-hero.png']) {
-    config = { joinHeroImageUrl: value };
+    config = { 'miniapp.pair.join_hero_image_url': value };
     await page.loadJoinHeroImage();
     assert.equal(page.data.joinHeroImageUrl, resolveImageUrl(value));
   }

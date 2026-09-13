@@ -36,7 +36,7 @@ async function submit() {
     <section class="login-card">
       <div class="brand-heart" aria-hidden="true">♥</div>
       <p class="eyebrow">PERSONA LINK</p>
-      <h1>心动测测</h1>
+      <h1>映见你我</h1>
       <p class="login-subtitle">运营后台</p>
       <form @submit.prevent="submit">
         <label>账号<input v-model="username" autocomplete="username" placeholder="请输入运营账号" @input="message = ''" /></label>

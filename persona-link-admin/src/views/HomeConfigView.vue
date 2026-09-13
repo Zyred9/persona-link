@@ -246,7 +246,7 @@ onMounted(load)
         <div class="phone-shell">
           <div class="phone-screen">
             <div class="phone-status"><strong>9:41</strong><span>▮▮▮　⌁　▰</span></div>
-            <div class="phone-nav"><strong>心动测测 <i>♡</i></strong><span>•••　◉</span></div>
+            <div class="phone-nav"><strong>映见你我 <i>♡</i></strong><span>•••　◉</span></div>
             <img v-if="preview?.titleImageUrl && !titlePreviewFailed" class="phone-title-image" :src="assetUrl(preview.titleImageUrl)" alt="首页标题图" @error="titlePreviewFailed = true" />
             <div v-else class="phone-copy">把此刻的你，<br />收进一张小卡片。</div>
             <div class="phone-content">
@@ -297,7 +297,7 @@ onMounted(load)
 .phone-title-image{display:block;width:calc(100% - 44px);height:auto;max-height:150px;object-fit:contain;margin:12px 22px 16px}
 .list-summary,.list-pagination{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .list-summary{justify-content:space-between}
-.list-scroll{display:grid;align-content:start;gap:12px;max-height:clamp(320px,calc(100dvh - 320px),700px);overflow-y:auto;overscroll-behavior:contain;padding:2px 8px 2px 2px;scrollbar-gutter:stable}
+.list-scroll{display:grid;align-content:start;gap:12px;max-height:clamp(320px,calc(100dvh / var(--ui-zoom) - 320px),700px);overflow-y:auto;overscroll-behavior:contain;padding:2px 8px 2px 2px;scrollbar-gutter:stable}
 .list-pagination{justify-content:flex-end;padding:12px 0;color:#777;font-size:13px}
 .list-pagination select,.list-pagination button,.list-pagination b{height:34px;padding:0 10px;border:1px solid #d5c8df;border-radius:8px;background:#fff;font:inherit}
 .list-pagination b{display:grid;place-items:center;background:#d8bafd;color:#352043}
@@ -350,7 +350,7 @@ onMounted(load)
 .phone-tabbar span{display:grid;justify-items:center;gap:1px;color:#777;font-size:20px}
 .phone-tabbar b{font-size:10px}
 .phone-tabbar .active{color:#8f57d4}
-@media(max-width:1460px){.layout{grid-template-columns:1fr}.preview{position:static}.phone-shell{width:min(100%,390px)}}
+@media(max-width:1540px){.layout{grid-template-columns:1fr}.preview{position:static}.phone-shell{width:min(100%,390px)}}
 @media(max-width:900px){.test-row{grid-template-columns:80px 1fr 1fr}.test-row img,.no-image{width:80px;height:58px}.test-info{grid-column:2/-1}}
 @media(max-width:560px){.home-tests h1{font-size:30px}.test-row{grid-template-columns:72px 1fr}.test-row label,.test-row button{grid-column:1/-1}.test-row img,.no-image{width:72px;height:54px}.preview{padding:12px}.phone-shell{box-sizing:border-box}.phone-screen{height:640px}.phone-copy{font-size:23px}}
 </style>

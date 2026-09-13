@@ -31,7 +31,9 @@ public record AppConfigSaveRequest(
     /** 与小程序展示图片共用归一化与校验规则的配置键。 */
     private static boolean isMiniappImageKey(String configKey) {
         return "miniapp.home.title_image_url".equals(configKey)
-                || "miniapp.pair.join_hero_image_url".equals(configKey);
+                || "miniapp.pair.join_hero_image_url".equals(configKey)
+                || "miniapp.pair.waiting_hero_image_url".equals(configKey)
+                || "miniapp.pair.completed_hero_image_url".equals(configKey);
     }
 
     @AssertTrue(message = "配置值与类型不匹配，数字须为有效数字，布尔须为true/false，JSON须为完整JSON")

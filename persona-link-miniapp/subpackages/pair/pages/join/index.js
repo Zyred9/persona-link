@@ -77,8 +77,9 @@ Page({
 
   async loadJoinHeroImage() {
     try {
-      const config = await requestData({ url: '/api/miniapp/pairs/config' });
-      this.setData({ joinHeroImageUrl: resolveImageUrl(config && config.joinHeroImageUrl) });
+      const key = 'miniapp.pair.join_hero_image_url';
+      const config = await requestData({ url: '/api/miniapp/config/values', data: { keys: key } });
+      this.setData({ joinHeroImageUrl: resolveImageUrl(config && config[key]) });
     } catch (error) {
       // 配置读取失败时保持隐藏头图，不阻塞加入流程。
       this.setData({ joinHeroImageUrl: '' });

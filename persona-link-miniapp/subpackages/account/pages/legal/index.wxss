@@ -34,10 +34,3 @@
   line-height: 1.8;
 }
 
-.legal-version {
-  display: block;
-  margin-top: 30rpx;
-  color: #817b82;
-  font-size: 23rpx;
-  text-align: center;
-}

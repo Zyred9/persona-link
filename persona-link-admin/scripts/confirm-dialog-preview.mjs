@@ -21,6 +21,6 @@ createServer((request, response) => {
 import { createApp, h, ref } from '/vue.js';
 import ConfirmDialog from '/component.js';
 import { confirmAction } from '/confirm.js';
-createApp({ setup() { const result=ref('尚未操作'); return () => h('main', [h('h1','心动测测 · 二次确认样例'), h('button',{onClick:async()=>{result.value=await confirmAction('确认删除选中的 3 个题型？删除后将不再向用户展示，请确认这些内容已不再需要。',{title:'删除选中的题型',confirmText:'确认删除',danger:true})?'已确认（样例，不删除数据）':'已取消'}},'测试删除确认'),h('p',{role:'status'},result.value),h(ConfirmDialog)]) }}).mount('#app');
+createApp({ setup() { const result=ref('尚未操作'); return () => h('main', [h('h1','映见你我 · 二次确认样例'), h('button',{onClick:async()=>{result.value=await confirmAction('确认删除选中的 3 个题型？删除后将不再向用户展示，请确认这些内容已不再需要。',{title:'删除选中的题型',confirmText:'确认删除',danger:true})?'已确认（样例，不删除数据）':'已取消'}},'测试删除确认'),h('p',{role:'status'},result.value),h(ConfirmDialog)]) }}).mount('#app');
 </script></html>`)
 }).listen(8765, '127.0.0.1', () => console.log('Confirmation preview: http://127.0.0.1:8765'))

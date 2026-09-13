@@ -83,11 +83,3 @@
   right: 18rpx;
 }
 
-.pair-link-button {
-  width: 100%;
-  min-height: 62rpx;
-  color: #60427e;
-  font-size: 25rpx;
-  font-weight: 800;
-  text-decoration: underline;
-}

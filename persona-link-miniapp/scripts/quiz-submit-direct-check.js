@@ -63,6 +63,17 @@ async function main() {
   await pending;
   assert.equal(runner.data.submissionPending, true);
   assert.ok(events.at(-1).detail.url.includes('/test/pages/result/'), '交卷后进入结果页');
+  for (const [flow, expected] of [
+    ['pair-partner', '/subpackages/pair/pages/result/index?pairSessionId=99'],
+    ['pair-initiator', '/subpackages/pair/pages/invite/index?answerSessionId=1']
+  ]) {
+    runner.flow = flow;
+    runner.pairSessionId = '99';
+    const submission = runner.submitAssessment(runner.requestVersion);
+    requests.at(-1).resolve({ reportId: 'report' });
+    await submission;
+    assert.equal(events.at(-1).detail.url, expected);
+  }
 
   const markup = fs.readFileSync(path.join(__dirname, '../components/quiz-runner/index.wxml'), 'utf8');
   assert.match(markup, /wx:if="\{\{allAnswered && !isLast && !submissionPending\}\}"/);

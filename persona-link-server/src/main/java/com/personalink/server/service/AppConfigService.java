@@ -9,9 +9,11 @@ import com.personalink.server.dto.MiniappConfigResponse;
 import com.personalink.server.dto.PageResponse;
 import com.personalink.server.dto.PairConfigResponse;
 import java.util.List;
+import java.util.Map;
 import com.personalink.server.entity.AppConfigEntity;
 
 public interface AppConfigService extends IService<AppConfigEntity> {
+    Map<String, String> readPublicValues(List<String> keys);
     HomeConfigResponse readHomeConfig();
     HomeConfigResponse saveHomeConfig(HomeConfigSaveRequest request);
     PairConfigResponse readPairConfig();

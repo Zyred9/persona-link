@@ -95,9 +95,8 @@ async function main() {
       const legacyLoad = instance.loadTest('12');
       detailRequests.at(-1).resolve({ testType, coverUrl: 'https://example.com/cover.png', detailImageUrl });
       await legacyLoad;
-      assert.strictEqual(instance.data.test.imageUrl,
-        `/assets/images/${testType === 2 ? 'pair' : 'single'}-detail-hero.png`,
-        '未配置详情图应使用默认整图，不能回退到首页封面');
+      assert.strictEqual(instance.data.test.imageUrl, '',
+        '未配置详情图时不使用默认整图，也不回退到首页封面');
     }
   }
   const swipe = createInstance({ testId: '12', testType: 1 });

@@ -22,13 +22,20 @@ async function main() {
   const waitReplies = [];
   const clipboard = [];
   const shareEvents = [];
+  let heroConfig = { 'miniapp.pair.waiting_hero_image_url': '/uploads/waiting.png', 'miniapp.pair.completed_hero_image_url': '/uploads/completed.png' };
+  let configFailed = false;
   vm.runInNewContext(read('subpackages/pair/pages/wait/index.js'), {
     Page(value) { waitDefinition = value; },
     require: (name) => {
       if (name.endsWith('/analytics')) return { trackEvent(...args) { shareEvents.push(args); } };
       if (name.endsWith('/image')) return { resolveImageUrl: (url) => (url ? `https://example.com${url}` : '') };
       return {
-        requestData: async () => ({ joinHeroImageUrl: '/uploads/pair-hero.png' }),
+        requestData: async (request) => {
+          assert.equal(request.url, '/api/miniapp/config/values');
+          assert.equal(request.data.keys, 'miniapp.pair.waiting_hero_image_url,miniapp.pair.completed_hero_image_url');
+          if (configFailed) throw new Error('network');
+          return heroConfig;
+        },
         authenticatedRequestData: async () => waitReplies.shift()
       };
     },
@@ -42,12 +49,20 @@ async function main() {
   const wait = makePageInstance(waitDefinition);
   wait.onLoad({ pairSessionId: '99' });
   await flush();
-  assert.equal(wait.data.joinHeroImageUrl, 'https://example.com/uploads/pair-hero.png',
-    '配对进度页必须复用加入页头图配置');
+  assert.equal(wait.data.waitingHeroImageUrl, 'https://example.com/uploads/waiting.png');
+  assert.equal(wait.data.completedHeroImageUrl, 'https://example.com/uploads/completed.png');
+  const statusFirst = makePageInstance(waitDefinition);
+  statusFirst.pairSessionId = '99';
+  waitReplies.push({ pairStatus: 3, myRole: 'PARTNER' });
+  await statusFirst.refreshStatus();
+  await statusFirst.loadProgressImages();
+  assert.equal(statusFirst.data.bothCompleted, true, '先返回状态、后返回配置仍应展示完成头图');
+  assert.equal(statusFirst.data.completedHeroImageUrl, 'https://example.com/uploads/completed.png');
 
   waitReplies.push({ pairStatus: 1, myRole: 'INITIATOR', inviteToken: 'ABCDE' });
   await wait.refreshStatus();
   assert.equal(wait.data.canReshare, true, '发起者等待中必须展示邀请入口');
+  assert.equal(wait.data.bothCompleted, false);
   assert.equal(wait.data.inviteCode, 'ABCDE');
   const share = wait.onShareAppMessage();
   assert.equal(share.path, '/subpackages/pair/pages/join/index?code=ABCDE');
@@ -71,8 +86,30 @@ async function main() {
   assert.match(waitTemplate, /bindtap="copyPairCode"/);
   assert.match(waitTemplate, />分享<\/button>/);
   assert.match(waitTemplate, /wait-hero/);
-  assert.match(waitTemplate, /src="\{\{joinHeroImageUrl\}\}"/);
-  assert.match(waitTemplate, /binderror="handleJoinHeroImageError"/);
+  assert.match(waitTemplate, /src="\{\{bothCompleted \? completedHeroImageUrl : waitingHeroImageUrl\}\}"/);
+  assert.match(waitTemplate, /binderror="handleHeroImageError"/);
+  assert.doesNotMatch(waitTemplate, /wait-status-card|wait-person|wait-connector/);
+  assert.match(waitTemplate, /mode="widthFix"/);
+  for (const pairStatus of [3, 4, 5, 6]) {
+    waitReplies.push({ pairStatus, myRole: 'INITIATOR' });
+    await wait.refreshStatus();
+    assert.equal(wait.data.bothCompleted, pairStatus === 3 || pairStatus === 4);
+    assert.equal(wait.data.invalid, pairStatus === 5 || pairStatus === 6);
+    assert.equal(wait.data.reportReady, pairStatus === 4);
+  }
+  wait.handleHeroImageError({ currentTarget: { dataset: { field: 'waitingHeroImageUrl', url: 'old-url' } } });
+  assert.equal(wait.data.waitingHeroImageUrl, 'https://example.com/uploads/waiting.png');
+  wait.handleHeroImageError({ currentTarget: { dataset: { field: 'waitingHeroImageUrl', url: wait.data.waitingHeroImageUrl } } });
+  assert.equal(wait.data.waitingHeroImageUrl, '');
+  assert.equal(wait.data.completedHeroImageUrl, 'https://example.com/uploads/completed.png');
+  configFailed = true;
+  await wait.loadProgressImages();
+  assert.equal(wait.data.waitingHeroImageUrl, '');
+  assert.equal(wait.data.completedHeroImageUrl, '');
+  configFailed = false;
+  heroConfig = {};
+  await wait.loadProgressImages();
+  assert.equal(wait.data.waitingHeroImageUrl, '', '空配置不回退加入页图片');
 
   // ===== 测试记录：等待中加入邀请好友，已配对隐藏 =====
   let accountDefinition;

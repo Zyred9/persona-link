@@ -50,6 +50,8 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 logging:
+  pattern:
+    dateformat: "yyyy-MM-dd HH:mm:ss.SSS"
   level:
     # SQL 参数包含用户答案、报告和业务身份，默认不输出参数及查询结果。
     com.personalink.server.mapper: INFO

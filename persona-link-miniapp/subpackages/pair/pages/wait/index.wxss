@@ -11,66 +11,8 @@
   margin-bottom: 44rpx;
 }
 
-.wait-status-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20rpx 66rpx 52rpx;
-}
-
-.wait-person {
-  display: flex;
-  width: 156rpx;
-  height: 156rpx;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  flex-direction: column;
-  border: 5rpx solid #201b22;
-  border-radius: 50%;
-}
-
-.wait-person--self,
-.wait-person--complete {
-  background: #a9e1cc;
-}
-
-.wait-person--pending {
-  background: #ffd867;
-}
-
-.wait-person__name {
-  font-size: 40rpx;
-  font-weight: 900;
-}
-
-.wait-person__status {
-  margin-top: 8rpx;
-  font-size: 22rpx;
-  font-weight: 900;
-}
-
-.wait-connector {
-  display: flex;
-  width: 162rpx;
-  align-items: center;
-}
-
-.wait-connector__line {
-  flex: 1;
-  border-top: 4rpx dashed #201b22;
-}
-
-.wait-connector__heart {
-  margin: 0 8rpx;
-  color: #ff7469;
-  font-size: 52rpx;
-  -webkit-text-stroke: 3rpx #201b22;
-}
-
 .wait-title {
-  margin-top: 64rpx;
+  margin-top: 20rpx;
   font-size: 42rpx;
   font-weight: 900;
   text-align: center;

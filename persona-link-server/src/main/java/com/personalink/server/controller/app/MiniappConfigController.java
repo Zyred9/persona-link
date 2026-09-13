@@ -2,6 +2,9 @@ package com.personalink.server.controller.app;
 
 import com.personalink.server.dto.ApiResponse;
 import com.personalink.server.dto.MiniappConfigResponse;
+import com.personalink.server.dto.MiniappConfigQuery;
+import jakarta.validation.Valid;
+import java.util.Map;
 import com.personalink.server.service.AppConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +17,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class MiniappConfigController {
     private final AppConfigService service;
+
+    /**
+     * 批量读取指定的公开配置，未配置的键返回空字符串。
+     * @param query 约定的公开配置键
+     * @return 配置键到配置值的映射
+     */
+    @GetMapping("/values")
+    public ApiResponse<Map<String, String>> values(@Valid MiniappConfigQuery query) {
+        return ApiResponse.success(this.service.readPublicValues(query.getKeys()));
+    }
 
     /**
      * 读取小程序版本展示信息。

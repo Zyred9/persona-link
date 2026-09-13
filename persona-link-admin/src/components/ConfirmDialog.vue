@@ -72,8 +72,8 @@ onBeforeUnmount(() => finish(false))
 
 <style scoped>
 .confirm-dialog {
-  width: min(460px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  width: min(460px, calc(100vw / var(--ui-zoom) - 32px));
+  max-height: calc(100dvh / var(--ui-zoom) - 32px);
   margin: auto;
   padding: 0;
   overflow: auto;

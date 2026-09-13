@@ -13,6 +13,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -20,6 +22,32 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class AppConfigWebTest {
+    @Test
+    void publicValuesBindCommaSeparatedKeysAndRejectInvalidQueries() throws Exception {
+        var service = mock(AppConfigService.class);
+        var keys = List.of("miniapp.version", "miniapp.pair.waiting_hero_image_url");
+        when(service.readPublicValues(keys)).thenReturn(Map.of(keys.get(0), "1.2.3", keys.get(1), ""));
+        when(service.readPublicValues(List.of("server.secret")))
+                .thenThrow(new BusinessException(400, "请求包含不允许公开读取的配置键"));
+        var mvc = MockMvcBuilders.standaloneSetup(new MiniappConfigController(service))
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        mvc.perform(get("/api/miniapp/config/values").param("keys", String.join(",", keys)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data['miniapp.version']").value("1.2.3"))
+                .andExpect(jsonPath("$.data['miniapp.pair.waiting_hero_image_url']").value(""));
+        mvc.perform(get("/api/miniapp/config/values").param("keys", "server.secret"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/miniapp/config/values")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/miniapp/config/values").param("keys", "")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/miniapp/config/values").param("keys", "x".repeat(129)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/miniapp/config/values").param("keys", String.join(",", java.util.Collections.nCopies(21, "miniapp.version"))))
+                .andExpect(status().isBadRequest());
+        verify(service).readPublicValues(keys);
+        verify(service).readPublicValues(List.of("server.secret"));
+        verifyNoMoreInteractions(service);
+    }
+
     @Test
     void publicConfigOnlyExposesVersionWithoutLogin() throws Exception {
         var service = mock(AppConfigService.class);

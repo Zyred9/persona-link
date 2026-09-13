@@ -28,6 +28,11 @@ INSERT INTO t_app_config (config_key, config_value, value_type, config_name, rem
 VALUES ('miniapp.pair.join_hero_image_url', '', 1, '加入双人测试页头图', '空值或图片加载失败时隐藏加入页头图')
 ON DUPLICATE KEY UPDATE config_key = VALUES(config_key);
 
+INSERT INTO t_app_config (config_key, config_value, value_type, config_name, remark)
+VALUES ('miniapp.pair.waiting_hero_image_url', '', 1, '匹配进度页一方完成头图', '一方完成时展示；空值或图片加载失败时隐藏头图'),
+       ('miniapp.pair.completed_hero_image_url', '', 1, '匹配进度页双方完成头图', '双方完成时展示；空值或图片加载失败时隐藏头图')
+ON DUPLICATE KEY UPDATE config_key = VALUES(config_key);
+
 
 -- 用户反馈和协议配置增量；不写入占位协议正文。执行前核对目标数据库。
 CREATE TABLE IF NOT EXISTS t_feedback (

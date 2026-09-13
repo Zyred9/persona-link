@@ -2,8 +2,8 @@ const { requestData, authenticatedRequestData, authenticatedUploadData, createId
 const { resolveImageUrl, resolvePreviewUrl } = require('../../utils/image');
 
 const HISTORY_SECTIONS = {
-  single: { prefix: 'history', records: 'records', total: 'total', totalLabel: 'totalLabel', id: 'reportId', url: 'reports' },
-  pair: { prefix: 'pairHistory', records: 'pairRecords', total: 'pairTotal', totalLabel: 'pairTotalLabel', id: 'pairSessionId', url: 'pairs' }
+  single: { prefix: 'history', records: 'records', totalLabel: 'totalLabel', id: 'reportId', url: 'reports' },
+  pair: { prefix: 'pairHistory', records: 'pairRecords', totalLabel: 'pairTotalLabel', id: 'pairSessionId', url: 'pairs' }
 };
 const HISTORY_SWIPE_MIN_DISTANCE = 60;
 const PROFILE_VIEW = 'profile';
@@ -110,8 +110,6 @@ Component({
     pairHistoryErrorDescription: '',
     records: [],
     pairRecords: [],
-    total: 0,
-    pairTotal: 0,
     totalLabel: '0',
     pairTotalLabel: '0',
     historyErrorDescription: '暂时无法加载测试记录，请稍后重试。',
@@ -366,7 +364,6 @@ Component({
         this.setData({
           [prefix + 'State']: records.length > 0 ? 'ready' : 'empty',
           [section.records]: records,
-          [section.total]: Number(page.total) || 0,
           [section.totalLabel]: formatCount(page.total),
           [prefix + 'HasMore']: page.records.length > 0 && pageNumber * 20 < Number(page.total)
         });
@@ -447,30 +444,6 @@ Component({
       }
     },
 
-    deleteRecord(event) {
-      const reportId = String(event.currentTarget.dataset.reportId || '');
-      if (!reportId) return;
-      wx.showModal({
-        title: '删除这份报告？',
-        content: '删除后无法恢复。',
-        confirmColor: '#ff7469',
-        success: async (result) => {
-          if (!result.confirm) return;
-          try {
-            await authenticatedRequestData({
-              url: `/api/miniapp/reports/${encodeURIComponent(reportId)}`,
-              method: 'DELETE'
-            });
-            if (this.componentAttached && 'history' === this.data.currentView) {
-              this.loadRecords();
-            }
-          } catch (error) {
-            wx.showToast({ title: error.message || '删除失败', icon: 'none' });
-          }
-        }
-      });
-    },
-
     handleFeedbackInput(event) {
       if (this.data.feedbackSubmitting) return;
       this.setData({ feedbackContent: event.detail.value });
@@ -527,9 +500,10 @@ Component({
         && this.versionRequest === request;
       this.setData({ versionLabel: '加载中...' });
       try {
-        const config = await requestData({ url: '/api/miniapp/config' });
+        const key = 'miniapp.version';
+        const config = await requestData({ url: '/api/miniapp/config/values', data: { keys: key } });
         if (!active()) return;
-        const version = config && typeof config.version === 'string' ? config.version.trim() : '';
+        const version = config && typeof config[key] === 'string' ? config[key].trim() : '';
         this.setData({ versionLabel: version ? (/^v/i.test(version) ? version : `V${version}`) : '未配置' });
       } catch (error) {
         if (active()) this.setData({ versionLabel: '暂不可用' });

@@ -2,32 +2,18 @@
 
 <view class="paper-page wait-page">
   <image
-    wx:if="{{joinHeroImageUrl}}"
-    class="paper-card wait-hero"
-    src="{{joinHeroImageUrl}}"
+    wx:if="{{state === 'ready' && !invalid && (bothCompleted ? completedHeroImageUrl : waitingHeroImageUrl)}}"
+    class="wait-hero"
+    src="{{bothCompleted ? completedHeroImageUrl : waitingHeroImageUrl}}"
+    data-field="{{bothCompleted ? 'completedHeroImageUrl' : 'waitingHeroImageUrl'}}"
+    data-url="{{bothCompleted ? completedHeroImageUrl : waitingHeroImageUrl}}"
     mode="widthFix"
-    binderror="handleJoinHeroImageError"
+    binderror="handleHeroImageError"
   ></image>
 
   <page-state wx:if="{{state === 'loading'}}" type="loading" title="配对状态正在加载"></page-state>
   <page-state wx:elif="{{state === 'error'}}" type="error" title="配对状态加载失败" description="{{errorDescription}}" action-text="重新加载" bind:action="refreshStatus"></page-state>
   <block wx:else>
-  <view class="paper-card wait-status-card">
-    <view class="wait-person wait-person--self">
-      <text class="wait-person__name">我</text>
-      <text class="wait-person__status">已完成</text>
-    </view>
-    <view class="wait-connector">
-      <view class="wait-connector__line"></view>
-      <text class="wait-connector__heart">♥</text>
-      <view class="wait-connector__line"></view>
-    </view>
-    <view class="wait-person {{partnerCompleted ? 'wait-person--complete' : 'wait-person--pending'}}">
-      <text class="wait-person__name">TA</text>
-      <text class="wait-person__status">{{partnerStatusText}}</text>
-    </view>
-  </view>
-
   <text class="wait-title">{{waitTitle}}</text>
 
   <view class="paper-card wait-note-card">
