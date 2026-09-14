@@ -147,21 +147,10 @@ function createSession() {
   return pendingSession;
 }
 
-function ensureSession() {
+// 游客可自由浏览；核心功能首次使用时用静默 wx.login 建立会话，不弹授权。
+function ensureSessionOrCreate() {
   const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
-  return token ? Promise.resolve(token) : Promise.reject(createRequestError('请先点击微信登录'));
-}
-
-function onboardingProfile(data, expectedToken) {
-  return ensureSession().then((token) => {
-    if (expectedToken && expectedToken !== token) throw createRequestError('登录状态已变化，请重新登录');
-    return requestData({ url: '/api/miniapp/profile',
-      method: data ? 'PUT' : 'GET', data, sessionBound: true, silentUnauthorized: true });
-  });
-}
-
-function isProfileComplete(profile) {
-  return !!(profile && String(profile.nickname || '').trim() && String(profile.avatarUrl || '').trim());
+  return token ? Promise.resolve(token) : createSession();
 }
 
 // 账户中心首次进入时先用缓存的完整资料渲染，避免重复拉取导致的等待。
@@ -186,22 +175,10 @@ function writeProfileCache(token, nickname, avatarUrl) {
   }
 }
 
-let primedProfile = null;
-
-// 协议校验刚拉取到完整资料时暂存一次，供账户中心复用，避免同一次进入重复请求。
-function primeProfileCache(token, profile) {
-  if (token && profile) primedProfile = { token, profile };
-}
-
 async function fetchProfile() {
   const app = typeof getApp === 'function' ? getApp() : null;
   if (app && app.verifyConsent) await app.verifyConsent();
-  const token = await ensureSession();
-  if (primedProfile && primedProfile.token === token) {
-    const profile = primedProfile.profile;
-    primedProfile = null;
-    return profile;
-  }
+  await ensureSessionOrCreate();
   return requestData({ url: '/api/miniapp/profile', sessionBound: true, silentUnauthorized: true });
 }
 
@@ -215,7 +192,7 @@ async function authenticatedRequestData(options) {
     }
     return result;
   };
-  await ensureSession();
+  await ensureSessionOrCreate();
   if (options.expectedToken && options.expectedToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) {
     throw createRequestError('登录状态已变化，请重新加载资料');
   }
@@ -238,7 +215,7 @@ async function authenticatedUploadData(options) {
 }
 
 async function uploadData(options) {
-  await ensureSession();
+  await ensureSessionOrCreate();
   const upload = () => {
     const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
     if (options.expectedToken && options.expectedToken !== token) {
@@ -274,7 +251,7 @@ async function uploadData(options) {
   };
   try { return await upload(); } catch (error) {
     if (error.statusCode !== 401) throw error;
-    await ensureSession();
+    await ensureSessionOrCreate();
     return upload();
   }
 }
@@ -285,19 +262,14 @@ function createIdempotencyKey(prefix) {
 
 module.exports = {
   loginSession: createSession,
-  onboardingProfile,
-  onboardingAvatar(filePath, expectedToken) { return uploadData({ url: '/api/miniapp/profile/avatar', filePath, expectedToken }); },
-  isProfileComplete,
   readProfileCache,
   writeProfileCache,
-  primeProfileCache,
   fetchProfile,
   invalidateTestRecordRequests() { testRecordsGeneration += 1; },
   request,
   requestData,
   authenticatedRequestData,
   authenticatedUploadData,
-  ensureSession,
   createIdempotencyKey,
   TOKEN_STORAGE_KEY
 };

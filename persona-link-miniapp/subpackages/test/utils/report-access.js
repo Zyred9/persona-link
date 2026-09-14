@@ -1,4 +1,4 @@
-const { authenticatedRequestData } = require('./request');
+const { authenticatedRequestData } = require('../../../utils/request');
 
 // 单人、双人共用权限入口；前端观看回调不是可信的服务端奖励凭证。
 function createReportAccess(page, reportUrl) {

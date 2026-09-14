@@ -66,5 +66,6 @@
       }
     ]
   },
+  "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json"
 }

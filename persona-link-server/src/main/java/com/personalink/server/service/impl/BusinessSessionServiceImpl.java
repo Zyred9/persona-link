@@ -60,4 +60,15 @@ public class BusinessSessionServiceImpl extends ServiceImpl<BusinessSessionMappe
                 .eq(BusinessSessionEntity::getDeleted, NOT_DELETED)
                 .update();
     }
+
+    @Override
+    public void revokeMiniappSessions(String openId, LocalDateTime revokedAt) {
+        this.lambdaUpdate()
+                .set(BusinessSessionEntity::getRevokedAt, revokedAt)
+                .eq(BusinessSessionEntity::getOpenId, openId)
+                .eq(BusinessSessionEntity::getSessionType, MINIAPP_SESSION)
+                .isNull(BusinessSessionEntity::getRevokedAt)
+                .eq(BusinessSessionEntity::getDeleted, NOT_DELETED)
+                .update();
+    }
 }

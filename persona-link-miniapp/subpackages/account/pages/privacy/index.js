@@ -1,8 +1,11 @@
 const { authenticatedRequestData, invalidateTestRecordRequests } = require('../../../../utils/request');
 
+const CONSENT_KEYS = ['personaLinkConsentVersion', 'personaLinkConsentedDocuments'];
+
 Page({
   data: {
-    deleting: false
+    deleting: false,
+    cancelling: false
   },
 
   onUnload() { this.disposed = true; },
@@ -36,6 +39,44 @@ Page({
         }
       },
       complete: () => { this.confirming = false; }
+    });
+  },
+
+  cancelAccount() {
+    if (this.data.cancelling || this.confirmingAccount) return;
+    this.confirmingAccount = true;
+    wx.showModal({
+      title: '注销账号？',
+      content: '注销将删除你的账号资料、全部测试记录与反馈，且无法恢复。',
+      confirmText: '确认注销',
+      confirmColor: '#ff7469',
+      success: async (result) => {
+        if (!result.confirm || this.disposed) return;
+        this.setData({ cancelling: true });
+        try {
+          await authenticatedRequestData({ url: '/api/miniapp/me', method: 'DELETE' });
+          invalidateTestRecordRequests();
+          this.clearLocalAccount();
+          getApp().globalData.pendingLaunchUrl = '';
+          getApp().globalData.resetHomeDetail = true;
+          // 注销后回到游客状态，仅保留本机协议同意记录。
+          wx.reLaunch({ url: '/pages/home/index' });
+          wx.showToast({ title: '账号已注销', icon: 'success' });
+        } catch (error) {
+          if (!this.disposed) wx.showToast({ title: error.message || '注销失败，请重试', icon: 'none' });
+        } finally {
+          if (!this.disposed) this.setData({ cancelling: false });
+        }
+      },
+      complete: () => { this.confirmingAccount = false; }
+    });
+  },
+
+  clearLocalAccount() {
+    const consent = CONSENT_KEYS.map((key) => [key, wx.getStorageSync(key)]);
+    wx.clearStorageSync();
+    consent.forEach(([key, value]) => {
+      if (value !== undefined && value !== '') wx.setStorageSync(key, value);
     });
   }
 });

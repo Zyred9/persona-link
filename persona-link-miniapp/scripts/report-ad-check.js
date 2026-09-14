@@ -30,7 +30,7 @@ function setup() {
       return { status: 1 };
     } }; }
   };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../utils/report-access.js'), 'utf8'), sandbox);
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../subpackages/test/utils/report-access.js'), 'utf8'), sandbox);
   const page = { data: {}, setData(patch) { Object.assign(this.data, patch); } };
   const gate = sandbox.module.exports.createReportAccess(page, '/report');
   const load = async (active) => { if (active()) { reads++; page.setData({ state: 'ready' }); } };

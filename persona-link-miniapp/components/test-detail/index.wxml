@@ -19,7 +19,10 @@
   ></page-state>
 
   <block wx:elif="{{testType === 2}}">
-    <image class="pair-detail-hero paper-card" src="{{test.imageUrl}}" mode="widthFix"></image>
+    <view class="detail-hero-frame">
+      <image class="pair-detail-hero paper-card" src="{{test.imageUrl}}" mode="widthFix" bindtap="previewDetailImage"></image>
+      <view class="detail-hero-badge"><ai-badge text="AI 生成"></ai-badge></view>
+    </view>
 
     <view class="pair-detail-tags">
       <text class="pair-detail-tag pair-detail-tag--yellow">双人独立作答</text>
@@ -49,7 +52,10 @@
   </block>
 
   <block wx:else>
-    <image class="single-detail-hero paper-card" src="{{test.imageUrl}}" mode="widthFix"></image>
+    <view class="detail-hero-frame detail-hero-frame--single">
+      <image class="single-detail-hero paper-card" src="{{test.imageUrl}}" mode="widthFix" bindtap="previewDetailImage"></image>
+      <view class="detail-hero-badge"><ai-badge text="AI 生成"></ai-badge></view>
+    </view>
 
     <view class="detail-tags">
       <text class="detail-tag detail-tag--yellow">{{test.categoryName}}</text>

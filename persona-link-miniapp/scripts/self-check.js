@@ -21,6 +21,16 @@ javaScriptFiles.forEach((file) => execFileSync(process.execPath, ['--check', fil
 jsonFiles.forEach((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
 
 const appConfig = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
+const projectConfig = JSON.parse(fs.readFileSync(path.join(root, 'project.config.json'), 'utf8'));
+const packagedFiles = files.filter((file) => {
+  const relative = path.relative(root, file).split(path.sep).join('/');
+  return !projectConfig.packOptions.ignore.some((entry) => entry.type === 'folder'
+    ? relative.startsWith(`${entry.value}/`)
+    : entry.type === 'file' && relative === entry.value);
+});
+packagedFiles.filter((file) => /\.(png|jpe?g|webp|gif|mp3|wav|mp4|m4a|aac|ogg)$/i.test(file))
+  .forEach((file) => assert(fs.statSync(file).size <= 200 * 1024,
+    `打包媒体超过 200 KB：${path.relative(root, file)}`));
 const routes = [
   ...appConfig.pages,
   ...appConfig.subpackages.flatMap((subpackage) =>
@@ -162,9 +172,10 @@ assert.strictEqual(
 );
 assert((homeTemplate.match(/lazy-load="{{true}}"/g) || []).length === 2, '首页非首屏图片未启用懒加载');
 assert(
-  fs.statSync(path.join(root, 'assets/images/home-title.png')).size < 600 * 1024,
+  fs.statSync(path.join(root, 'assets/images/home-title.jpg')).size < 200 * 1024,
   '首页标题整图体积回退，可能再次阻塞页面交互'
 );
+assert.strictEqual(appConfig.lazyCodeLoading, 'requiredComponents', '未启用组件按需注入');
 assert(
   appConfig.preloadRule['pages/home/index'].packages.includes('subpackages/account')
     && appConfig.preloadRule['pages/profile/index'].packages.includes('subpackages/account'),

@@ -17,12 +17,13 @@ const wx = {
   showToast: (value) => toasts.push(value), showModal: (value) => { modal = value; },
   getStorageSync: (key) => storage.get(key), setStorageSync: (key, value) => storage.set(key, value),
   getStorageInfoSync: () => ({ keys: [...storage.keys()] }), removeStorageSync: (key) => storage.delete(key),
+  clearStorageSync: () => storage.clear(),
   stopPullDownRefresh: () => { pullDownStops++; },
   reLaunch: (value) => redirects.push(value), switchTab: (value) => redirects.push(value)
 };
 const modules = {
   '../../utils/markdown': require('../subpackages/account/utils/markdown'),
-  '../../../../utils/format': require('../utils/format')
+  '../../utils/format': require('../subpackages/account/utils/format')
 };
 function load(file, component = false) {
   let definition;
@@ -99,7 +100,29 @@ async function run() {
   assert.equal(storage.get('personaLinkBusinessToken'), 'token');
   assert.equal(storage.get('consent'), 'v2.0');
   assert.equal(redirects[0].url, '/pages/home/index');
+
+  // 注销账号：二次确认后删除账号数据，本机清空并只保留协议同意记录。
+  storage.set('personaLinkBusinessToken', 'token');
+  storage.set('personaLinkProfileCache', { nickname: '旧昵称', avatarUrl: '/a.png' });
+  storage.set('personaPairSession', {});
+  storage.set('personaLinkConsentVersion', 'v2.0');
+  storage.set('personaLinkConsentedDocuments', [{ type: 1, version: 1 }]);
+  redirects = [];
+  reply = () => Promise.reject(new Error('注销失败'));
+  privacy.cancelAccount(); await modal.success({ confirm: true }); modal.complete();
+  assert.equal(storage.has('personaLinkBusinessToken'), true, '注销失败时保留本机登录态');
+  assert.equal(redirects.length, 0);
+  reply = () => Promise.resolve();
+  privacy.cancelAccount(); await modal.success({ confirm: true }); modal.complete();
+  const cancelCall = calls.filter((call) => call && call.url === '/api/miniapp/me').at(-1);
+  assert.equal(cancelCall.method, 'DELETE');
+  assert.equal(storage.has('personaLinkBusinessToken'), false, '注销后清除本地登录态');
+  assert.equal(storage.has('personaLinkProfileCache'), false, '注销后清除本地资料缓存');
+  assert.equal(storage.has('personaPairSession'), false, '注销后清除本机配对缓存');
+  assert.equal(storage.get('personaLinkConsentVersion'), 'v2.0', '注销保留本机协议同意记录');
+  assert.equal(redirects.at(-1).url, '/pages/home/index');
   // 删除后的旧 HTTP 响应不能让调用方重新写入双人缓存。
+  storage.set('personaLinkBusinessToken', 'token');
   const requestModule = { exports: {} };
   let respond;
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'utils/request.js'), 'utf8'), {
@@ -111,6 +134,6 @@ async function run() {
   requestModule.exports.invalidateTestRecordRequests();
   respond({ statusCode: 200, data: { code: 0, data: { pairSessionId: 1 } } });
   await assert.rejects(stale, /测试记录已删除/);
-  console.log('ACCOUNT_SERVICES_CHECK_OK feedback/legal/legal-time/legal-refresh/consent/deletion');
+  console.log('ACCOUNT_SERVICES_CHECK_OK feedback/legal/legal-time/legal-refresh/consent/deletion/account-cancel');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

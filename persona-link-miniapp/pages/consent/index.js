@@ -1,101 +1,43 @@
-const { requestData, loginSession, onboardingProfile, onboardingAvatar, isProfileComplete, TOKEN_STORAGE_KEY } = require('../../utils/request');
-const { resolveImageUrl } = require('../../utils/image');
+const { requestData } = require('../../utils/request');
 
 Page({
   data: {
     consentVersion: 'v2.0',
-    step: 'login',
-    state: 'ready',
-    nickname: '',
-    avatarUrl: '',
-    avatarImage: '',
+    state: 'loading',
     busy: false,
     error: ''
   },
 
-  onShow() {
-    if (this.started) {
-      if (!this.data.busy && this.profileToken && this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) this.setData({ step: 'login', error: '登录状态已变化，请重新登录' });
-      return;
-    }
-    this.started = true;
-    if (wx.getStorageSync(TOKEN_STORAGE_KEY)) this.resumeProfile();
+  onLoad() {
+    const { consentVersion } = getApp().globalData;
+    this.setData({ consentVersion });
   },
+
+  onShow() {
+    if (this.started) return;
+    this.started = true;
+    this.init();
+  },
+
   onUnload() { this.disposed = true; },
 
-  async login() {
-    if (this.data.busy) return;
-    this.setData({ busy: true, error: '' });
+  async init() {
+    // 已同意且协议未更新时直接进入，不重复展示协议页。
     try {
-      await loginSession();
-      await this.resumeProfile();
-    } catch (error) { this.showError(error); }
-    finally { if (!this.disposed) this.setData({ busy: false }); }
-  },
-
-  showError(error) {
+      await getApp().verifyConsent();
+    } catch (error) {}
     if (this.disposed) return;
-    this.setData({ error: error.message || '操作失败，请重试',
-      ...(!wx.getStorageSync(TOKEN_STORAGE_KEY) || (this.profileToken && this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) ? { step: 'login' } : {}) });
-  },
-
-  async resumeProfile() {
-    this.setData({ busy: true, error: '' });
-    try {
-      const profile = await onboardingProfile();
-      if (this.disposed) return;
-      this.profileToken = wx.getStorageSync(TOKEN_STORAGE_KEY);
-      this.setData({ step: 'profile', nickname: profile.nickname || '', avatarUrl: profile.avatarUrl || '', avatarImage: resolveImageUrl(profile.avatarUrl) });
-      if (isProfileComplete(profile)) {
-        try {
-          await getApp().verifyConsent();
-          this.continueToApp();
-          return;
-        } catch (error) {
-          // 登录状态在校验中变化时回到登录步骤，其余情况才需要重新阅读协议。
-          if (this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) { this.showError(error); return; }
-        }
-        // 只有未同意或协议版本更新时才需要下载协议正文。
-        await this.loadDocuments();
-      }
-    } catch (error) { this.showError(error); }
-    finally { if (!this.disposed) this.setData({ busy: false }); }
-  },
-
-  handleNicknameInput(event) { this.setData({ nickname: event.detail.value }); },
-
-  async chooseAvatar(event) {
-    if (this.data.busy || !event.detail.avatarUrl) return;
-    this.setData({ busy: true, error: '' });
-    try {
-      const result = await onboardingAvatar(event.detail.avatarUrl, this.profileToken);
-      if (!result || !result.avatarUrl) throw new Error('未获取到头像，请重试');
-      if (!this.disposed) this.setData({ avatarUrl: result.avatarUrl, avatarImage: resolveImageUrl(result.avatarUrl) });
-    } catch (error) { this.showError(error); }
-    finally { if (!this.disposed) this.setData({ busy: false }); }
-  },
-
-  async saveProfile(event) {
-    if (this.data.busy) return;
-    const value = event && event.detail && event.detail.value;
-    const nickname = String(typeof value === 'string' ? value : value ? value.nickname : this.data.nickname).trim();
-    if (!nickname || nickname.length > 32 || !this.data.avatarUrl) {
-      this.setData({ error: '请选择微信头像并填写昵称（最多32字）' }); return;
+    if (getApp().globalData.hasConsent) {
+      this.continueToApp();
+      return;
     }
-    this.setData({ busy: true, error: '', nickname });
-    try {
-      if (this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) throw new Error('登录状态已变化，请重新登录');
-      const profile = await onboardingProfile({ nickname, avatarUrl: this.data.avatarUrl }, this.profileToken);
-      if (!isProfileComplete(profile)) throw new Error('头像昵称保存未完成，请重试');
-      await this.loadDocuments();
-    } catch (error) { this.showError(error); }
-    finally { if (!this.disposed) this.setData({ busy: false }); }
+    await this.loadDocuments();
   },
 
   async loadDocuments() {
     if (this.loading) return;
     this.loading = true;
-    this.setData({ step: 'consent', state: 'loading', error: '' });
+    this.setData({ state: 'loading', error: '' });
     try {
       const documents = await Promise.all([1, 2, 3].map((type) =>
         requestData({ url: `/api/miniapp/legal-documents/${type}` })));
@@ -110,11 +52,6 @@ Page({
     } finally { this.loading = false; }
   },
 
-  onLoad() {
-    const { consentVersion } = getApp().globalData;
-    this.setData({ consentVersion });
-  },
-
   openLegal(event) {
     const type = event.currentTarget.dataset.type;
     wx.navigateTo({
@@ -123,23 +60,21 @@ Page({
   },
 
   async agreeAndContinue() {
-    if (this.data.step !== 'consent' || this.data.state !== 'ready' || this.data.busy || this.agreeing) return;
-    if (!this.profileToken || this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) {
-      this.setData({ step: 'login', error: '登录状态已变化，请重新登录' }); return;
-    }
+    if (this.data.state !== 'ready' || this.data.busy || this.agreeing) return;
     this.agreeing = true;
+    this.setData({ busy: true, error: '' });
     const app = getApp();
     app.consentEpoch = (app.consentEpoch || 0) + 1;
     wx.setStorageSync('personaLinkConsentedDocuments', this.documents);
     wx.setStorageSync(app.globalData.consentStorageKey, this.data.consentVersion);
-    wx.setStorageSync('personaLinkConsentToken', this.profileToken);
     try {
       await app.verifyConsent();
       this.continueToApp();
     } catch (error) {
       this.agreeing = false;
-      this.showError(error);
-      if (wx.getStorageSync(TOKEN_STORAGE_KEY)) await this.resumeProfile();
+      if (!this.disposed) this.setData({ error: error.message || '操作失败，请重试' });
+    } finally {
+      if (!this.disposed) this.setData({ busy: false });
     }
   },
 

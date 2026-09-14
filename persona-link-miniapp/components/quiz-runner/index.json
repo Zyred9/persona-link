@@ -1,6 +1,7 @@
 {
   "component": true,
   "usingComponents": {
+    "ai-notice": "/components/ai-notice/index",
     "page-state": "/components/page-state/index"
   }
 }

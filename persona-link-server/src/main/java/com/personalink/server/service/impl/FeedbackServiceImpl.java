@@ -2,19 +2,27 @@ package com.personalink.server.service.impl;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.personalink.server.dto.*;
 import com.personalink.server.entity.FeedbackEntity;
-import com.personalink.server.mapper.FeedbackMapper;
-import com.personalink.server.service.FeedbackService;
 import com.personalink.server.exception.BusinessException;
+import com.personalink.server.mapper.FeedbackMapper;
+import com.personalink.server.miniapp.security.WechatContentSecurityClient;
+import com.personalink.server.service.FeedbackService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 /** 反馈持久化，数据库唯一键保证断网重试不会重复收件。 */
 @Service
+@RequiredArgsConstructor
 public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, FeedbackEntity> implements FeedbackService {
+    private final WechatContentSecurityClient contentSecurityClient;
     @Override
     @Transactional(rollbackFor=Exception.class)
     public FeedbackResponse submit(String openId, FeedbackCreateRequest request) {
+        if (!this.contentSecurityClient.isTextAllowed(openId, request.content(),
+                WechatContentSecurityClient.SCENE_COMMENT)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, 40005, "反馈内容含违规信息，请修改后重新提交");
+        }
         FeedbackEntity entity = new FeedbackEntity();
         entity.setOpenId(openId);
         entity.setRequestId(request.requestId());
@@ -37,6 +45,13 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, FeedbackEnt
         return new PageResponse<>(records.stream().map(entity -> new AdminFeedbackResponse(
                 String.valueOf(entity.getId()), entity.getOpenId(), entity.getContent(), entity.getCreateDate()))
                 .toList(), total, page, size);
+    }
+
+    @Override
+    @Transactional(rollbackFor=Exception.class)
+    public void deleteByOpenId(String openId) {
+        this.lambdaUpdate().set(FeedbackEntity::getDeleted, 1)
+                .eq(FeedbackEntity::getOpenId, openId).eq(FeedbackEntity::getDeleted, 0).update();
     }
     private FeedbackResponse response(FeedbackEntity entity) {
         return new FeedbackResponse(String.valueOf(entity.getId()), entity.getContent(), entity.getCreateDate());

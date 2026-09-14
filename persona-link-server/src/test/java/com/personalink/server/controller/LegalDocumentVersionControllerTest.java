@@ -4,6 +4,7 @@ import com.personalink.server.controller.app.MiniappUserContentController;
 import com.personalink.server.dto.LegalDocumentVersionResponse;
 import com.personalink.server.service.FeedbackService;
 import com.personalink.server.service.LegalDocumentService;
+import com.personalink.server.service.MiniappAccountService;
 import com.personalink.server.service.TestRecordService;
 import com.personalink.server.service.impl.AuthService;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ class LegalDocumentVersionControllerTest {
         var legal = mock(LegalDocumentService.class);
         when(legal.versions()).thenReturn(List.of(new LegalDocumentVersionResponse(1, 4)));
         var controller = new MiniappUserContentController(auth, mock(FeedbackService.class),
-                legal, mock(TestRecordService.class));
+                legal, mock(TestRecordService.class), mock(MiniappAccountService.class));
         MockMvcBuilders.standaloneSetup(controller).build()
                 .perform(get("/api/miniapp/legal-documents/versions"))
                 .andExpect(status().isOk())

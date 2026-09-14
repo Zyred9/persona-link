@@ -14,4 +14,5 @@ public interface AnalyticsService extends IService<AnalyticsEventEntity> {
     AnalyticsEventBatchResponse receive(AnalyticsEventBatchRequest request, MiniappSessionContext context);
     AnalyticsOverviewResponse overview(int days);
     void cleanupExpiredEvents();
+    void deleteByOpenId(String openId);
 }

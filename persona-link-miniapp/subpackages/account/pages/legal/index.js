@@ -1,6 +1,6 @@
 const { requestData } = require('../../../../utils/request');
 const { renderMarkdown } = require('../../utils/markdown');
-const { formatDateTime } = require('../../../../utils/format');
+const { formatDateTime } = require('../../utils/format');
 const TYPES = { userAgreement: 1, privacyGuide: 2, disclaimer: 3 };
 
 Page({

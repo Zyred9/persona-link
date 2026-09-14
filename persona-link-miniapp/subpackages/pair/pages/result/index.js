@@ -1,6 +1,5 @@
 const { authenticatedRequestData } = require('../../../../utils/request');
 const { trackEvent } = require('../../../../utils/analytics');
-const { createReportAccess } = require('../../../../utils/report-access');
 
 Page({
   data: {
@@ -15,11 +14,28 @@ Page({
   },
 
   async loadReport(watch = false) {
+    if (this.disposed || this.loadingAccess) return;
     if (!this.pairSessionId) {
       this.setData({ state: 'error', errorDescription: '配对参数缺失，请从配对进度页重新进入。' });
       return;
     }
-    if (!this.reportAccess) this.reportAccess = createReportAccess(this, `/api/miniapp/pairs/${encodeURIComponent(this.pairSessionId)}/report`);
+    if (!this.reportAccess) {
+      this.loadingAccess = true;
+      this.setData({ state: 'loading' });
+      try {
+        // 报告权限逻辑只保留一份，跨分包按需加载，避免占用首页主包。
+        const { createReportAccess } = await require.async('../../../test/utils/report-access.js');
+        if (this.disposed) return;
+        this.reportAccess = createReportAccess(this, `/api/miniapp/pairs/${encodeURIComponent(this.pairSessionId)}/report`);
+        this.reportAccess.setHidden(Boolean(this.hidden));
+      } catch (error) {
+        if (!this.disposed) this.setData({ state: 'error', errorDescription: '报告组件加载失败，请重新加载。' });
+        return;
+      } finally {
+        this.loadingAccess = false;
+      }
+    }
+    if (this.hidden) return;
     return this.reportAccess.run(async (active) => {
       const [report, pair] = await Promise.all([
         authenticatedRequestData({ url: `/api/miniapp/pairs/${encodeURIComponent(this.pairSessionId)}/report` }),
@@ -51,9 +67,15 @@ Page({
 
   watchAd() { return this.loadReport(true); },
 
-  onUnload() { if (this.reportAccess) this.reportAccess.dispose(); },
-  onHide() { if (this.reportAccess) this.reportAccess.setHidden(true); },
-  onShow() { if (this.reportAccess) this.reportAccess.setHidden(false); },
+  onUnload() { this.disposed = true; if (this.reportAccess) this.reportAccess.dispose(); },
+  onHide() { this.hidden = true; if (this.reportAccess) this.reportAccess.setHidden(true); },
+  onShow() {
+    this.hidden = false;
+    if (this.reportAccess) {
+      this.reportAccess.setHidden(false);
+      if (this.data.state === 'loading') this.loadReport();
+    }
+  },
 
   onShareAppMessage() {
     trackEvent(5, '/subpackages/pair/pages/result/index', this.pairSessionId);

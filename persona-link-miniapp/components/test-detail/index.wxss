@@ -13,7 +13,21 @@
   display: block;
   width: 648rpx;
   height: 294rpx;
+}
+
+.detail-hero-frame {
+  position: relative;
+  width: 648rpx;
+}
+
+.detail-hero-frame--single {
   margin-top: 22rpx;
+}
+
+.detail-hero-badge {
+  position: absolute;
+  right: 18rpx;
+  bottom: 18rpx;
 }
 
 .detail-tags,

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.personalink.server.dto.*;
 import com.personalink.server.entity.*;
 import com.personalink.server.mapper.*;
+import com.personalink.server.miniapp.security.WechatContentSecurityClient;
 import com.personalink.server.exception.BusinessException;
 import jakarta.validation.Validation;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -35,7 +36,9 @@ class UserContentServiceTest {
     @Test
     void feedbackRetryReturnsSameRecordButChangedContentConflicts() {
         var mapper = mock(FeedbackMapper.class);
-        var service = new FeedbackServiceImpl();
+        var security = mock(WechatContentSecurityClient.class);
+        when(security.isTextAllowed(any(), any(), anyInt())).thenReturn(true);
+        var service = new FeedbackServiceImpl(security);
         this.initialize(service, mapper, FeedbackEntity.class);
         var saved = new FeedbackEntity();
         saved.setId(1L); saved.setContent("feedback"); saved.setCreateDate(LocalDateTime.now());
@@ -47,9 +50,21 @@ class UserContentServiceTest {
         verify(mapper, times(3)).insertIdempotent(argThat(entity -> "owner".equals(entity.getOpenId())));
     }
     @Test
+    void feedbackRiskyContentIsRejectedBeforeInsert() {
+        var mapper = mock(FeedbackMapper.class);
+        var security = mock(WechatContentSecurityClient.class);
+        when(security.isTextAllowed("owner", "违规内容", WechatContentSecurityClient.SCENE_COMMENT))
+                .thenReturn(false);
+        var service = new FeedbackServiceImpl(security);
+        this.initialize(service, mapper, FeedbackEntity.class);
+
+        assertThrows(BusinessException.class, () -> service.submit("owner", new FeedbackCreateRequest("key", "违规内容")));
+        verify(mapper, never()).insertIdempotent(any());
+    }
+    @Test
     void feedbackHistoryIncludesAuthenticatedSubmitter() {
         var mapper = mock(FeedbackMapper.class);
-        var service = new FeedbackServiceImpl();
+        var service = new FeedbackServiceImpl(mock(WechatContentSecurityClient.class));
         this.initialize(service, mapper, FeedbackEntity.class);
         var saved = new FeedbackEntity();
         saved.setId(7L);

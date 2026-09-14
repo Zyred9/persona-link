@@ -95,6 +95,7 @@ Component({
     avatarUrl: '',
     avatarImage: '',
     draftNickname: '',
+    profileCustomized: false,
     profileSaving: false,
     avatarUploading: false,
     viewTitle: VIEW_TITLES[PROFILE_VIEW],
@@ -205,7 +206,8 @@ Component({
         nickname: cache.nickname,
         draftNickname: cache.nickname,
         avatarUrl: cache.avatarUrl,
-        avatarImage: resolveImageUrl(cache.avatarUrl)
+        avatarImage: resolveImageUrl(cache.avatarUrl),
+        profileCustomized: true
       });
     },
 
@@ -218,11 +220,14 @@ Component({
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
         if (!profile || typeof profile !== 'object') throw new Error('用户资料响应异常');
         this.profileToken = wx.getStorageSync(TOKEN_STORAGE_KEY);
-        this.setData({ profileState: 'ready', nickname: profile.nickname || '', draftNickname: profile.nickname || '', avatarUrl: profile.avatarUrl || '', avatarImage: resolveImageUrl(profile.avatarUrl) });
-        writeProfileCache(this.profileToken, profile.nickname || '', profile.avatarUrl || '');
+        const nickname = profile.nickname || '';
+        const avatarUrl = profile.avatarUrl || '';
+        const profileCustomized = profile.customized === true;
+        this.setData({ profileState: 'ready', nickname, draftNickname: nickname, avatarUrl, avatarImage: resolveImageUrl(avatarUrl), profileCustomized });
+        if (profileCustomized) writeProfileCache(this.profileToken, nickname, avatarUrl);
       } catch (error) {
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
-        this.setData({ profileState: 'error', profileError: error.message || '登录失败，请重试' });
+        this.setData({ profileState: 'error', profileError: error.message || '资料加载失败，请重试' });
       }
     },
 
@@ -241,7 +246,7 @@ Component({
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
         if (!result || !result.avatarUrl) throw new Error('上传服务未返回头像地址');
         if (this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) { await this.loadProfile(); return; }
-        this.setData({ avatarUrl: result.avatarUrl, avatarImage: resolveImageUrl(result.avatarUrl) });
+        this.setData({ avatarUrl: result.avatarUrl, avatarImage: resolveImageUrl(result.avatarUrl), profileCustomized: true });
         writeProfileCache(this.profileToken, this.data.nickname, result.avatarUrl);
         wx.showToast({ title: '头像已保存', icon: 'success' });
       } catch (error) {
@@ -261,8 +266,11 @@ Component({
       try {
         const profile = await authenticatedRequestData({ url: '/api/miniapp/profile', method: 'PUT', data: { nickname, avatarUrl: this.data.avatarUrl }, sessionBound: true, expectedToken: this.profileToken });
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
-        this.setData({ nickname: profile.nickname || '', draftNickname: profile.nickname || '', avatarUrl: profile.avatarUrl || '', avatarImage: resolveImageUrl(profile.avatarUrl) });
-        writeProfileCache(this.profileToken, profile.nickname || '', profile.avatarUrl || '');
+        const savedNickname = profile.nickname || '';
+        const savedAvatarUrl = profile.avatarUrl || '';
+        const profileCustomized = profile.customized === true;
+        this.setData({ nickname: savedNickname, draftNickname: savedNickname, avatarUrl: savedAvatarUrl, avatarImage: resolveImageUrl(savedAvatarUrl), profileCustomized });
+        if (profileCustomized) writeProfileCache(this.profileToken, savedNickname, savedAvatarUrl);
         wx.showToast({ title: '资料已保存', icon: 'success' });
       } catch (error) {
         if (this.componentAttached && epoch === this.profileEpoch) this.setData({ profileError: error.message || '保存失败，请重试' });

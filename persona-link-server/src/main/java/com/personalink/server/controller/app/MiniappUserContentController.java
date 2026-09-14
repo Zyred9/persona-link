@@ -13,6 +13,7 @@ public class MiniappUserContentController {
     private final FeedbackService feedbackService;
     private final LegalDocumentService legalDocumentService;
     private final TestRecordService testRecordService;
+    private final MiniappAccountService miniappAccountService;
     /**
      * 无需登录查询当前协议版本，供启动及进入核心功能前核对同意记录。
      * @return 已配置协议的类型与版本列表；缺少类型表示对应协议尚未配置
@@ -50,6 +51,16 @@ public class MiniappUserContentController {
     @DeleteMapping("/me/test-records")
     public ApiResponse<Void> deleteRecords(@RequestHeader(value=HttpHeaders.AUTHORIZATION, required=false) String authorization) {
         this.testRecordService.deleteAll(this.authService.requireSession(authorization).openId());
+        return ApiResponse.success(null);
+    }
+    /**
+     * 注销当前用户账号：删除账号资料、测试记录、反馈与埋点，并失效全部会话。
+     * @param authorization 登录令牌
+     * @return 空响应，事务完成后返回
+     */
+    @DeleteMapping("/me")
+    public ApiResponse<Void> cancelAccount(@RequestHeader(value=HttpHeaders.AUTHORIZATION, required=false) String authorization) {
+        this.miniappAccountService.cancel(this.authService.requireSession(authorization).openId());
         return ApiResponse.success(null);
     }
 }

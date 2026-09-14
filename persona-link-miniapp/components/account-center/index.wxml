@@ -8,7 +8,7 @@
 <block wx:if="{{currentView === 'profile'}}">
   <view class="paper-page profile-page">
     <view class="paper-card profile-card">
-      <block wx:if="{{profileState === 'ready' && avatarUrl && nickname}}">
+      <block wx:if="{{profileState === 'ready' && profileCustomized}}">
         <view class="profile-face profile-avatar">
           <image class="profile-avatar__image" src="{{avatarImage}}" mode="aspectFill" aria-label="用户头像"></image>
         </view>
@@ -34,13 +34,13 @@
         </form>
         <text wx:else class="profile-title">先从一题开始</text>
         <text class="profile-description">所有测试和双人配对均可免费体验</text>
-        <text wx:if="{{profileState === 'ready'}}" class="profile-description profile-hint">点击头像或昵称，使用微信资料</text>
+        <text wx:if="{{profileState === 'ready'}}" class="profile-description profile-hint">头像和昵称可选，用于报告署名</text>
       </view>
       </block>
     </view>
 
     <page-state wx:if="{{profileState === 'loading'}}" type="loading" title="正在加载个人资料"></page-state>
-    <button wx:elif="{{profileState === 'error'}}" class="paper-button paper-button--primary profile-action" bindtap="loadProfile">微信登录 · 重试</button>
+    <button wx:elif="{{profileState === 'error'}}" class="paper-button paper-button--primary profile-action" bindtap="loadProfile">重新加载资料</button>
     <view wx:if="{{profileError}}" class="profile-error">
       <text>{{profileError}}</text>
       <button wx:if="{{profileState === 'ready'}}" class="paper-button profile-action" disabled="{{profileSaving || avatarUploading}}" bindtap="loadProfile">重新加载资料</button>
@@ -139,6 +139,7 @@
     </block>
     </view>
     </block>
+    <ai-notice align="center" text="部分封面与结果名称由 AI 生成"></ai-notice>
   </view>
 </block>
 

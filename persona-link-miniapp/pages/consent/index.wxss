@@ -4,13 +4,7 @@
   flex-direction: column;
 }
 
-.onboarding-panel { display: block; margin-top: 70rpx; }
-.onboarding-avatar::after { border: 0; }
-.onboarding-panel .paper-button { margin-top: 36rpx; }
-.onboarding-avatar { width: 200rpx; height: 200rpx; padding: 0; border: 3rpx solid #201b22; border-radius: 50%; background: #fff7ec; font-size: 24rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.onboarding-avatar image { width: 100%; height: 100%; }
-.onboarding-nickname { height: 90rpx; margin: 36rpx 0; padding: 0 24rpx; border: 2rpx solid #201b22; border-radius: 20rpx; background: #fffdf8; }
-.onboarding-error { display: block; margin-top: 24rpx; color: #b63232; font-size: 26rpx; }
+.consent-error { display: block; margin-top: 24rpx; color: #b63232; font-size: 26rpx; }
 
 .consent-hero {
   display: flex;

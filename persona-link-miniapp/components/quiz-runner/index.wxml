@@ -40,6 +40,8 @@
       </button>
     </view>
 
+    <ai-notice text="题目内容由 AI 生成，仅供娱乐参考"></ai-notice>
+
     <view class="quiz-footer">
       <button
         wx:if="{{allAnswered && !isLast && !submissionPending}}"

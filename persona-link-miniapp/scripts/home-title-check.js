@@ -20,7 +20,7 @@ vm.runInNewContext(fs.readFileSync(path.join(root, 'pages/home/index.js'), 'utf8
 page.setData = function(value) { Object.assign(this.data, value); };
 
 async function run() {
-  const fallback = '/assets/images/home-title.png';
+  const fallback = '/assets/images/home-title.jpg';
   assert.equal(page.data.titleImageUrl, fallback, '初始加载必须有本地标题图');
   for (const value of [undefined, null, '', '/uploads/title.png', 'https://example.com/title.png']) {
     titleImageUrl = value;

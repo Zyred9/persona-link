@@ -6,4 +6,5 @@ import com.personalink.server.entity.FeedbackEntity;
 public interface FeedbackService extends IService<FeedbackEntity> {
     FeedbackResponse submit(String openId, FeedbackCreateRequest request);
     PageResponse<AdminFeedbackResponse> history(long page, long size);
+    void deleteByOpenId(String openId);
 }

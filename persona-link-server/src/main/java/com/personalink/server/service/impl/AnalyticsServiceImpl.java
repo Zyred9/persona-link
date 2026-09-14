@@ -96,6 +96,13 @@ public class AnalyticsServiceImpl extends ServiceImpl<AnalyticsEventMapper, Anal
                 .lt(AnalyticsEventEntity::getReceivedTime, cutoff));
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteByOpenId(String openId) {
+        this.remove(Wrappers.<AnalyticsEventEntity>lambdaQuery()
+                .eq(AnalyticsEventEntity::getOpenId, openId));
+    }
+
     private AnalyticsEventEntity toEntity(AnalyticsEventRequest request,
                                            MiniappSessionContext context,
                                            LocalDateTime receivedTime) {

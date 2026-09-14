@@ -37,7 +37,7 @@ class MiniappProfileWebTest {
         MiniappUserService users = mock(MiniappUserService.class);
         AuthService auth = mock(AuthService.class);
         when(auth.requireSession("Bearer valid")).thenReturn(new MiniappSessionContext("real-openid", null));
-        when(users.profile("real-openid")).thenReturn(new MiniappProfileResponse("昵称", ""));
+        when(users.profile("real-openid")).thenReturn(new MiniappProfileResponse("昵称", "", false));
         var mvc = MockMvcBuilders.standaloneSetup(new MiniappProfileController(auth, users))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         mvc.perform(get("/api/miniapp/profile").header("Authorization", "Bearer valid").param("openId", "forged"))

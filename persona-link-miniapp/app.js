@@ -51,7 +51,7 @@ App({
       const sharedUrl = buildLaunchUrl(source.path, source.query);
       if (sharedUrl) this.globalData.pendingLaunchUrl = sharedUrl;
     }
-    // 头像选择和阅读协议返回时，保留正在进行的引导步骤。
+    // 阅读协议返回时，保留正在进行的引导步骤。
     if (current && ['pages/consent/index', 'subpackages/account/pages/legal/index'].includes(current.route)) return;
     if (source.path === 'pages/consent/index' || source.path === 'subpackages/account/pages/legal/index') return;
     this.verifyConsent(buildLaunchUrl(source.path, source.query)).catch(() => {});
@@ -64,26 +64,14 @@ App({
     const epoch = this.consentEpoch || 0;
     this.consentCheck = (async () => {
       try {
-        const request = require('./utils/request');
-        const { onboardingProfile, isProfileComplete, primeProfileCache, TOKEN_STORAGE_KEY, writeProfileCache } = request;
-        const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
-        if (!token) throw new Error('请先点击微信登录');
-        // 资料完整性与协议版本互不依赖，并发校验，避免两次串行网络往返。
-        const [profile, versions] = await Promise.all([
-          onboardingProfile(),
-          request.requestData({
-            url: '/api/miniapp/legal-documents/versions', silentUnauthorized: true
-          })
-        ]);
+        // 协议校验只依赖设备上的同意记录，登录与资料在核心功能使用时才需要。
+        const { requestData } = require('./utils/request');
+        const versions = await requestData({
+          url: '/api/miniapp/legal-documents/versions', silentUnauthorized: true
+        });
         if (epoch !== (this.consentEpoch || 0)) throw new Error('协议状态已变化，请重试');
-        if (token !== wx.getStorageSync(TOKEN_STORAGE_KEY)) throw new Error('登录状态已变化，请重新登录');
-        if (!isProfileComplete(profile)) throw new Error('请先设置微信头像和昵称');
-        writeProfileCache(token, profile.nickname, profile.avatarUrl);
-        // 本次校验已拉取资料，账户中心可直接复用，避免同一次进入重复请求。
-        primeProfileCache(token, profile);
         const accepted = wx.getStorageSync('personaLinkConsentedDocuments');
         const current = wx.getStorageSync(CONSENT_STORAGE_KEY) === CONSENT_VERSION
-          && wx.getStorageSync('personaLinkConsentToken') === token
           && Array.isArray(accepted) && Array.isArray(versions)
           && [1, 2, 3].every((type) => {
             const latest = versions.find((document) => Number(document.type) === type);

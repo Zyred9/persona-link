@@ -1,5 +1,11 @@
 package com.personalink.server.dto;
 
-/** 当前用户公开资料，不返回 OpenID。 */
-public record MiniappProfileResponse(String nickname, String avatarUrl) {
+/**
+ * 当前用户本人资料（不含 OpenID）。
+ *
+ * @param nickname   头像昵称均由用户提供时为用户填写值，否则为默认值
+ * @param avatarUrl  用户未提供头像时为默认头像或空串
+ * @param customized 头像与昵称是否均为用户本人提供（默认值不算提供）
+ */
+public record MiniappProfileResponse(String nickname, String avatarUrl, boolean customized) {
 }

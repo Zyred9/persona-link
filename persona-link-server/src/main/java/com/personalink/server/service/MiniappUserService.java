@@ -13,4 +13,5 @@ public interface MiniappUserService extends IService<MiniappUserEntity> {
     MiniappProfileResponse profile(String openId);
     MiniappProfileResponse updateProfile(String openId, MiniappProfileRequest request);
     MiniappAvatarResponse uploadAvatar(String openId, MultipartFile file);
+    void anonymize(String openId);
 }

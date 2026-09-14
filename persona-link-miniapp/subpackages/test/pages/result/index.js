@@ -1,6 +1,6 @@
 const { authenticatedRequestData } = require('../../../../utils/request');
 const { trackEvent } = require('../../../../utils/analytics');
-const { createReportAccess } = require('../../../../utils/report-access');
+const { createReportAccess } = require('../../utils/report-access');
 
 const VIEW_ALIASES = {
   permission: 'permission-denied'

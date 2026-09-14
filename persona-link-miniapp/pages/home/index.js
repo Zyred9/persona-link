@@ -7,7 +7,7 @@ const { trackEvent } = require('../../utils/analytics');
 const { resolveImageUrl } = require('../../utils/image');
 
 const ALL_CATEGORY_ID = 'all';
-const DEFAULT_TITLE_IMAGE = '/assets/images/home-title.png';
+const DEFAULT_TITLE_IMAGE = '/assets/images/home-title.jpg';
 
 function prepareTests(tests) {
   return (Array.isArray(tests) ? tests : []).map((item) => Object.assign({}, item, {

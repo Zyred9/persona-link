@@ -1,7 +1,9 @@
 package com.personalink.server.miniapp.analytics;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.personalink.server.miniapp.WechatAccessTokenProvider;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,7 +14,9 @@ class WechatAnalyticsClientTest {
 
     @Test
     void shouldParseDailyVisitTrend() {
-        WechatAnalyticsClient client = new WechatAnalyticsClient("", "", new ObjectMapper());
+        WechatAccessTokenProvider tokenProvider = new WechatAccessTokenProvider(
+                "", "", new ObjectMapper(), RestClient.builder().build());
+        WechatAnalyticsClient client = new WechatAnalyticsClient(tokenProvider, new ObjectMapper());
 
         WechatDailyMetric metric = client.parseDailyMetric("""
                 {"list":[{"ref_date":"20260903","session_cnt":12,"visit_pv":30,"visit_uv":18,

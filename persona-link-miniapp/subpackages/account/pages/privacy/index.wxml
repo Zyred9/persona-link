@@ -3,7 +3,7 @@
 <view class="paper-page privacy-page">
   <view class="paper-card privacy-intro">
     <text class="privacy-intro__title">你可以管理自己的数据</text>
-    <text class="privacy-intro__copy">可删除自己的全部测试记录。</text>
+    <text class="privacy-intro__copy">可删除全部测试记录，或注销账号。</text>
   </view>
 
   <view class="privacy-list">
@@ -11,9 +11,13 @@
       <text>{{deleting ? '正在删除' : '删除全部测试记录'}}</text>
       <text class="privacy-row__arrow">›</text>
     </button>
+    <button class="paper-card privacy-row privacy-row--danger" loading="{{cancelling}}" disabled="{{cancelling}}" bindtap="cancelAccount">
+      <text>{{cancelling ? '正在注销' : '注销账号'}}</text>
+      <text class="privacy-row__arrow">›</text>
+    </button>
   </view>
 
   <view class="paper-card privacy-note">
-    删除范围包括你的未完成答卷、答案、测试报告及个人双人记录。未完成的双人测试将取消；对方仍可查看已完成的双人报告及自己的答卷。此操作不是账号注销，也不会删除反馈或登录信息。
+    删除记录会清理你的未完成答卷、答案、测试报告及个人双人记录；对方仍可查看已完成的双人报告及自己的答卷。注销账号还会删除账号资料、反馈与登录信息，无法恢复；注销后重新登录将视为全新账号。
   </view>
 </view>

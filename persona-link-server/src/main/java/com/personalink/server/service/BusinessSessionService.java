@@ -17,4 +17,6 @@ public interface BusinessSessionService extends IService<BusinessSessionEntity> 
     void revoke(Long sessionId, LocalDateTime revokedAt);
 
     void revokeAdminSessions(Long adminId, LocalDateTime revokedAt);
+
+    void revokeMiniappSessions(String openId, LocalDateTime revokedAt);
 }

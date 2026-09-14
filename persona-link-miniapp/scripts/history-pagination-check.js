@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
-let definition, modal;
+let definition;
 let pairAuto = true;
 const requests = [];
 const navigations = [];
@@ -15,7 +15,7 @@ vm.runInNewContext(read('components/account-center/index.js'), {
     : pairAuto && options.url.startsWith('/api/miniapp/pairs?')
     ? Promise.resolve({ records: [], total: 0 })
     : new Promise((resolve, reject) => requests.push({ ...options, resolve, reject })) }),
-  wx: { getStorageSync() {}, navigateTo({ url }) { navigations.push(url); }, showModal(value) { modal = value; }, showToast() {} },
+  wx: { getStorageSync() {}, navigateTo({ url }) { navigations.push(url); }, showToast() {} },
   clearTimeout() {}
 });
 function component() {
@@ -116,14 +116,6 @@ async function run() {
   assert.equal(history.data.historyHasMore, false); // total 过期也不会空页无限加载。
 
   pending = history.loadRecords(); requests.at(-1).resolve(page(40)); await pending;
-  const beforeDelete = history.loadMoreRecords(); const deletedPage = requests.at(-1);
-  history.deleteRecord({ currentTarget: { dataset: { reportId: '40' } } });
-  const deletion = modal.success({ confirm: true }); requests.at(-1).resolve(); await deletion;
-  const afterDelete = requests.at(-1);
-  deletedPage.resolve(page(20)); await beforeDelete;
-  assert.equal(history.data.historyState, 'loading');
-  afterDelete.resolve(page(39)); await new Promise(setImmediate);
-  assert.equal(history.data.records[0].reportId, '39');
   const leaving = history.loadMoreRecords(); history.setCurrentView('profile');
   requests.at(-1).resolve(page(19)); await leaving;
   assert.equal(history.data.records.length, 20);
@@ -198,6 +190,6 @@ async function run() {
   const pairHistory = pairSql.match(/<select id="selectHistory"[\s\S]*?<\/select>/)[0];
   assert.match(reportHistory, /v\.cover_url/);
   assert.match(pairHistory, /v\.cover_url/);
-  console.log('HISTORY_PAGINATION_CHECK_OK tabs/swipe/panel-animation/no-pull-down/scroll-view/pair-navigation/covers-centered/single+pair/paging/retry/dedup/stale/delete/failure-isolation/three-entry-wiring/order');
+  console.log('HISTORY_PAGINATION_CHECK_OK tabs/swipe/panel-animation/no-pull-down/scroll-view/pair-navigation/covers-centered/single+pair/paging/retry/dedup/stale/failure-isolation/three-entry-wiring/order');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

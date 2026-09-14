@@ -6,6 +6,8 @@ const vm = require('vm');
 const detailRequests = [];
 const assessmentRequests = [];
 const navigations = [];
+const previews = [];
+const toasts = [];
 let definition;
 
 const imageModule = { exports: {} };
@@ -43,7 +45,8 @@ vm.runInNewContext(source, {
       if (options.success) options.success();
       if (options.complete) options.complete();
     },
-    showToast() {}
+    previewImage(options) { previews.push(options); },
+    showToast(options) { toasts.push(options); }
   }
 });
 
@@ -87,16 +90,28 @@ async function main() {
 
   for (const testType of [1, 2]) {
     const instance = createInstance({ testId: '12', testType });
+    instance.previewDetailImage();
+    const previewCount = previews.length;
     const customLoad = instance.loadTest('12');
-    detailRequests.at(-1).resolve({ testType, detailImageUrl: 'https://example.com/detail.png' });
+    const originalUrl = 'https://pgcloud.aitici.com/common/detail.png';
+    detailRequests.at(-1).resolve({ testType, detailImageUrl: originalUrl });
     await customLoad;
-    assert.strictEqual(instance.data.test.imageUrl, 'https://example.com/detail.png');
+    assert.strictEqual(instance.data.test.imageUrl, imageModule.exports.resolveImageUrl(originalUrl));
+    instance.previewDetailImage();
+    assert.strictEqual(previews.length, previewCount + 1);
+    assert.strictEqual(previews.at(-1).current, originalUrl, '预览应使用原图');
+    assert.strictEqual(previews.at(-1).urls[0], originalUrl);
+    assert.strictEqual(previews.at(-1).showmenu, true, '预览应允许长按保存');
+    previews.at(-1).fail();
+    assert.ok(toasts.at(-1).title.includes('失败'));
     for (const detailImageUrl of [undefined, null, '']) {
       const legacyLoad = instance.loadTest('12');
       detailRequests.at(-1).resolve({ testType, coverUrl: 'https://example.com/cover.png', detailImageUrl });
       await legacyLoad;
       assert.strictEqual(instance.data.test.imageUrl, '',
         '未配置详情图时不使用默认整图，也不回退到首页封面');
+      instance.previewDetailImage();
+      assert.strictEqual(previews.length, previewCount + 1, '无图不得打开预览');
     }
   }
   const swipe = createInstance({ testId: '12', testType: 1 });
@@ -111,6 +126,7 @@ async function main() {
   assert.deepStrictEqual(swipe.events, ['back'], '纵向滑动不得触发返回');
 
   const template = fs.readFileSync(path.join(__dirname, '../components/test-detail/index.wxml'), 'utf8');
+  assert.strictEqual((template.match(/bindtap="previewDetailImage"/g) || []).length, 2);
   assert.strictEqual((template.match(/src="{{test.imageUrl}}" mode="widthFix"/g) || []).length, 2,
     '单人和双人详情图均应完整等比例展示');
   assert.match(template, /bindtouchstart="handleSwipeStart"/);

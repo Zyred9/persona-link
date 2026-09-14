@@ -2,6 +2,8 @@
   "navigationBarTitleText": "映见你我",
   "enablePullDownRefresh": true,
   "usingComponents": {
+    "ai-badge": "/components/ai-badge/index",
+    "ai-notice": "/components/ai-notice/index",
     "app-nav-bar": "/components/app-nav-bar/index",
     "account-center": "/components/account-center/index",
     "page-state": "/components/page-state/index",

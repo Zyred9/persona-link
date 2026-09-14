@@ -4,9 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personalink.server.exception.BusinessException;
+import com.personalink.server.miniapp.WechatAccessTokenProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -14,7 +14,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -26,18 +25,12 @@ public class WechatAnalyticsClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(WechatAnalyticsClient.class);
     private static final DateTimeFormatter WECHAT_DATE = DateTimeFormatter.BASIC_ISO_DATE;
 
-    private final String appId;
-    private final String appSecret;
+    private final WechatAccessTokenProvider accessTokenProvider;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
-    private volatile String accessToken;
-    private volatile Instant accessTokenExpiresAt = Instant.EPOCH;
 
-    public WechatAnalyticsClient(@Value("${WECHAT_APP_ID:}") String appId,
-                                 @Value("${WECHAT_APP_SECRET:}") String appSecret,
-                                 ObjectMapper objectMapper) {
-        this.appId = appId;
-        this.appSecret = appSecret;
+    public WechatAnalyticsClient(WechatAccessTokenProvider accessTokenProvider, ObjectMapper objectMapper) {
+        this.accessTokenProvider = accessTokenProvider;
         this.objectMapper = objectMapper;
         this.restClient = RestClient.builder().baseUrl("https://api.weixin.qq.com").build();
     }
@@ -48,42 +41,13 @@ public class WechatAnalyticsClient {
         try {
             String responseBody = this.restClient.post()
                     .uri(uriBuilder -> uriBuilder.path("/datacube/getweanalysisappiddailyvisittrend")
-                            .queryParam("access_token", this.getAccessToken()).build())
+                            .queryParam("access_token", this.accessTokenProvider.getToken()).build())
                     .body(Map.of("begin_date", date, "end_date", date))
                     .retrieve()
                     .body(String.class);
             return this.parseDailyMetric(responseBody, statDate);
         } catch (RestClientException exception) {
             LOGGER.error("[微信统计] 日访问趋势调用失败，统计日期：{}", statDate, exception);
-            throw new BusinessException(HttpStatus.BAD_GATEWAY, 50231, "微信统计服务暂不可用");
-        }
-    }
-
-    synchronized String getAccessToken() {
-        if (StringUtils.hasText(this.accessToken) && Instant.now().isBefore(this.accessTokenExpiresAt)) {
-            return this.accessToken;
-        }
-        try {
-            String responseBody = this.restClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/cgi-bin/token")
-                            .queryParam("grant_type", "client_credential")
-                            .queryParam("appid", this.appId)
-                            .queryParam("secret", this.appSecret)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
-            JsonNode root = this.parseJson(responseBody);
-            this.raiseWechatError(root);
-            String token = root.path("access_token").asText();
-            if (!StringUtils.hasText(token)) {
-                throw new BusinessException(HttpStatus.BAD_GATEWAY, 50231, "微信凭证响应异常");
-            }
-            int expiresIn = root.path("expires_in").asInt(7200);
-            this.accessToken = token;
-            this.accessTokenExpiresAt = Instant.now().plusSeconds(Math.max(60, expiresIn - 300L));
-            return token;
-        } catch (RestClientException exception) {
-            LOGGER.error("[微信统计] access_token 调用失败", exception);
             throw new BusinessException(HttpStatus.BAD_GATEWAY, 50231, "微信统计服务暂不可用");
         }
     }
@@ -130,7 +94,7 @@ public class WechatAnalyticsClient {
     }
 
     private void requireConfigured() {
-        if (!StringUtils.hasText(this.appId) || !StringUtils.hasText(this.appSecret)) {
+        if (!this.accessTokenProvider.isConfigured()) {
             throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, 50331, "微信小程序 AppID 或 AppSecret 未配置");
         }
     }

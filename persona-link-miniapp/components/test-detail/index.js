@@ -4,7 +4,7 @@ const {
   createIdempotencyKey
 } = require('../../utils/request');
 const { trackEvent } = require('../../utils/analytics');
-const { resolveImageUrl } = require('../../utils/image');
+const { resolveImageUrl, resolvePreviewUrl } = require('../../utils/image');
 
 const DETAIL_SWIPE_MIN_DISTANCE = 60;
 
@@ -79,7 +79,6 @@ Component({
         }
         this.setData({ state: 'ready', test: Object.assign({}, test, {
           imageUrl: resolveImageUrl(test.detailImageUrl)
-            || `/assets/images/${expectedTestType === 2 ? 'pair' : 'single'}-detail-hero.png`
         }) });
       } catch (error) {
         if (this.requestVersion !== requestVersion || this.data.testId !== normalizedTestId) {
@@ -90,6 +89,17 @@ Component({
           errorDescription: error.message || '题型详情加载失败'
         });
       }
+    },
+
+    previewDetailImage() {
+      const url = resolvePreviewUrl(this.data.test && this.data.test.detailImageUrl);
+      if (!url) return;
+      wx.previewImage({
+        current: url,
+        urls: [url],
+        showmenu: true,
+        fail: () => wx.showToast({ title: '图片预览失败，请稍后重试', icon: 'none' })
+      });
     },
 
     async startAssessment() {

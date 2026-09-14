@@ -1,0 +1,11 @@
+.ai-notice {
+  display: block;
+  margin-top: 24rpx;
+  color: #766e78;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.ai-notice--center {
+  text-align: center;
+}

@@ -19,6 +19,7 @@
       bindtap="openTest"
     >
       <image class="home-test-card__image" src="{{focusTest.imageUrl}}" mode="widthFix" webp="{{true}}"></image>
+      <view class="home-test-card__badge"><ai-badge text="AI生成"></ai-badge></view>
     </view>
 
     <view wx:if="{{recommendedTests.length > 0}}" class="test-grid">
@@ -31,6 +32,7 @@
         bindtap="openTest"
       >
         <image class="home-test-card__image" src="{{item.imageUrl}}" mode="widthFix" webp="{{true}}" lazy-load="{{true}}"></image>
+        <view class="home-test-card__badge"><ai-badge text="AI生成"></ai-badge></view>
       </button>
     </view>
 
@@ -54,10 +56,13 @@
         bindtap="openTest"
       >
         <image class="home-test-card__image paper-card" src="{{item.imageUrl}}" mode="widthFix" webp="{{true}}" lazy-load="{{true}}"></image>
+        <view class="home-test-card__badge"><ai-badge text="AI生成"></ai-badge></view>
       </button>
     </view>
 
     <view wx:if="{{tests.length === 0}}" class="category-empty">这个分类还在准备中</view>
+
+    <ai-notice align="center" text="题型配图由 AI 生成"></ai-notice>
   </block>
 
   <block wx:elif="{{state === 'loading'}}">

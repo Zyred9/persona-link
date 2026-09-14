@@ -1,0 +1,10 @@
+.ai-badge {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(32, 27, 34, 0.62);
+  color: #fffdf8;
+  font-size: 20rpx;
+  line-height: 1.4;
+  white-space: nowrap;
+}
