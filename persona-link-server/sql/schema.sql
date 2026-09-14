@@ -37,7 +37,8 @@ ON DUPLICATE KEY UPDATE config_key = VALUES(config_key);
 -- 用户反馈和协议配置增量；不写入占位协议正文。执行前核对目标数据库。
 CREATE TABLE IF NOT EXISTS t_feedback (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-    open_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT '提交用户',
+    open_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '提交用户；匿名提交为空',
+    nickname VARCHAR(32) NOT NULL DEFAULT '' COMMENT '提交时的昵称快照；匿名或未设置时为空',
     request_id VARCHAR(64) COLLATE utf8mb4_bin NOT NULL COMMENT '用户内幂等请求号',
     content VARCHAR(500) NOT NULL COMMENT '反馈或举报纯文本',
     deleted TINYINT NOT NULL DEFAULT 0,
@@ -486,9 +487,23 @@ CREATE TABLE IF NOT EXISTS t_miniapp_user (
     open_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT '微信用户唯一标识',
     nickname VARCHAR(32) NOT NULL DEFAULT '' COMMENT '用户主动填写的昵称',
     avatar_url VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '本服务上传的头像地址',
+    pending_avatar_url VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '待审核头像地址，审核通过后替换 avatar_url',
+    pending_avatar_trace_id VARCHAR(128) NOT NULL DEFAULT '' COMMENT '微信图片审核任务 trace_id',
     deleted TINYINT NOT NULL DEFAULT 0,
     create_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_miniapp_user_open_id (open_id)
+    UNIQUE KEY uk_miniapp_user_open_id (open_id),
+    KEY idx_miniapp_user_avatar_trace (pending_avatar_trace_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='小程序用户资料';
+
+CREATE TABLE IF NOT EXISTS t_avatar_audit_result (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    trace_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT '微信审核任务号',
+    passed TINYINT NOT NULL COMMENT '1审核通过，0未通过',
+    deleted TINYINT NOT NULL DEFAULT 0,
+    create_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_avatar_audit_trace (trace_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='微信头像审核首次结果';

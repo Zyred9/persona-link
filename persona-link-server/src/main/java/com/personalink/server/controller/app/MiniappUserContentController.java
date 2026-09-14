@@ -6,6 +6,8 @@ import com.personalink.server.service.impl.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Objects;
 /** 用户反馈、公开协议和本人测试记录清理。 */
 @RestController @RequestMapping("/api/miniapp") @RequiredArgsConstructor
 public class MiniappUserContentController {
@@ -24,15 +26,16 @@ public class MiniappUserContentController {
     }
 
     /**
-     * 提交当前用户的反馈，重试相同请求号不会重复创建。
-     * @param authorization 登录令牌
+     * 提交反馈，支持匿名：未登录不创建账号，仅在有会话时记录提交人。
+     * @param authorization 可选登录令牌
      * @param request 反馈内容和幂等请求号
      * @return 收件记录
      */
     @PostMapping("/feedbacks")
     public ApiResponse<FeedbackResponse> feedback(@RequestHeader(value=HttpHeaders.AUTHORIZATION, required=false) String authorization,
             @Valid @RequestBody FeedbackCreateRequest request) {
-        return ApiResponse.success(this.feedbackService.submit(this.authService.requireSession(authorization).openId(), request));
+        MiniappSessionContext session = this.authService.findSession(authorization);
+        return ApiResponse.success(this.feedbackService.submit(Objects.isNull(session) ? null : session.openId(), request));
     }
     /**
      * 无需登录查询已发布协议，供首次同意前阅读。

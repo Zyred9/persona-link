@@ -2,11 +2,6 @@ const { authenticatedRequestData } = require('../../../../utils/request');
 const { trackEvent } = require('../../../../utils/analytics');
 const { createReportAccess } = require('../../utils/report-access');
 
-const VIEW_ALIASES = {
-  permission: 'permission-denied'
-};
-const AVAILABLE_VIEWS = ['result', 'permission-denied'];
-
 function textOf(content) {
   if (content && typeof content === 'object') return content.text || '';
   return typeof content === 'string' ? content : '';
@@ -31,7 +26,6 @@ function prepareResult(report) {
 Page({
   data: {
     state: 'loading',
-    view: 'result',
     result: null,
     errorDescription: '暂时无法加载报告，请稍后重试。'
   },
@@ -39,13 +33,6 @@ Page({
   onLoad(options) {
     this.reportId = options.reportId || '';
     this.shareToken = typeof options.shareToken === 'string' ? options.shareToken : '';
-    const requestedView = VIEW_ALIASES[options.state] || options.state;
-    const view = AVAILABLE_VIEWS.includes(requestedView) ? requestedView : 'result';
-    this.setData({ view });
-    if (view !== 'result') {
-      this.setData({ state: 'ready' });
-      return;
-    }
     this.loadReport();
   },
 
@@ -112,18 +99,5 @@ Page({
 
   retry() {
     this.loadReport();
-  },
-
-  returnResult() {
-    if (this.data.result) {
-      this.setData({ state: 'ready', view: 'result' });
-      return;
-    }
-    if (this.reportId) {
-      this.setData({ view: 'result' });
-      this.loadReport();
-      return;
-    }
-    getApp().returnToHome();
   }
 });

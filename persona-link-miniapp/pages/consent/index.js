@@ -1,4 +1,4 @@
-const { requestData } = require('../../utils/request');
+const { requestData, clearAccountSession } = require('../../utils/request');
 
 Page({
   data: {
@@ -90,11 +90,14 @@ Page({
     wx.switchTab({ url: '/pages/home/index', fail: () => { this.agreeing = false; } });
   },
 
-  exitMiniProgram() {
-    wx.exitMiniProgram({
-      fail() {
-        wx.showToast({ title: '请关闭小程序退出', icon: 'none' });
-      }
-    });
+  browseAsGuest() {
+    const app = getApp();
+    app.consentEpoch = (app.consentEpoch || 0) + 1;
+    app.globalData.hasConsent = false;
+    app.globalData.pendingLaunchUrl = '';
+    clearAccountSession();
+    wx.removeStorageSync(app.globalData.consentStorageKey);
+    wx.removeStorageSync('personaLinkConsentedDocuments');
+    wx.switchTab({ url: '/pages/home/index' });
   }
 });

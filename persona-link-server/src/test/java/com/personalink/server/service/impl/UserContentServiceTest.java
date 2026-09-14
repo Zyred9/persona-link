@@ -5,6 +5,7 @@ import com.personalink.server.dto.*;
 import com.personalink.server.entity.*;
 import com.personalink.server.mapper.*;
 import com.personalink.server.miniapp.security.WechatContentSecurityClient;
+import com.personalink.server.service.MiniappUserService;
 import com.personalink.server.exception.BusinessException;
 import jakarta.validation.Validation;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -38,7 +39,7 @@ class UserContentServiceTest {
         var mapper = mock(FeedbackMapper.class);
         var security = mock(WechatContentSecurityClient.class);
         when(security.isTextAllowed(any(), any(), anyInt())).thenReturn(true);
-        var service = new FeedbackServiceImpl(security);
+        var service = new FeedbackServiceImpl(security, mock(MiniappUserService.class));
         this.initialize(service, mapper, FeedbackEntity.class);
         var saved = new FeedbackEntity();
         saved.setId(1L); saved.setContent("feedback"); saved.setCreateDate(LocalDateTime.now());
@@ -55,20 +56,66 @@ class UserContentServiceTest {
         var security = mock(WechatContentSecurityClient.class);
         when(security.isTextAllowed("owner", "违规内容", WechatContentSecurityClient.SCENE_COMMENT))
                 .thenReturn(false);
-        var service = new FeedbackServiceImpl(security);
-        this.initialize(service, mapper, FeedbackEntity.class);
+        var service = new FeedbackServiceImpl(security, mock(MiniappUserService.class));
 
         assertThrows(BusinessException.class, () -> service.submit("owner", new FeedbackCreateRequest("key", "违规内容")));
         verify(mapper, never()).insertIdempotent(any());
     }
     @Test
+    void anonymousFeedbackSkipsAccountBoundCheckAndKeepsEmptyIdentity() {
+        var mapper = mock(FeedbackMapper.class);
+        var security = mock(WechatContentSecurityClient.class);
+        var users = mock(MiniappUserService.class);
+        var service = new FeedbackServiceImpl(security, users);
+        this.initialize(service, mapper, FeedbackEntity.class);
+        var saved = new FeedbackEntity();
+        saved.setId(9L); saved.setContent("匿名反馈"); saved.setCreateDate(LocalDateTime.now());
+        when(mapper.selectOne(any())).thenReturn(saved);
+
+        assertEquals("9", service.submit(null, new FeedbackCreateRequest("anon-key", "匿名反馈")).id());
+
+        verify(security, never()).isTextAllowed(any(), any(), anyInt());
+        verify(users, never()).findByOpenId(any());
+        verify(mapper).insertIdempotent(argThat(entity -> "".equals(entity.getOpenId()) && "".equals(entity.getNickname())));
+    }
+    @Test
+    void anonymousFeedbackIsNotDeletedByAnyAccountCancellation() {
+        var mapper = mock(FeedbackMapper.class);
+        var service = new FeedbackServiceImpl(mock(WechatContentSecurityClient.class), mock(MiniappUserService.class));
+        this.initialize(service, mapper, FeedbackEntity.class);
+
+        service.deleteByOpenId(" ");
+
+        verifyNoInteractions(mapper);
+    }
+    @Test
+    void authenticatedFeedbackSavesSubmitterNicknameSnapshot() {
+        var mapper = mock(FeedbackMapper.class);
+        var security = mock(WechatContentSecurityClient.class);
+        var users = mock(MiniappUserService.class);
+        when(security.isTextAllowed(any(), any(), anyInt())).thenReturn(true);
+        var owner = new MiniappUserEntity();
+        owner.setNickname("小明");
+        when(users.findByOpenId("owner")).thenReturn(owner);
+        var service = new FeedbackServiceImpl(security, users);
+        this.initialize(service, mapper, FeedbackEntity.class);
+        var saved = new FeedbackEntity();
+        saved.setId(3L); saved.setContent("反馈"); saved.setCreateDate(LocalDateTime.now());
+        when(mapper.selectOne(any())).thenReturn(saved);
+
+        service.submit("owner", new FeedbackCreateRequest("key", "反馈"));
+
+        verify(mapper).insertIdempotent(argThat(entity -> "owner".equals(entity.getOpenId()) && "小明".equals(entity.getNickname())));
+    }
+    @Test
     void feedbackHistoryIncludesAuthenticatedSubmitter() {
         var mapper = mock(FeedbackMapper.class);
-        var service = new FeedbackServiceImpl(mock(WechatContentSecurityClient.class));
+        var service = new FeedbackServiceImpl(mock(WechatContentSecurityClient.class), mock(MiniappUserService.class));
         this.initialize(service, mapper, FeedbackEntity.class);
         var saved = new FeedbackEntity();
         saved.setId(7L);
         saved.setOpenId("feedback-owner");
+        saved.setNickname("小明");
         saved.setContent("feedback");
         saved.setCreateDate(LocalDateTime.now());
         when(mapper.selectCount(any())).thenReturn(1L);
@@ -77,7 +124,7 @@ class UserContentServiceTest {
         var page = service.history(1, 20);
 
         assertEquals(1, page.total());
-        assertEquals(new AdminFeedbackResponse("7", "feedback-owner", "feedback", saved.getCreateDate()),
+        assertEquals(new AdminFeedbackResponse("7", "feedback-owner", "小明", "feedback", saved.getCreateDate()),
                 page.records().get(0));
     }
     @Test

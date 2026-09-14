@@ -53,11 +53,28 @@ public class AuthService {
     }
 
     public MiniappSessionContext requireSession(String authorization) {
+        MiniappSessionContext session = this.findSession(authorization);
+        if (Objects.isNull(session)) {
+            throw this.unauthorizedSession();
+        }
+        return session;
+    }
+
+    /**
+     * 解析可选业务会话，缺失或失效返回 null。
+     * <p>供匿名接口在有登录态时沿用用户身份，未登录时不强制登录。
+     * @param authorization 请求头中的 Bearer 令牌，可为空
+     * @return 有效会话上下文；未登录或已失效返回 null
+     */
+    public MiniappSessionContext findSession(String authorization) {
         String token = this.extractBearerToken(authorization);
+        if (Objects.isNull(token)) {
+            return null;
+        }
         BusinessSessionEntity session = this.businessSessionService.findActiveMiniappSession(
                 MiniappTokenCodec.hashToken(token), LocalDateTime.now());
         if (Objects.isNull(session) || Objects.isNull(session.getOpenId())) {
-            throw this.unauthorizedSession();
+            return null;
         }
         return new MiniappSessionContext(session.getOpenId(), session);
     }
@@ -65,13 +82,10 @@ public class AuthService {
     private String extractBearerToken(String authorization) {
         if (Objects.isNull(authorization)
                 || !authorization.regionMatches(true, 0, "Bearer ", 0, "Bearer ".length())) {
-            throw this.unauthorizedSession();
+            return null;
         }
         String token = authorization.substring("Bearer ".length()).trim();
-        if (token.isEmpty()) {
-            throw this.unauthorizedSession();
-        }
-        return token;
+        return token.isEmpty() ? null : token;
     }
 
     private BusinessException unauthorizedSession() {

@@ -21,6 +21,8 @@ async function main() {
   let waitDefinition;
   const waitReplies = [];
   const clipboard = [];
+  const clipboardOptions = [];
+  const waitToasts = [];
   const shareEvents = [];
   let heroConfig = { 'miniapp.pair.waiting_hero_image_url': '/uploads/waiting.png', 'miniapp.pair.completed_hero_image_url': '/uploads/completed.png' };
   let configFailed = false;
@@ -41,7 +43,8 @@ async function main() {
     },
     wx: {
       getStorageSync: () => '',
-      setClipboardData: ({ data }) => clipboard.push(data),
+      setClipboardData: (options) => { clipboard.push(options.data); clipboardOptions.push(options); },
+      showToast: ({ title }) => waitToasts.push(title),
       navigateTo() {},
       redirectTo() {}
     }
@@ -69,6 +72,8 @@ async function main() {
   assert.equal(shareEvents.at(-1)[0], 5, '重新分享必须上报分享事件');
   wait.copyPairCode();
   assert.equal(clipboard.at(-1), 'ABCDE');
+  clipboardOptions.at(-1).fail();
+  assert.equal(waitToasts.at(-1), '复制失败，请手动记录配对码', '等待页复制失败必须提示用户手动记录配对码');
 
   waitReplies.push({ pairStatus: 2, myRole: 'INITIATOR', inviteToken: null });
   await wait.refreshStatus();
@@ -252,6 +257,8 @@ async function main() {
   // ===== invite 页：对方加入后隐藏失效的分享入口 =====
   let inviteDefinition;
   const inviteReplies = [];
+  const inviteClipboard = [];
+  const inviteToasts = [];
   vm.runInNewContext(read('subpackages/pair/pages/invite/index.js'), {
     Page(value) { inviteDefinition = value; },
     require: (name) => name.endsWith('/analytics')
@@ -260,7 +267,12 @@ async function main() {
         authenticatedRequestData: async () => inviteReplies.shift(),
         createIdempotencyKey: () => 'pair-id'
       },
-    wx: { getStorageSync: () => '', setStorageSync() {}, setClipboardData() {} }
+    wx: {
+      getStorageSync: () => '',
+      setStorageSync() {},
+      setClipboardData: (options) => inviteClipboard.push(options),
+      showToast: ({ title }) => inviteToasts.push(title)
+    }
   });
   const invite = makePageInstance(inviteDefinition);
   invite.pairSessionId = '99';
@@ -271,6 +283,11 @@ async function main() {
   inviteReplies.push({ pairStatus: 1 });
   await invite.refreshShareState();
   assert.equal(invite.data.shareable, true, '仍在等待时保持分享入口');
+  invite.setData({ pairCode: 'ABCDE' });
+  invite.copyPairCode();
+  assert.equal(inviteClipboard.at(-1).data, 'ABCDE');
+  inviteClipboard.at(-1).fail();
+  assert.equal(inviteToasts.at(-1), '复制失败，请手动记录配对码', '邀请页复制失败必须提示用户手动记录配对码');
   const inviteTemplate = read('subpackages/pair/pages/invite/index.wxml');
   assert.match(inviteTemplate, /wx:if="\{\{shareable\}\}"/);
   assert.match(inviteTemplate, /invite-joined-note/);

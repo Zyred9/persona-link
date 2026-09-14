@@ -39,12 +39,12 @@ async function check({ consent = true, token = '', overlay = false, fail = false
     setData(patch) { Object.assign(this.data, patch); }
   };
   const refreshing = page.onPullDownRefresh();
-  if (consent && !overlay) {
-    assert.deepEqual(requests, token
+  if (!overlay) {
+    assert.deepEqual(requests, consent && token
       ? ['/api/miniapp/home', '/api/miniapp/assessments/current'] : ['/api/miniapp/home']);
     assert.equal(stopped, 0, '等待请求结束后才收起刷新动画');
     pending[0]();
-    if (token) {
+    if (consent && token) {
       await new Promise((resolve) => setImmediate(resolve));
       assert.equal(stopped, 0, '继续等待答卷请求结束');
       pending[1]();
@@ -52,10 +52,10 @@ async function check({ consent = true, token = '', overlay = false, fail = false
     await refreshing;
     assert.equal(page.data.state, fail ? 'error' : 'ready');
     if (!fail) assert.equal(page.data.tests[0].testId, 'new-test');
-    if (token) assert.equal(page.data.currentAssessment?.answerSessionId, fail ? undefined : 'new-session');
+    if (consent && token) assert.equal(page.data.currentAssessment?.answerSessionId, fail ? undefined : 'new-session');
   } else {
     await refreshing;
-    assert.deepEqual(requests, [], '未同意隐私或弹层打开时不刷新底层');
+    assert.deepEqual(requests, [], '弹层打开时不刷新底层');
   }
   assert.equal(stopped, 1, '每次下拉都必须结束刷新动画');
 }

@@ -11,7 +11,8 @@ const api = {
   authenticatedRequestData: (options) => { calls.push(options); return reply(options); },
   requestData: (options) => { calls.push(options); return reply(options); },
   createIdempotencyKey: (() => { let id = 0; return () => `key-${++id}`; })(),
-  invalidateTestRecordRequests: () => calls.push('invalidate')
+  invalidateTestRecordRequests: () => calls.push('invalidate'),
+  clearAccountSession: () => {}
 };
 const wx = {
   showToast: (value) => toasts.push(value), showModal: (value) => { modal = value; },
@@ -55,6 +56,7 @@ async function run() {
   assert.equal(toasts.at(-1).title, '提交成功');
   feedback.data.feedbackContent = '新问题';
   const late = feedback.submitFeedback();
+  await new Promise(setImmediate);
   assert.notEqual(calls.at(-1).data.requestId, firstId);
   feedback.pageLifetimes.hide.call(feedback);
   const toastCount = toasts.length;

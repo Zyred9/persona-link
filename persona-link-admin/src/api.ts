@@ -279,7 +279,7 @@ export interface AdConfig extends AdConfigInput {
 }
 
 export function getAdConfig(): Promise<AdConfig> { return request('/api/admin/ad-config') }
-export interface FeedbackItem { id: string; openId: string; content: string; createdAt: string }
+export interface FeedbackItem { id: string; openId: string; nickname: string; content: string; createdAt: string }
 export interface LegalDocument { type: 1 | 2 | 3; title: string; content: string; version: number; updatedAt: string | null }
 export function getFeedbacks(page: number, size: number): Promise<PageResponse<FeedbackItem>> { return request(`/api/admin/feedbacks${queryString({ page, size })}`) }
 export function getLegalDocuments(): Promise<LegalDocument[]> { return request('/api/admin/legal-documents') }

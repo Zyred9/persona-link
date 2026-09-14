@@ -49,8 +49,6 @@
 }
 
 .tab-bar__icon--home {
-  width: 56rpx;
-  height: 56rpx;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 56'%3E%3Cpath d='M2 24 25 2Q28 0 30 3L53 25Q55 29 51 30L47 29 46 53Q46 55 43 54L11 54Q8 54 8 51L7 29 4 30Q0 29 2 24Z' fill='%23fffdf8' stroke='%23201b22' stroke-width='2.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M27 45C24 42 17 37 18 32C19 27 25 26 28 32C31 26 37 27 38 32C39 37 31 42 27 45Z' fill='%23fffdf8' stroke='%23201b22' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
@@ -61,7 +59,8 @@
 .tab-bar__icon--profile::before {
   position: absolute;
   top: 0;
-  left: 13rpx;
+  left: 50%;
+  transform: translateX(-50%);
   width: 18rpx;
   height: 18rpx;
   content: '';

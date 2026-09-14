@@ -12,7 +12,7 @@
   <page-state title="测试结果已生成" description="{{adDescription}}" action-text="{{adAction}}" bind:action="watchAd"></page-state>
 </view>
 
-<view wx:elif="{{view === 'result'}}" class="paper-page result-page">
+<view wx:else class="paper-page result-page">
   <view class="result-card paper-card">
     <view class="result-card__summary">
       <text class="result-badge">你的类型是</text>
@@ -32,16 +32,4 @@
   <ai-notice text="结果文案由 AI 生成，仅供娱乐参考"></ai-notice>
 
   <button class="paper-button result-share" open-type="share">分享结果</button>
-</view>
-
-<view wx:else class="paper-page state-page state-page--permission">
-  <view class="permission-card paper-card"><view class="permission-icon"><view></view></view></view>
-  <text class="state-title">未获得相册权限</text>
-  <view class="state-description">
-    <text>你可以在微信设置中开启相册保存权限；</text>
-    <text>拒绝不影响查看或分享结果。</text>
-  </view>
-  <view class="state-actions">
-    <button class="paper-button" bindtap="returnResult">知道了</button>
-  </view>
 </view>

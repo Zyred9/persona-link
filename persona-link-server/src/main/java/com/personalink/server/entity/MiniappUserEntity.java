@@ -20,4 +20,8 @@ public class MiniappUserEntity extends BaseAssessmentEntity {
     private String nickname;
     /** 本服务上传的头像地址，未完善时为空串。 */
     private String avatarUrl;
+    /** 待审核头像地址，审核通过前不对外生效。 */
+    private String pendingAvatarUrl;
+    /** 微信图片审核任务 trace_id，为空表示没有进行中的审核。 */
+    private String pendingAvatarTraceId;
 }

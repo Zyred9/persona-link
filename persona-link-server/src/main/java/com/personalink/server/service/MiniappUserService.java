@@ -10,8 +10,10 @@ import org.springframework.web.multipart.MultipartFile;
 /** 基于已认证 OpenID 的小程序用户资料服务。 */
 public interface MiniappUserService extends IService<MiniappUserEntity> {
     MiniappUserEntity findOrCreate(String openId);
+    MiniappUserEntity findByOpenId(String openId);
     MiniappProfileResponse profile(String openId);
     MiniappProfileResponse updateProfile(String openId, MiniappProfileRequest request);
     MiniappAvatarResponse uploadAvatar(String openId, MultipartFile file);
+    void applyAvatarAuditResult(String traceId, boolean passed);
     void anonymize(String openId);
 }

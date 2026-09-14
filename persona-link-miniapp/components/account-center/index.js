@@ -1,4 +1,4 @@
-const { requestData, authenticatedRequestData, authenticatedUploadData, createIdempotencyKey, readProfileCache, writeProfileCache, fetchProfile, TOKEN_STORAGE_KEY } = require('../../utils/request');
+const { requestData, authenticatedRequestData, authenticatedUploadData, createIdempotencyKey, readProfileCache, writeProfileCache, fetchProfile, loginSession, TOKEN_STORAGE_KEY } = require('../../utils/request');
 const { resolveImageUrl, resolvePreviewUrl } = require('../../utils/image');
 
 const HISTORY_SECTIONS = {
@@ -6,6 +6,9 @@ const HISTORY_SECTIONS = {
   pair: { prefix: 'pairHistory', records: 'pairRecords', totalLabel: 'pairTotalLabel', id: 'pairSessionId', url: 'pairs' }
 };
 const HISTORY_SWIPE_MIN_DISTANCE = 60;
+// 头像审核结果由微信推送异步返回，进入页面后有限轮询刷新，避免无上限请求。
+const AVATAR_AUDIT_POLL_INTERVAL = 15000;
+const AVATAR_AUDIT_POLL_LIMIT = 4;
 const PROFILE_VIEW = 'profile';
 const VIEW_TITLES = {
   profile: '我的',
@@ -89,13 +92,13 @@ Component({
 
   data: {
     currentView: PROFILE_VIEW,
-    profileState: 'idle',
-    profileError: '',
+    profileState: 'guest',
     nickname: '',
     avatarUrl: '',
     avatarImage: '',
     draftNickname: '',
     profileCustomized: false,
+    avatarReviewing: false,
     profileSaving: false,
     avatarUploading: false,
     viewTitle: VIEW_TITLES[PROFILE_VIEW],
@@ -131,6 +134,7 @@ Component({
       this.profileEpoch = (this.profileEpoch || 0) + 1;
       this.feedbackEpoch = (this.feedbackEpoch || 0) + 1;
       this.historyRequestVersion = (this.historyRequestVersion || 0) + 1;
+      this.clearAvatarAuditRefresh();
       this.clearFeedbackRedirect();
     }
   },
@@ -140,20 +144,27 @@ Component({
       this.pageHidden = true;
       this.pairResultRequest = null;
       this.feedbackEpoch = (this.feedbackEpoch || 0) + 1;
+      this.clearAvatarAuditRefresh();
       this.clearFeedbackRedirect();
     },
     show() {
       this.pageHidden = false;
       this.setData({ feedbackSubmitting: false });
-      if (this.componentAttached && this.data.currentView === PROFILE_VIEW && this.data.profileState !== 'loading'
-          && this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY) && !this.data.avatarUploading && !this.data.profileSaving) this.loadProfile();
+      const token = wx.getStorageSync(TOKEN_STORAGE_KEY) || '';
+      // 加载失败弹窗被取消后，回到本页时自动重试一次。
+      const needsProfile = this.profileToken !== token || (this.data.profileState === 'error' && token);
+      if (this.componentAttached && this.data.currentView === PROFILE_VIEW && needsProfile) this.loadProfile();
+      if (this.data.avatarReviewing) this.scheduleAvatarAuditRefresh();
     }
   },
 
   methods: {
     setCurrentView(view) {
       const currentView = normalizeView(view);
-      if (currentView !== PROFILE_VIEW) this.profileEpoch = (this.profileEpoch || 0) + 1;
+      if (currentView !== PROFILE_VIEW) {
+        this.profileEpoch = (this.profileEpoch || 0) + 1;
+        this.clearAvatarAuditRefresh();
+      }
       if (this.data.currentView === 'history' && 'history' !== currentView) {
         this.pairResultRequest = null;
         this.historyRequestVersion = (this.historyRequestVersion || 0) + 1;
@@ -167,9 +178,11 @@ Component({
         viewTitle: VIEW_TITLES[currentView]
       };
       if ('history' === currentView) viewState.historyTab = this.data.historyTab;
+      if (PROFILE_VIEW === currentView) this.prepareView(currentView);
       this.setData(viewState, () => {
         if (currentView !== this.data.currentView) return;
-        this.prepareView(currentView);
+        if (PROFILE_VIEW !== currentView) this.prepareView(currentView);
+        else if (this.data.avatarReviewing) this.scheduleAvatarAuditRefresh();
         this.triggerEvent('viewchange', {
           view: currentView,
           atRoot: PROFILE_VIEW === currentView
@@ -179,8 +192,9 @@ Component({
 
     prepareView(view) {
       if (PROFILE_VIEW === view) {
-        if (this.data.profileState !== 'ready'
-            || this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) this.loadProfile();
+        if (!['ready', 'guest'].includes(this.data.profileState)
+            || this.profileToken !== (wx.getStorageSync(TOKEN_STORAGE_KEY) || '')) this.loadProfile();
+        else if (this.data.avatarReviewing) this.scheduleAvatarAuditRefresh();
         return;
       }
       if ('history' === view) {
@@ -207,14 +221,19 @@ Component({
         draftNickname: cache.nickname,
         avatarUrl: cache.avatarUrl,
         avatarImage: resolveImageUrl(cache.avatarUrl),
-        profileCustomized: true
+        profileCustomized: true,
+        avatarReviewing: cache.reviewing === true
       });
+      if (cache.reviewing === true) this.scheduleAvatarAuditRefresh();
     },
 
     async loadProfile() {
       const epoch = this.profileEpoch = (this.profileEpoch || 0) + 1;
-      this.profileToken = '';
-      this.setData({ profileState: 'loading', profileError: '', nickname: '', avatarUrl: '', avatarImage: '', draftNickname: '', profileSaving: false, avatarUploading: false });
+      const token = wx.getStorageSync(TOKEN_STORAGE_KEY) || '';
+      this.profileToken = token;
+      // 游客无需请求资料：首帧直接显示公共入口，避免先闪登录加载态。
+      this.setData({ profileState: token ? 'loading' : 'guest', nickname: '', avatarUrl: '', avatarImage: '', draftNickname: '', profileCustomized: false, avatarReviewing: false, profileSaving: false, avatarUploading: false });
+      if (!token) return;
       try {
         const profile = await fetchProfile();
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
@@ -223,36 +242,186 @@ Component({
         const nickname = profile.nickname || '';
         const avatarUrl = profile.avatarUrl || '';
         const profileCustomized = profile.customized === true;
-        this.setData({ profileState: 'ready', nickname, draftNickname: nickname, avatarUrl, avatarImage: resolveImageUrl(avatarUrl), profileCustomized });
-        if (profileCustomized) writeProfileCache(this.profileToken, nickname, avatarUrl);
+        const avatarReviewing = profile.avatarReviewing === true;
+        this.setData({ profileState: 'ready', nickname, draftNickname: nickname, avatarUrl, avatarImage: resolveImageUrl(avatarUrl), profileCustomized, avatarReviewing });
+        if (profileCustomized) writeProfileCache(this.profileToken, nickname, avatarUrl, avatarReviewing);
+        if (avatarReviewing) this.scheduleAvatarAuditRefresh();
       } catch (error) {
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
-        this.setData({ profileState: 'error', profileError: error.message || '资料加载失败，请重试' });
+        const message = error.message || '资料加载失败，请重试';
+        this.setData({ profileState: 'error' });
+        this.showProfileLoadError(message);
       }
+    },
+
+    // 游客点击卡片先确认登录，确认后过协议门禁并静默建号，成功提示登录成功。
+    async createGuestSession() {
+      if (this.data.profileState !== 'guest' || this.guestSessionPending) return;
+      this.guestSessionPending = true;
+      let epoch = 0;
+      try {
+        if (!await this.confirmGuestLogin()) return;
+        epoch = this.profileEpoch = (this.profileEpoch || 0) + 1;
+        this.setData({ profileState: 'loading' });
+        const app = typeof getApp === 'function' ? getApp() : null;
+        if (app && app.verifyConsent) await app.verifyConsent();
+        await loginSession();
+        if (!this.componentAttached || epoch !== this.profileEpoch) return;
+        await this.loadProfile();
+        if (this.componentAttached && this.data.profileState === 'ready') {
+          wx.showToast({ title: '登录成功', icon: 'success' });
+        }
+      } catch (error) {
+        if (epoch && this.componentAttached && epoch === this.profileEpoch) {
+          this.setData({ profileState: 'guest' });
+          this.showProfileError('登录失败', error.message || '创建账号失败，请重试');
+        }
+      } finally {
+        this.guestSessionPending = false;
+      }
+    },
+
+    confirmGuestLogin() {
+      return new Promise((resolve) => {
+        wx.showModal({
+          title: '登录？',
+          content: '登录后可设置头像和昵称。',
+          confirmText: '登录',
+          cancelText: '不登录',
+          success: (result) => resolve(result.confirm === true),
+          fail: () => resolve(false)
+        });
+      });
+    },
+
+    // 失败弹窗一次只开一个，避免轮询与手动操作同时报错时弹窗叠加；被抑制的失败用 toast 兜底。
+    showProfileError(title, content) {
+      if (this.profileErrorDialogOpen) {
+        wx.showToast({ title: content, icon: 'none' });
+        return;
+      }
+      this.profileErrorDialogOpen = true;
+      wx.showModal({
+        title,
+        content,
+        showCancel: false,
+        confirmText: '知道了',
+        complete: () => { this.profileErrorDialogOpen = false; }
+      });
+    },
+
+    showProfileLoadError(content) {
+      if (this.profileErrorDialogOpen) {
+        wx.showToast({ title: content, icon: 'none' });
+        return;
+      }
+      this.profileErrorDialogOpen = true;
+      wx.showModal({
+        title: '资料加载失败',
+        content,
+        confirmText: '重新加载',
+        cancelText: '取消',
+        success: (result) => { if (result.confirm && this.componentAttached) this.loadProfile(); },
+        complete: () => { this.profileErrorDialogOpen = false; }
+      });
     },
 
     handleNicknameInput(event) {
       if (!this.data.profileSaving) this.setData({ draftNickname: event.detail.value });
     },
 
+    // 失去焦点直接保存：输入过程只更新草稿，值未变化时不重复请求。
+    handleNicknameBlur(event) {
+      if (this.data.profileSaving || this.data.avatarUploading) return;
+      this.handleNicknameInput(event);
+      if (String(this.data.draftNickname || '').trim() === this.data.nickname) return;
+      this.profileSavePending = this.saveProfile(event);
+      return this.profileSavePending;
+    },
+
     async chooseAvatar(event) {
-      if (this.data.avatarUploading || this.data.profileSaving || this.data.profileState !== 'ready' || !event.detail.avatarUrl) return;
-      const epoch = this.profileEpoch;
+      if (this.data.avatarUploading || this.data.profileState !== 'ready' || !event.detail.avatarUrl) return;
+      // 失焦保存可能尚未结束：等保存完成后再上传，避免刚选的头像被丢弃。
+      if (this.data.profileSaving) {
+        if (!this.profileSavePending) return;
+        await this.profileSavePending;
+        if (this.data.avatarUploading || this.data.profileState !== 'ready') return;
+      }
+      const epoch = this.profileEpoch = (this.profileEpoch || 0) + 1;
       if (this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) { await this.loadProfile(); return; }
-      this.setData({ avatarUploading: true, profileError: '' });
+      this.setData({ avatarUploading: true });
       try {
-        // 微信返回的是临时文件，上传成功后才显示持久化头像。
+        // 微信返回的是临时文件，先送内容安全审核，通过后才替换展示头像。
         const result = await authenticatedUploadData({ url: '/api/miniapp/profile/avatar', filePath: event.detail.avatarUrl, expectedToken: this.profileToken });
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
-        if (!result || !result.avatarUrl) throw new Error('上传服务未返回头像地址');
+        if (!result || typeof result.reviewing !== 'boolean') throw new Error('上传服务未返回审核状态');
         if (this.profileToken !== wx.getStorageSync(TOKEN_STORAGE_KEY)) { await this.loadProfile(); return; }
-        this.setData({ avatarUrl: result.avatarUrl, avatarImage: resolveImageUrl(result.avatarUrl), profileCustomized: true });
-        writeProfileCache(this.profileToken, this.data.nickname, result.avatarUrl);
-        wx.showToast({ title: '头像已保存', icon: 'success' });
+        const avatarReviewing = result.reviewing;
+        const avatarUrl = avatarReviewing ? this.data.avatarUrl : (result.avatarUrl || '');
+        this.setData({ avatarReviewing, avatarUrl, avatarImage: resolveImageUrl(avatarUrl) });
+        // 只缓存当前生效头像和待审标记，重进页面后继续查询新头像的审核结果。
+        if (this.data.profileCustomized) writeProfileCache(this.profileToken, this.data.nickname, avatarUrl, avatarReviewing);
+        if (avatarReviewing) this.scheduleAvatarAuditRefresh();
+        else this.clearAvatarAuditRefresh();
+        wx.showToast({ title: avatarReviewing ? '头像已提交审核' : '头像已处理', icon: 'none' });
       } catch (error) {
-        if (this.componentAttached && epoch === this.profileEpoch) this.setData({ profileError: error.message || '头像上传失败，请重试' });
+        if (this.componentAttached && epoch === this.profileEpoch) {
+          this.showProfileError('头像上传失败', error.message || '头像上传失败，请重试');
+        }
       } finally {
         if (this.componentAttached && epoch === this.profileEpoch) this.setData({ avatarUploading: false });
+      }
+    },
+
+    async refreshAvatarAudit() {
+      if (!this.componentAttached || this.pageHidden || this.data.currentView !== PROFILE_VIEW || !this.data.avatarReviewing
+          || this.data.profileSaving || this.data.avatarUploading) return;
+      // 轮询只读取当前操作版本；保存或上传开始后，其旧响应必须丢弃。
+      const epoch = this.profileEpoch;
+      const generation = this.avatarAuditGeneration || 0;
+      if (!(wx.getStorageSync(TOKEN_STORAGE_KEY) || '')) return;
+      try {
+        const profile = await fetchProfile();
+        if (!this.componentAttached || this.pageHidden || this.data.currentView !== PROFILE_VIEW
+            || epoch !== this.profileEpoch || generation !== (this.avatarAuditGeneration || 0)) return;
+        if (!profile || typeof profile !== 'object') return;
+        this.profileToken = wx.getStorageSync(TOKEN_STORAGE_KEY);
+        const avatarUrl = profile.avatarUrl || '';
+        const profileCustomized = profile.customized === true;
+        const avatarReviewing = profile.avatarReviewing === true;
+        const rejected = this.data.avatarReviewing && !avatarReviewing && avatarUrl === this.data.avatarUrl;
+        this.setData({ avatarReviewing, avatarUrl, avatarImage: resolveImageUrl(avatarUrl), profileCustomized });
+        if (profileCustomized) writeProfileCache(this.profileToken, profile.nickname || this.data.nickname, avatarUrl, avatarReviewing);
+        if (rejected) this.showProfileError('头像审核未通过', '请重新选择头像');
+      } catch (error) {
+        // 静默轮询失败不影响页面，等下一次轮询或下次进入页面再刷新。
+      }
+    },
+
+    scheduleAvatarAuditRefresh() {
+      if (this.avatarAuditTimer || this.pageHidden || this.data.currentView !== PROFILE_VIEW) return;
+      const generation = this.avatarAuditGeneration = (this.avatarAuditGeneration || 0) + 1;
+      let remaining = AVATAR_AUDIT_POLL_LIMIT;
+      const poll = async () => {
+        if (generation !== (this.avatarAuditGeneration || 0)) return;
+        this.avatarAuditTimer = null;
+        if (!this.componentAttached || this.pageHidden || this.data.currentView !== PROFILE_VIEW || !this.data.avatarReviewing) return;
+        await this.refreshAvatarAudit();
+        remaining -= 1;
+        if (generation === (this.avatarAuditGeneration || 0) && remaining > 0
+            && this.componentAttached && !this.pageHidden && this.data.currentView === PROFILE_VIEW && this.data.avatarReviewing) {
+          this.avatarAuditTimer = setTimeout(poll, AVATAR_AUDIT_POLL_INTERVAL);
+        }
+      };
+      this.avatarAuditTimer = setTimeout(poll, AVATAR_AUDIT_POLL_INTERVAL);
+    },
+
+    clearAvatarAuditRefresh() {
+      // 已发出的请求无法撤回，但其循环不能在切页或隐藏后重新挂定时器。
+      this.avatarAuditGeneration = (this.avatarAuditGeneration || 0) + 1;
+      if (this.avatarAuditTimer) {
+        clearTimeout(this.avatarAuditTimer);
+        this.avatarAuditTimer = null;
       }
     },
 
@@ -260,20 +429,23 @@ Component({
       if (this.data.profileSaving || this.data.avatarUploading || this.data.profileState !== 'ready') return;
       const value = event && event.detail && event.detail.value;
       const nickname = String(typeof value === 'string' ? value : value ? value.nickname : this.data.draftNickname).trim();
-      if (nickname.length > 32) { this.setData({ profileError: '昵称不能超过32字' }); return; }
-      const epoch = this.profileEpoch;
-      this.setData({ profileSaving: true, profileError: '' });
+      if (nickname.length > 32) { this.showProfileError('保存失败', '昵称不能超过32字'); return; }
+      const epoch = this.profileEpoch = (this.profileEpoch || 0) + 1;
+      this.setData({ profileSaving: true });
       try {
         const profile = await authenticatedRequestData({ url: '/api/miniapp/profile', method: 'PUT', data: { nickname, avatarUrl: this.data.avatarUrl }, sessionBound: true, expectedToken: this.profileToken });
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
         const savedNickname = profile.nickname || '';
         const savedAvatarUrl = profile.avatarUrl || '';
         const profileCustomized = profile.customized === true;
-        this.setData({ nickname: savedNickname, draftNickname: savedNickname, avatarUrl: savedAvatarUrl, avatarImage: resolveImageUrl(savedAvatarUrl), profileCustomized });
-        if (profileCustomized) writeProfileCache(this.profileToken, savedNickname, savedAvatarUrl);
+        const avatarReviewing = profile.avatarReviewing === true;
+        this.setData({ nickname: savedNickname, draftNickname: savedNickname, avatarUrl: savedAvatarUrl, avatarImage: resolveImageUrl(savedAvatarUrl), profileCustomized, avatarReviewing });
+        if (profileCustomized) writeProfileCache(this.profileToken, savedNickname, savedAvatarUrl, avatarReviewing);
         wx.showToast({ title: '资料已保存', icon: 'success' });
       } catch (error) {
-        if (this.componentAttached && epoch === this.profileEpoch) this.setData({ profileError: error.message || '保存失败，请重试' });
+        if (this.componentAttached && epoch === this.profileEpoch) {
+          this.showProfileError('保存失败', error.message || '保存失败，请重试');
+        }
       } finally {
         if (this.componentAttached && epoch === this.profileEpoch) this.setData({ profileSaving: false });
       }
@@ -472,7 +644,10 @@ Component({
         && epoch === (this.feedbackEpoch || 0);
       this.setData({ feedbackSubmitting: true });
       try {
-        await authenticatedRequestData({ url: '/api/miniapp/feedbacks', method: 'POST', data: this.feedbackRequest });
+        const app = typeof getApp === 'function' ? getApp() : null;
+        if (app && app.verifyConsent) await app.verifyConsent();
+        // 反馈支持匿名提交：不建立账号，登录用户由请求自动携带令牌。
+        await requestData({ url: '/api/miniapp/feedbacks', method: 'POST', data: this.feedbackRequest });
       } catch (error) {
         if (active()) wx.showToast({ title: error.message || '提交失败，请重试', icon: 'none' });
         return;

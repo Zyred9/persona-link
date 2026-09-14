@@ -11,12 +11,13 @@ const redirects = [], calls = [];
 const wx = {
   getStorageSync: (key) => storage.get(key),
   setStorageSync: (key, value) => storage.set(key, value),
+  removeStorageSync: (key) => storage.delete(key),
   reLaunch: (options) => { redirects.push(options.url); if (options.complete) options.complete(); },
   switchTab: (options) => { redirects.push(options.url); if (options.complete) options.complete(); },
   login: (options) => { logins += 1; options.success({ code: 'code' }); },
   request: (options) => {
     const url = new URL(options.url).pathname;
-    calls.push({ url, method: options.method || 'GET' });
+    calls.push({ url, method: options.method || 'GET', authorization: options.header.Authorization });
     if (url === '/api/miniapp/auth/wechat') {
       options.success({ statusCode: 200, data: { code: 0, data: { token: 'token' } } });
       return;
@@ -42,7 +43,7 @@ const api = requestModule.exports;
 let consent;
 vm.runInNewContext(source('pages/consent/index.js'), {
   Page(definition) { consent = definition; }, wx, getApp: () => app,
-  require: () => ({ requestData: requestDataMock })
+  require: () => ({ requestData: requestDataMock, clearAccountSession: () => api.clearAccountSession() })
 });
 consent.setData = (patch) => Object.assign(consent.data, patch);
 
@@ -125,6 +126,45 @@ async function main() {
   resolve(versions);
   await assert.rejects(stale, /协议状态已变化/);
   assert.equal(app.globalData.hasConsent, true, '旧校验不得撤销新同意');
-  console.log('CONSENT_VERSION_CHECK_OK guest-first/silent-login/version-gate/share-return');
+  // 8. 拒绝后只浏览公开页面；分享和直接进入核心页面仍执行同意门禁。
+  storage.set(api.TOKEN_STORAGE_KEY, 'old-token');
+  storage.set('personaLinkProfileCache', { token: 'old-token', nickname: 'old-user' });
+  consent.browseAsGuest();
+  assert.equal(app.globalData.hasConsent, false);
+  assert.equal(storage.has('personaLinkConsentVersion'), false);
+  assert.equal(redirects.at(-1), '/pages/home/index');
+  assert.equal(storage.has(api.TOKEN_STORAGE_KEY), false);
+  assert.equal(storage.has('personaLinkProfileCache'), false);
+  await api.requestData({ url: '/api/miniapp/home' });
+  assert.equal(calls.at(-1).authorization, undefined, '拒绝后公开浏览不携带原账号身份');
+  reply = () => Promise.resolve(versions);
+  for (const route of ['pages/home/index', 'pages/profile/index', 'subpackages/account/pages/settings/index',
+    'subpackages/account/pages/feedback/index', 'subpackages/account/pages/privacy/index',
+    'subpackages/test/pages/detail/index', 'subpackages/pair/pages/detail/index']) {
+    currentPage = { route, options: { id: 'test' } };
+    const count = redirects.length;
+    app.ensureConsent({ path: route, query: currentPage.options, scene: 1007 });
+    await flush();
+    assert.equal(redirects.length, count, '公开首页和详情不强制同意');
+    assert.equal(app.globalData.hasConsent, false);
+  }
+  for (const route of ['subpackages/test/pages/quiz/index', 'subpackages/test/pages/result/index', 'subpackages/pair/pages/join/index', 'subpackages/account/pages/review/index']) {
+    currentPage = { route, options: { shareToken: 'shared', code: 'ABCDE' } };
+    app.ensureConsent({ path: route, query: currentPage.options, scene: 1007 });
+    await flush();
+    assert.equal(redirects.at(-1), '/pages/consent/index');
+    const requestCount = calls.length;
+    await assert.rejects(api.authenticatedRequestData({ url: '/api/miniapp/reports/1?shareToken=shared' }), /协议/);
+    assert.equal(calls.length, requestCount, '分享令牌不能绕过同意门禁');
+  }
+  // 9. 公开浏览与核心请求同时校验，不能沿用公开页面的免跳转行为。
+  currentPage = { route: 'pages/home/index', options: {} };
+  reply = () => new Promise((done) => { resolve = done; });
+  const optional = assert.rejects(app.verifyConsent(undefined, false), /协议/);
+  const required = assert.rejects(api.authenticatedRequestData({ url: '/api/miniapp/assessments' }), /协议/);
+  resolve(versions);
+  await Promise.all([optional, required]);
+  assert.equal(redirects.at(-1), '/pages/consent/index');
+  console.log('CONSENT_VERSION_CHECK_OK guest-browse/decline/public-detail/core-share-gate/concurrent-gate');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

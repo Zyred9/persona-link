@@ -1,5 +1,4 @@
-.result-page,
-.state-page {
+.result-page {
   display: flex;
   min-height: calc(100vh - 120rpx);
   flex-direction: column;
@@ -42,10 +41,6 @@
   line-height: 1.5;
   text-align: left;
   white-space: pre-line;
-}
-
-.state-description text {
-  display: block;
 }
 
 .score-row {
@@ -112,67 +107,4 @@
 .result-share {
   margin-top: auto;
   margin-bottom: calc(84rpx + env(safe-area-inset-bottom));
-}
-
-.state-actions {
-  margin-bottom: calc(28rpx + env(safe-area-inset-bottom));
-}
-
-.permission-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 274rpx;
-  margin-top: 28rpx;
-}
-
-.permission-card {
-  background: #e7d8ff;
-}
-
-.permission-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 60rpx;
-  height: 60rpx;
-  border: 7rpx solid #945ee8;
-}
-
-.permission-icon view {
-  width: 30rpx;
-  height: 30rpx;
-  background: #945ee8;
-}
-
-.state-title {
-  margin-top: 74rpx;
-  font-size: 40rpx;
-  font-weight: 900;
-  text-align: center;
-}
-
-.state-description {
-  margin-top: 22rpx;
-  color: #6e6671;
-  font-size: 24rpx;
-  font-weight: 700;
-  line-height: 1.65;
-  text-align: center;
-  white-space: pre-line;
-}
-
-.state-actions {
-  display: flex;
-  gap: 20rpx;
-  margin-top: auto;
-  flex-direction: column;
-}
-
-.state-page--permission {
-  padding-top: 30rpx;
-}
-
-.state-page--permission .state-title {
-  margin-top: 42rpx;
 }

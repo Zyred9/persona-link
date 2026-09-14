@@ -54,10 +54,10 @@ Page({
       this.getTabBar().setData({ selected: accountVisible ? 1 : 0 });
     }
     try {
-      if (app.verifyConsent) await app.verifyConsent();
-    } catch (error) { return; }
+      if (app.verifyConsent) await app.verifyConsent(undefined, false);
+    } catch (error) { /* 公开首页不依赖同意记录；核心请求仍单独校验。 */ }
+    this.loadHome();
     if (app.globalData.hasConsent) {
-      this.loadHome();
       trackEvent(2, '/pages/home/index');
       if (wx.getStorageSync(TOKEN_STORAGE_KEY)) this.loadCurrentAssessment();
     }
@@ -65,12 +65,12 @@ Page({
 
   async onPullDownRefresh() {
     try {
-      if (!getApp().globalData.hasConsent || this.data.containerVisible) {
+      if (this.data.containerVisible) {
         return;
       }
       await Promise.all([
         this.loadHome(),
-        wx.getStorageSync(TOKEN_STORAGE_KEY) ? this.loadCurrentAssessment() : Promise.resolve()
+        getApp().globalData.hasConsent && wx.getStorageSync(TOKEN_STORAGE_KEY) ? this.loadCurrentAssessment() : Promise.resolve()
       ]);
     } finally {
       wx.stopPullDownRefresh();

@@ -65,7 +65,12 @@ Page({
   },
 
   copyPairCode() {
-    if (this.data.shareable && this.data.pairCode) wx.setClipboardData({ data: this.data.pairCode });
+    if (this.data.shareable && this.data.pairCode) {
+      wx.setClipboardData({
+        data: this.data.pairCode,
+        fail: () => wx.showToast({ title: '复制失败，请手动记录配对码', icon: 'none' })
+      });
+    }
   },
 
   onShareAppMessage() {

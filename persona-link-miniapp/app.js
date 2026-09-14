@@ -7,6 +7,7 @@ const MINIAPP_ROUTES = new Set([
   'subpackages/account/pages/settings/index',
   'subpackages/account/pages/privacy/index',
   'subpackages/account/pages/history/index',
+  'subpackages/account/pages/review/index',
   'subpackages/account/pages/feedback/index',
   'subpackages/test/pages/detail/index',
   'subpackages/test/pages/quiz/index',
@@ -54,11 +55,17 @@ App({
     // 阅读协议返回时，保留正在进行的引导步骤。
     if (current && ['pages/consent/index', 'subpackages/account/pages/legal/index'].includes(current.route)) return;
     if (source.path === 'pages/consent/index' || source.path === 'subpackages/account/pages/legal/index') return;
-    this.verifyConsent(buildLaunchUrl(source.path, source.query)).catch(() => {});
+    const route = source.path || (current && current.route) || 'pages/home/index';
+    const publicPage = ['pages/home/index', 'pages/profile/index',
+      'subpackages/account/pages/settings/index', 'subpackages/account/pages/feedback/index', 'subpackages/account/pages/privacy/index',
+      'subpackages/test/pages/detail/index', 'subpackages/pair/pages/detail/index'].includes(route);
+    this.verifyConsent(buildLaunchUrl(source.path, source.query), !publicPage).catch(() => {});
   },
 
-  verifyConsent(launchUrl) {
+  verifyConsent(launchUrl, required = true) {
     if (launchUrl) this.consentLaunchUrl = launchUrl;
+    // 公开浏览与核心请求可共享校验，但任一核心请求都必须触发同意门禁。
+    this.consentRedirectRequired = this.consentRedirectRequired || required;
     if (this.consentCheck) return this.consentCheck;
     this.globalData.hasConsent = false;
     const epoch = this.consentEpoch || 0;
@@ -85,7 +92,7 @@ App({
           this.globalData.hasConsent = false;
           const pages = getCurrentPages();
           const current = pages[pages.length - 1];
-          if (!this.globalData.consentRedirecting && (!current || !['pages/consent/index', 'subpackages/account/pages/legal/index'].includes(current.route))) {
+          if (this.consentRedirectRequired && !this.globalData.consentRedirecting && (!current || !['pages/consent/index', 'subpackages/account/pages/legal/index'].includes(current.route))) {
             this.globalData.pendingLaunchUrl = this.consentLaunchUrl
               || (current ? buildLaunchUrl(current.route, current.options) : '');
             this.globalData.consentRedirecting = true;
@@ -94,7 +101,7 @@ App({
         }
         throw error;
       }
-    })().finally(() => { this.consentCheck = null; this.consentLaunchUrl = ''; });
+    })().finally(() => { this.consentCheck = null; this.consentLaunchUrl = ''; this.consentRedirectRequired = false; });
     return this.consentCheck;
   },
 

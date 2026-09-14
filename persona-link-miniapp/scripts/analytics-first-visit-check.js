@@ -8,10 +8,15 @@ const requests = [];
 const app = { globalData: { hasConsent: false } };
 let loginCount = 0;
 let finishLogin;
+let cancellation;
 const wx = {
   getStorageSync: (key) => storage.get(key),
   setStorageSync: (key, value) => storage.set(key, value),
   removeStorageSync: (key) => storage.delete(key),
+  clearStorageSync: () => storage.clear(),
+  showModal: (options) => { cancellation = options.success({ confirm: true }); },
+  showToast() {},
+  reLaunch: () => home.onShow(),
   login(options) { loginCount += 1; finishLogin = () => options.success({ code: 'test-code' }); },
   getAccountInfoSync: () => ({ miniProgram: { version: 'test' } }),
   getLaunchOptionsSync: () => ({ scene: 1001 }),
@@ -43,24 +48,29 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../pages/home/index.js'
 });
 home.loadHome = () => { homeLoads += 1; };
 home.loadCurrentAssessment = () => {};
+home.clearTestDetail = () => {};
+let privacy;
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../subpackages/account/pages/privacy/index.js'), 'utf8'), {
+  wx, getApp: () => app, Page: (definition) => { privacy = definition; }, require: () => request
+});
+privacy.setData = (patch) => Object.assign(privacy.data, patch);
 
 async function main() {
   await analytics.trackEvent(2, '/pages/home/index');
-  home.onShow();
+  await home.onShow();
   assert.strictEqual(loginCount, 0, '未同意隐私时不应登录或上报');
   assert.strictEqual(requests.length, 0);
-  assert.strictEqual(homeLoads, 0);
+  assert.strictEqual(homeLoads, 1, '未同意也可浏览公开首页');
   app.globalData.hasConsent = true;
   await analytics.trackEvent(2, '/pages/home/index');
-  await assert.rejects(request.authenticatedRequestData({ url: '/api/miniapp/assessments', method: 'POST' }), /请先点击微信登录/);
-  assert.strictEqual(loginCount, 0, '统计与答题不能偷偷创建登录会话');
+  assert.strictEqual(loginCount, 0, '统计不能偷偷创建登录会话');
   const login = request.loginSession();
   const duplicateLogin = request.loginSession();
   assert.strictEqual(loginCount, 1, '重复点击共用一次微信登录');
   finishLogin();
   await Promise.all([login, duplicateLogin]);
   await home.onShow(); // 仅等待协议校验，不能等待尚未完成的登录上报。
-  assert.strictEqual(homeLoads, 1, '完成登录后加载首页');
+  assert.strictEqual(homeLoads, 2, '完成登录后加载首页');
   const start = request.authenticatedRequestData({ url: '/api/miniapp/assessments', method: 'POST' });
   assert.strictEqual(loginCount, 1, '并发统计与答题复用已建立的会话');
   await Promise.all([firstVisit, start]);
@@ -86,7 +96,44 @@ async function main() {
   assert.strictEqual(storage.get(request.TOKEN_STORAGE_KEY), 'test-token', '延迟返回的旧 401 不能清除新会话');
   assert.strictEqual(loginCount, 2, '旧 401 应复用新会话，不能再次登录');
   await staleB;
-  console.log('ANALYTICS_FIRST_VISIT_CHECK_OK');
+  storage.set(request.TOKEN_STORAGE_KEY, 'expired-token');
+  const expiredEvent = analytics.trackEvent(2, '/pages/home/index');
+  requests.at(-1).success({ statusCode: 401, data: { message: 'expired' } });
+  await expiredEvent;
+  assert.strictEqual(loginCount, 2, '过期埋点不得重新登录');
+  assert.strictEqual(storage.get(request.TOKEN_STORAGE_KEY), undefined);
+
+  storage.set(request.TOKEN_STORAGE_KEY, 'test-token');
+  storage.set('personaLinkConsentVersion', 'v2.0');
+  const beforeCancel = requests.length;
+  privacy.cancelAccount();
+  await cancellation;
+  await new Promise(setImmediate);
+  assert.strictEqual(storage.get(request.TOKEN_STORAGE_KEY), undefined, '注销返回首页仍为游客');
+  assert.strictEqual(loginCount, 2, '注销后的首页埋点不得建号');
+  assert.deepStrictEqual(requests.slice(beforeCancel).map((item) => item.method + ' ' + new URL(item.url).pathname), ['DELETE /api/miniapp/me']);
+  const pendingLogin = request.loginSession();
+  request.clearAccountSession();
+  const cancelledLogin = assert.rejects(pendingLogin, /登录已取消/);
+  const beforeCallback = requests.length;
+  finishLogin();
+  await cancelledLogin;
+  assert.strictEqual(requests.length, beforeCallback, '拒绝后旧微信回调不再提交登录');
+  assert.strictEqual(storage.get(request.TOKEN_STORAGE_KEY), undefined);
+  const liveRequest = wx.request;
+  let finishSession;
+  wx.request = (options) => { finishSession = () => options.success({ statusCode: 200, data: { code: 0, data: { token: 'late-token' } } }); };
+  const pendingSession = request.loginSession();
+  finishLogin();
+  await new Promise(setImmediate);
+  request.clearAccountSession();
+  const cancelledSession = assert.rejects(pendingSession, /登录已取消/);
+  finishSession();
+  await cancelledSession;
+  wx.request = liveRequest;
+  assert.strictEqual(storage.get(request.TOKEN_STORAGE_KEY), undefined, '已发出的登录响应不得恢复身份');
+  console.log('ANALYTICS_FIRST_VISIT_CHECK_OK guest/no-auto-login/expired-event/cancel-return');
 }
 
-main().catch((error) => { console.error(error); process.exitCode = 1; });
+const timeout = setTimeout(() => { console.error('FAIL analytics check timed out'); process.exit(1); }, 10000);
+main().then(() => clearTimeout(timeout)).catch((error) => { clearTimeout(timeout); console.error(error); process.exitCode = 1; });

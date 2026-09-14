@@ -39,7 +39,7 @@ function setup(answerType = 1, pairSessionId = null, required = true, answerStat
 }
 
 async function main() {
-  for (const [type, pair, expected] of [[1, null, '/test/pages/result/'], [2, null, '/pair/pages/invite/'], [2, 'pair', '/pair/pages/wait/']]) {
+  for (const [type, pair, expected] of [[1, null, '/test/pages/result/'], [2, null, '/pair/pages/invite/'], [2, 'pair', '/pair/pages/result/']]) {
     const test = setup(type, pair);
     await test.runner.continueTest(event(test.runner));
     assert.equal(test.runner.data.submissionPending, true);

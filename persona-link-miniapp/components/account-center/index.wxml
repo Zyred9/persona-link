@@ -7,7 +7,7 @@
 
 <block wx:if="{{currentView === 'profile'}}">
   <view class="paper-page profile-page">
-    <view class="paper-card profile-card">
+    <view class="paper-card profile-card" bindtap="createGuestSession">
       <block wx:if="{{profileState === 'ready' && profileCustomized}}">
         <view class="profile-face profile-avatar">
           <image class="profile-avatar__image" src="{{avatarImage}}" mode="aspectFill" aria-label="用户头像"></image>
@@ -17,7 +17,7 @@
         </view>
       </block>
       <block wx:else>
-      <button class="profile-face profile-avatar" open-type="{{profileState === 'ready' ? 'chooseAvatar' : ''}}" bindchooseavatar="chooseAvatar" loading="{{avatarUploading}}" disabled="{{profileState !== 'ready' || avatarUploading || profileSaving}}" aria-label="使用微信头像">
+      <button class="profile-face profile-avatar" open-type="{{profileState === 'ready' ? 'chooseAvatar' : ''}}" bindchooseavatar="chooseAvatar" disabled="{{(profileState !== 'ready' && profileState !== 'guest') || avatarUploading || profileSaving}}" aria-label="{{avatarUploading ? '头像上传中' : profileState === 'loading' ? '资料加载中' : '使用微信头像'}}">
         <image wx:if="{{avatarImage && profileState === 'ready'}}" class="profile-avatar__image" src="{{avatarImage}}" mode="aspectFill"></image>
         <block wx:else>
         <view class="profile-heart"></view>
@@ -25,25 +25,22 @@
         <view class="profile-cheek profile-cheek--right"></view>
         <view class="profile-smile"></view>
         </block>
+        <view wx:if="{{avatarUploading || profileState === 'loading'}}" class="profile-avatar__mask">
+          <view class="profile-avatar__spinner"></view>
+        </view>
       </button>
       <view class="profile-copy">
-        <text class="profile-badge">{{profileState === 'ready' ? '已登录' : profileState === 'loading' ? '正在登录' : '未登录'}}</text>
-        <form wx:if="{{profileState === 'ready'}}" class="profile-name-form" bindsubmit="saveProfile">
-          <input name="nickname" class="profile-title profile-nickname" type="nickname" maxlength="32" value="{{draftNickname}}" placeholder="微信昵称" placeholder-class="profile-nickname__placeholder" disabled="{{profileSaving || avatarUploading}}" bindinput="handleNicknameInput" bindblur="handleNicknameInput" bindconfirm="saveProfile" confirm-type="done" aria-label="使用微信昵称" />
-          <button wx:if="{{draftNickname !== nickname}}" class="profile-name-save" form-type="submit" loading="{{profileSaving}}" disabled="{{profileSaving || avatarUploading}}">保存</button>
-        </form>
+        <input wx:if="{{profileState === 'ready'}}" class="profile-title profile-nickname" type="nickname" maxlength="32" value="{{draftNickname}}" placeholder="微信昵称" placeholder-class="profile-nickname__placeholder" disabled="{{profileSaving || avatarUploading}}" bindinput="handleNicknameInput" bindblur="handleNicknameBlur" bindconfirm="saveProfile" confirm-type="done" aria-label="使用微信昵称" />
+        <text wx:elif="{{profileState === 'loading'}}" class="profile-title">正在加载个人资料</text>
         <text wx:else class="profile-title">先从一题开始</text>
-        <text class="profile-description">所有测试和双人配对均可免费体验</text>
-        <text wx:if="{{profileState === 'ready'}}" class="profile-description profile-hint">头像和昵称可选，用于报告署名</text>
       </view>
       </block>
-    </view>
-
-    <page-state wx:if="{{profileState === 'loading'}}" type="loading" title="正在加载个人资料"></page-state>
-    <button wx:elif="{{profileState === 'error'}}" class="paper-button paper-button--primary profile-action" bindtap="loadProfile">重新加载资料</button>
-    <view wx:if="{{profileError}}" class="profile-error">
-      <text>{{profileError}}</text>
-      <button wx:if="{{profileState === 'ready'}}" class="paper-button profile-action" disabled="{{profileSaving || avatarUploading}}" bindtap="loadProfile">重新加载资料</button>
+      <view class="profile-copy profile-summary">
+        <text class="profile-description">所有测试和双人配对均可免费体验</text>
+        <text class="profile-description profile-hint">头像和昵称可选，用于报告署名</text>
+        <text wx:if="{{profileState === 'guest'}}" class="profile-description profile-hint">点击卡片登录后可设置头像和昵称</text>
+        <text wx:if="{{avatarReviewing}}" class="profile-description profile-hint">头像审核中，通过后自动生效</text>
+      </view>
     </view>
 
     <view class="profile-menu">

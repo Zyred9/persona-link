@@ -86,7 +86,12 @@ Page({
   },
 
   copyPairCode() {
-    if (this.data.inviteCode) wx.setClipboardData({ data: this.data.inviteCode });
+    if (this.data.inviteCode) {
+      wx.setClipboardData({
+        data: this.data.inviteCode,
+        fail: () => wx.showToast({ title: '复制失败，请手动记录配对码', icon: 'none' })
+      });
+    }
   },
 
   onShareAppMessage() {

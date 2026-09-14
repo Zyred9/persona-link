@@ -10,12 +10,16 @@ import com.personalink.server.exception.BusinessException;
 import com.personalink.server.mapper.MiniappUserMapper;
 import com.personalink.server.miniapp.security.WechatContentSecurityClient;
 import com.personalink.server.service.AppConfigService;
+import com.personalink.server.service.AvatarAuditResultService;
 import com.personalink.server.service.MiniappUserService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,6 +35,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class MiniappUserServiceImpl extends ServiceImpl<MiniappUserMapper, MiniappUserEntity>
         implements MiniappUserService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MiniappUserServiceImpl.class);
     /** 默认头像配置键。 */
     private static final String DEFAULT_AVATAR_CONFIG_KEY = "miniapp.default_avatar_url";
     /** 生成的默认昵称格式：用户 + 6 位随机数字，不查重。 */
@@ -39,6 +44,7 @@ public class MiniappUserServiceImpl extends ServiceImpl<MiniappUserMapper, Minia
     private final LocalAssetService localAssetService;
     private final AppConfigService appConfigService;
     private final WechatContentSecurityClient contentSecurityClient;
+    private final AvatarAuditResultService avatarAuditResultService;
 
     @Override
     public MiniappUserEntity findOrCreate(String openId) {
@@ -69,6 +75,17 @@ public class MiniappUserServiceImpl extends ServiceImpl<MiniappUserMapper, Minia
     @Override
     public MiniappProfileResponse profile(String openId) {
         MiniappUserEntity user = this.findOrCreate(openId);
+        // 上传落库后进程中断时，下一次资料查询继续应用已持久化的审核结果。
+        if (this.isAvatarReviewing(user)) {
+            Boolean stored = this.avatarAuditResultService.findResult(user.getPendingAvatarTraceId());
+            if (Objects.nonNull(stored)) {
+                this.applyStoredAvatarAuditResult(user.getPendingAvatarTraceId(), stored);
+                user = this.findByOpenId(openId);
+                if (Objects.isNull(user)) {
+                    throw new BusinessException(HttpStatus.CONFLICT, 40904, "账号状态已变化，请重新进入");
+                }
+            }
+        }
         return this.toResponse(user);
     }
 
@@ -97,20 +114,68 @@ public class MiniappUserServiceImpl extends ServiceImpl<MiniappUserMapper, Minia
                 .eq(MiniappUserEntity::getDeleted, 0))) {
             throw new BusinessException(HttpStatus.CONFLICT, 40904, "资料已变化，请刷新后重试");
         }
-        return new MiniappProfileResponse(nickname, avatarUrl, this.isCustomized(nickname, avatarUrl));
+        return new MiniappProfileResponse(nickname, avatarUrl, this.isCustomized(nickname, avatarUrl),
+                this.isAvatarReviewing(user));
     }
 
     @Override
     public MiniappAvatarResponse uploadAvatar(String openId, MultipartFile file) {
         MiniappUserEntity user = this.findOrCreate(openId);
+        // 先送审再落待审字段：微信未受理时不产生永远无法闭环的待审头像。
         String avatarUrl = this.localAssetService.saveAvatarImage(file).url();
+        String traceId = this.contentSecurityClient.checkImageAsync(openId, avatarUrl,
+                WechatContentSecurityClient.SCENE_PROFILE);
         if (!this.update(Wrappers.<MiniappUserEntity>lambdaUpdate()
-                .set(MiniappUserEntity::getAvatarUrl, avatarUrl)
+                .set(MiniappUserEntity::getPendingAvatarUrl, avatarUrl)
+                .set(MiniappUserEntity::getPendingAvatarTraceId, traceId)
                 .eq(MiniappUserEntity::getId, user.getId())
                 .eq(MiniappUserEntity::getDeleted, 0))) {
             throw this.saveFailed();
         }
-        return new MiniappAvatarResponse(avatarUrl);
+        // 两侧均先提交各自记录再读取对侧，回调先到或后到都能闭环；不要包裹外层长事务。
+        Boolean earlyResult = this.avatarAuditResultService.findResult(traceId);
+        if (Objects.nonNull(earlyResult)) {
+            this.applyStoredAvatarAuditResult(traceId, earlyResult);
+        }
+        MiniappUserEntity current = this.findByOpenId(openId);
+        if (Objects.isNull(current)) {
+            throw new BusinessException(HttpStatus.CONFLICT, 40904, "账号状态已变化，请重新进入");
+        }
+        return new MiniappAvatarResponse(current.getAvatarUrl(), this.isAvatarReviewing(current));
+    }
+
+    @Override
+    public void applyAvatarAuditResult(String traceId, boolean passed) {
+        Assert.hasText(traceId, "审核任务号不能为空");
+        boolean stored = this.avatarAuditResultService.record(traceId, passed);
+        this.applyStoredAvatarAuditResult(traceId, stored);
+    }
+
+    private void applyStoredAvatarAuditResult(String traceId, boolean passed) {
+        MiniappUserEntity user = this.getOne(Wrappers.<MiniappUserEntity>lambdaQuery()
+                .eq(MiniappUserEntity::getPendingAvatarTraceId, traceId)
+                .eq(MiniappUserEntity::getDeleted, 0), false);
+        if (Objects.isNull(user)) {
+            // 早到结果已持久化，上传落库后会再读取；旧任务及注销用户不会被恢复。
+            return;
+        }
+        boolean updated = passed
+                ? this.update(Wrappers.<MiniappUserEntity>lambdaUpdate()
+                        .set(MiniappUserEntity::getAvatarUrl, user.getPendingAvatarUrl())
+                        .set(MiniappUserEntity::getPendingAvatarUrl, "")
+                        .set(MiniappUserEntity::getPendingAvatarTraceId, "")
+                        .eq(MiniappUserEntity::getId, user.getId())
+                        .eq(MiniappUserEntity::getPendingAvatarTraceId, traceId)
+                        .eq(MiniappUserEntity::getDeleted, 0))
+                : this.update(Wrappers.<MiniappUserEntity>lambdaUpdate()
+                        .set(MiniappUserEntity::getPendingAvatarUrl, "")
+                        .set(MiniappUserEntity::getPendingAvatarTraceId, "")
+                        .eq(MiniappUserEntity::getId, user.getId())
+                        .eq(MiniappUserEntity::getPendingAvatarTraceId, traceId)
+                        .eq(MiniappUserEntity::getDeleted, 0));
+        if (updated) {
+            LOGGER.info("[头像审核] 用户 ID：{}，审核结果：{}", user.getId(), passed ? "通过" : "未通过");
+        }
     }
 
     @Override
@@ -126,13 +191,16 @@ public class MiniappUserServiceImpl extends ServiceImpl<MiniappUserMapper, Minia
                 .set(MiniappUserEntity::getOpenId, anonymizedOpenId)
                 .set(MiniappUserEntity::getNickname, "")
                 .set(MiniappUserEntity::getAvatarUrl, "")
+                .set(MiniappUserEntity::getPendingAvatarUrl, "")
+                .set(MiniappUserEntity::getPendingAvatarTraceId, "")
                 .set(MiniappUserEntity::getDeleted, 1)
                 .eq(MiniappUserEntity::getId, user.getId())
                 .eq(MiniappUserEntity::getDeleted, 0)
                 .update();
     }
 
-    private MiniappUserEntity findByOpenId(String openId) {
+    @Override
+    public MiniappUserEntity findByOpenId(String openId) {
         return this.getOne(Wrappers.<MiniappUserEntity>lambdaQuery()
                 .eq(MiniappUserEntity::getOpenId, openId)
                 .eq(MiniappUserEntity::getDeleted, 0), false);
@@ -162,7 +230,12 @@ public class MiniappUserServiceImpl extends ServiceImpl<MiniappUserMapper, Minia
 
     private MiniappProfileResponse toResponse(MiniappUserEntity user) {
         return new MiniappProfileResponse(user.getNickname(), user.getAvatarUrl(),
-                this.isCustomized(user.getNickname(), user.getAvatarUrl()));
+                this.isCustomized(user.getNickname(), user.getAvatarUrl()), this.isAvatarReviewing(user));
+    }
+
+    /** 存在待审任务号即视为审核中，审核结论到达前不更换对外头像。 */
+    private boolean isAvatarReviewing(MiniappUserEntity user) {
+        return StringUtils.hasText(user.getPendingAvatarTraceId());
     }
 
     /** 头像为本人上传、昵称非生成值时，视为用户提供了资料。 */

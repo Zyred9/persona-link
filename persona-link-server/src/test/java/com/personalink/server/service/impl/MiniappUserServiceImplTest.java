@@ -4,18 +4,26 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.personalink.server.dto.AssetResponse;
+import com.personalink.server.dto.MiniappAvatarResponse;
 import com.personalink.server.dto.MiniappProfileRequest;
 import com.personalink.server.entity.MiniappUserEntity;
 import com.personalink.server.exception.BusinessException;
 import com.personalink.server.miniapp.security.WechatContentSecurityClient;
 import com.personalink.server.service.AppConfigService;
+import com.personalink.server.service.AvatarAuditResultService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -26,6 +34,7 @@ class MiniappUserServiceImplTest {
     private AppConfigService configs;
     private WechatContentSecurityClient security;
     private MiniappUserServiceImpl service;
+    private AvatarAuditResultService auditResults;
 
     @BeforeEach
     void setup() {
@@ -35,7 +44,9 @@ class MiniappUserServiceImplTest {
         this.configs = mock(AppConfigService.class);
         this.security = mock(WechatContentSecurityClient.class);
         when(this.security.isTextAllowed(any(), any(), anyInt())).thenReturn(true);
-        this.service = spy(new MiniappUserServiceImpl(this.assets, this.configs, this.security));
+        this.auditResults = mock(AvatarAuditResultService.class);
+        when(this.auditResults.record(anyString(), anyBoolean())).thenAnswer(call -> call.getArgument(1));
+        this.service = spy(new MiniappUserServiceImpl(this.assets, this.configs, this.security, this.auditResults));
     }
 
     @Test
@@ -116,14 +127,123 @@ class MiniappUserServiceImplTest {
     }
 
     @Test
-    void avatarUploadBindsOnlyCurrentUserAndReportsWriteFailure() {
-        doReturn(this.user()).when(this.service).findOrCreate("openid-a");
+    void avatarUploadSubmitsAuditAndKeepsEffectiveAvatarUntilPassed() {
+        MiniappUserEntity user = this.user();
+        user.setPendingAvatarTraceId("trace-1");
+        doReturn(user).when(this.service).getOne(any(Wrapper.class), eq(false));
+        doReturn(user).when(this.service).findOrCreate("openid-a");
         MockMultipartFile file = new MockMultipartFile("file", new byte[]{1});
         when(this.assets.saveAvatarImage(file)).thenReturn(new AssetResponse("https://cdn.example/new.png"));
+        when(this.security.checkImageAsync("openid-a", "https://cdn.example/new.png",
+                WechatContentSecurityClient.SCENE_PROFILE)).thenReturn("trace-1");
         doReturn(true).when(this.service).update(any(Wrapper.class));
-        assertEquals("https://cdn.example/new.png", this.service.uploadAvatar("openid-a", file).avatarUrl());
+        MiniappAvatarResponse response = this.service.uploadAvatar("openid-a", file);
+        assertTrue(response.reviewing(), "上传后先进入内容安全审核");
+        assertEquals("https://cdn.example/a.png", response.avatarUrl(), "审核期间返回当前生效头像");
         doReturn(false).when(this.service).update(any(Wrapper.class));
         assertThrows(BusinessException.class, () -> this.service.uploadAvatar("openid-a", file));
+    }
+
+    @Test
+    void avatarAuditResultMovesPendingAvatarOnlyWhenPassed() {
+        MiniappUserEntity user = this.user();
+        user.setPendingAvatarUrl("https://cdn.example/new.png");
+        user.setPendingAvatarTraceId("trace-1");
+        doReturn(user).when(this.service).getOne(any(Wrapper.class), eq(false));
+        doReturn(true).when(this.service).update(any(Wrapper.class));
+        this.service.applyAvatarAuditResult("trace-1", true);
+        verify(this.service).update(any(Wrapper.class));
+        this.service.applyAvatarAuditResult("trace-1", false);
+        verify(this.service, times(2)).update(any(Wrapper.class));
+    }
+
+    @Test
+    void avatarAuditResultWithoutPendingRowIsPersistedForLaterUpload() {
+        doReturn(null).when(this.service).getOne(any(Wrapper.class), eq(false));
+        this.service.applyAvatarAuditResult("trace-unknown", true);
+        verify(this.auditResults).record("trace-unknown", true);
+        verify(this.service, never()).update(any(Wrapper.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void callbackBeforeUploadPersistenceIsAppliedAfterPendingRowAppears(boolean passed) {
+        MiniappUserEntity user = this.user();
+        Map<String, Boolean> storedResults = new HashMap<>();
+        when(this.auditResults.record(anyString(), anyBoolean())).thenAnswer(call -> {
+            storedResults.putIfAbsent(call.getArgument(0), call.getArgument(1));
+            return storedResults.get(call.getArgument(0));
+        });
+        when(this.auditResults.findResult(anyString())).thenAnswer(call -> storedResults.get(call.getArgument(0)));
+        doReturn(user).when(this.service).findOrCreate("openid-a");
+        List<LambdaUpdateWrapper<MiniappUserEntity>> updates = new ArrayList<>();
+        doAnswer(call -> updates.isEmpty() ? null : user)
+                .when(this.service).getOne(any(Wrapper.class), eq(false));
+        doAnswer(call -> {
+            LambdaUpdateWrapper<MiniappUserEntity> update = call.getArgument(0);
+            updates.add(update);
+            if (updates.size() == 1) {
+                user.setPendingAvatarTraceId("early-trace");
+                user.setPendingAvatarUrl("https://cdn.example/new.png");
+            } else {
+                if (passed) user.setAvatarUrl(user.getPendingAvatarUrl());
+                user.setPendingAvatarTraceId("");
+                user.setPendingAvatarUrl("");
+            }
+            return true;
+        }).when(this.service).update(any(Wrapper.class));
+        MockMultipartFile file = new MockMultipartFile("file", new byte[]{1});
+        when(this.assets.saveAvatarImage(file)).thenReturn(new AssetResponse("https://cdn.example/new.png"));
+        when(this.security.checkImageAsync(anyString(), anyString(), anyInt())).thenAnswer(call -> {
+            this.service.applyAvatarAuditResult("early-trace", passed);
+            assertTrue(updates.isEmpty(), "回调先到时不能更新不存在的待审记录");
+            return "early-trace";
+        });
+
+        MiniappAvatarResponse response = this.service.uploadAvatar("openid-a", file);
+        assertEquals(2, updates.size(), "上传落库后必须应用已经保存的结论");
+        assertFalse(response.reviewing());
+        assertEquals(passed ? "https://cdn.example/new.png" : "https://cdn.example/a.png", response.avatarUrl());
+        LambdaUpdateWrapper<MiniappUserEntity> applied = updates.get(1);
+        assertTrue(applied.getSqlSegment().contains("pending_avatar_trace_id"));
+        assertTrue(applied.getSqlSegment().contains("deleted"));
+        assertTrue(applied.getParamNameValuePairs().containsValue("early-trace"));
+        assertEquals(passed, applied.getSqlSet().startsWith("avatar_url="), "拒绝不得替换生效头像");
+    }
+
+    @Test
+    void duplicateCallbackUsesStoredDecisionInsteadOfIncomingDecision() {
+        MiniappUserEntity user = this.user();
+        user.setPendingAvatarTraceId("trace-first-rejected");
+        user.setPendingAvatarUrl("https://cdn.example/rejected.png");
+        when(this.auditResults.record("trace-first-rejected", true)).thenReturn(false);
+        doReturn(user).when(this.service).getOne(any(Wrapper.class), eq(false));
+        doAnswer(call -> {
+            LambdaUpdateWrapper<MiniappUserEntity> update = call.getArgument(0);
+            assertFalse(update.getSqlSet().startsWith("avatar_url="), "重放通过结论不能覆盖首次拒绝");
+            assertTrue(update.getSqlSegment().contains("pending_avatar_trace_id"));
+            assertTrue(update.getSqlSegment().contains("deleted"));
+            return true;
+        }).when(this.service).update(any(Wrapper.class));
+        this.service.applyAvatarAuditResult("trace-first-rejected", true);
+        verify(this.service).update(any(Wrapper.class));
+    }
+
+    @Test
+    void profileReadRecoversStoredResultAfterInterruptedUpload() {
+        MiniappUserEntity user = this.user();
+        user.setPendingAvatarTraceId("stored-trace");
+        user.setPendingAvatarUrl("https://cdn.example/recovered.png");
+        when(this.auditResults.findResult("stored-trace")).thenReturn(true);
+        doReturn(user).when(this.service).findOrCreate("openid-a");
+        doReturn(user).when(this.service).getOne(any(Wrapper.class), eq(false));
+        doAnswer(call -> {
+            user.setAvatarUrl(user.getPendingAvatarUrl());
+            user.setPendingAvatarTraceId("");
+            return true;
+        }).when(this.service).update(any(Wrapper.class));
+        assertEquals("https://cdn.example/recovered.png", this.service.profile("openid-a").avatarUrl());
+        verify(this.service).update(any(Wrapper.class));
     }
 
     @Test

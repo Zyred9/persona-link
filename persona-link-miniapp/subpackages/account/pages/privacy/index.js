@@ -1,4 +1,4 @@
-const { authenticatedRequestData, invalidateTestRecordRequests } = require('../../../../utils/request');
+const { authenticatedRequestData, invalidateTestRecordRequests, clearAccountSession } = require('../../../../utils/request');
 
 const CONSENT_KEYS = ['personaLinkConsentVersion', 'personaLinkConsentedDocuments'];
 
@@ -73,6 +73,7 @@ Page({
   },
 
   clearLocalAccount() {
+    clearAccountSession();
     const consent = CONSENT_KEYS.map((key) => [key, wx.getStorageSync(key)]);
     wx.clearStorageSync();
     consent.forEach(([key, value]) => {

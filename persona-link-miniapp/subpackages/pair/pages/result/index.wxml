@@ -28,6 +28,7 @@
   </view>
 
   <text class="result-privacy">双方单题答案默认不可见</text>
+  <ai-notice text="结果文案由 AI 生成，仅供娱乐参考"></ai-notice>
 
   <button class="paper-button result-share" open-type="share">分享结果</button>
   </block>

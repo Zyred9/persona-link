@@ -3,6 +3,7 @@ const { getApiBaseUrl } = require('../config/env');
 const TOKEN_STORAGE_KEY = 'personaLinkBusinessToken';
 const PROFILE_CACHE_KEY = 'personaLinkProfileCache';
 let pendingSession = null;
+let sessionGeneration = 0;
 let testRecordsGeneration = 0;
 
 function createRequestError(message, statusCode, responseData, responseRequestId) {
@@ -125,7 +126,9 @@ function login() {
 }
 
 async function requestSession() {
+  const generation = sessionGeneration;
   const code = await login();
+  if (generation !== sessionGeneration) throw createRequestError('登录已取消');
   const session = await requestData({
     url: '/api/miniapp/auth/wechat',
     method: 'POST',
@@ -135,6 +138,7 @@ async function requestSession() {
   if (!session || !session.token) {
     throw createRequestError('登录服务未返回业务会话');
   }
+  if (generation !== sessionGeneration) throw createRequestError('登录已取消');
   wx.setStorageSync(TOKEN_STORAGE_KEY, session.token);
   return session.token;
 }
@@ -142,9 +146,18 @@ async function requestSession() {
 function createSession() {
   // 重复点击共用登录请求，避免重复创建会话。
   if (!pendingSession) {
-    pendingSession = requestSession().finally(() => { pendingSession = null; });
+    const current = requestSession().finally(() => { if (pendingSession === current) pendingSession = null; });
+    pendingSession = current;
   }
   return pendingSession;
+}
+
+function clearAccountSession() {
+  // 拒绝协议或注销后，旧登录回调不得恢复身份。
+  sessionGeneration += 1;
+  pendingSession = null;
+  wx.removeStorageSync(TOKEN_STORAGE_KEY);
+  wx.removeStorageSync(PROFILE_CACHE_KEY);
 }
 
 // 游客可自由浏览；核心功能首次使用时用静默 wx.login 建立会话，不弹授权。
@@ -166,19 +179,21 @@ function readProfileCache(token) {
   return cache;
 }
 
-function writeProfileCache(token, nickname, avatarUrl) {
+function writeProfileCache(token, nickname, avatarUrl, reviewing) {
   if (!token || !nickname || !avatarUrl) return;
   try {
-    wx.setStorageSync(PROFILE_CACHE_KEY, { token, nickname, avatarUrl });
+    wx.setStorageSync(PROFILE_CACHE_KEY, { token, nickname, avatarUrl, reviewing: reviewing === true });
   } catch (error) {
     // 缓存失败不影响主流程。
   }
 }
 
 async function fetchProfile() {
+  const token = wx.getStorageSync(TOKEN_STORAGE_KEY);
+  if (!token) return null;
   const app = typeof getApp === 'function' ? getApp() : null;
   if (app && app.verifyConsent) await app.verifyConsent();
-  await ensureSessionOrCreate();
+  if (token !== wx.getStorageSync(TOKEN_STORAGE_KEY)) throw createRequestError('登录状态已变化，请重新加载资料');
   return requestData({ url: '/api/miniapp/profile', sessionBound: true, silentUnauthorized: true });
 }
 
@@ -261,6 +276,7 @@ function createIdempotencyKey(prefix) {
 }
 
 module.exports = {
+  clearAccountSession,
   loginSession: createSession,
   readProfileCache,
   writeProfileCache,
