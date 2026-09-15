@@ -216,6 +216,10 @@ Page({
   },
 
   closeTestDetail() {
+    const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (tabBar) {
+      tabBar.setData({ hidden: false });
+    }
     this.setData({ containerVisible: false });
   },
 
@@ -281,6 +285,10 @@ Page({
   },
 
   closeQuiz() {
+    const tabBar = typeof this.getTabBar === 'function' ? this.getTabBar() : null;
+    if (tabBar) {
+      tabBar.setData({ hidden: false });
+    }
     this.setData({ containerVisible: false });
   },
 

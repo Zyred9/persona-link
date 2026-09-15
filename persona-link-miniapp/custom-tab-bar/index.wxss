@@ -13,6 +13,10 @@
   border-top: 4rpx solid #201b22;
 }
 
+.tab-bar.tab-bar--hidden {
+  display: none;
+}
+
 .tab-bar__item {
   position: relative;
   display: flex;
