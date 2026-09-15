@@ -1,9 +1,10 @@
 const { requestData, authenticatedRequestData, authenticatedUploadData, createIdempotencyKey, readProfileCache, writeProfileCache, fetchProfile, loginSession, TOKEN_STORAGE_KEY } = require('../../utils/request');
 const { resolveImageUrl, resolvePreviewUrl } = require('../../utils/image');
+const { WECHAT_NICKNAME_MAX_UNITS, wechatNicknameUnits } = require('../../utils/nickname');
 
 const HISTORY_SECTIONS = {
-  single: { prefix: 'history', records: 'records', totalLabel: 'totalLabel', id: 'reportId', url: 'reports' },
-  pair: { prefix: 'pairHistory', records: 'pairRecords', totalLabel: 'pairTotalLabel', id: 'pairSessionId', url: 'pairs' }
+  single: { prefix: 'history', records: 'records', id: 'reportId', url: 'reports' },
+  pair: { prefix: 'pairHistory', records: 'pairRecords', id: 'pairSessionId', url: 'pairs' }
 };
 const HISTORY_SWIPE_MIN_DISTANCE = 60;
 // 头像审核结果由微信推送异步返回，进入页面后有限轮询刷新，避免无上限请求。
@@ -39,11 +40,6 @@ function formatGeneratedAt(value) {
   return isToday
     ? `今天 ${time}`
     : `${generatedAt.getFullYear()}.${pad(generatedAt.getMonth() + 1)}.${pad(generatedAt.getDate())}`;
-}
-
-function formatCount(value) {
-  const count = Number(value) || 0;
-  return count > 99 ? '99+' : String(count);
 }
 
 function formatHistoryRecord(record, kind) {
@@ -97,6 +93,7 @@ Component({
     avatarUrl: '',
     avatarImage: '',
     draftNickname: '',
+    nicknameEditing: false,
     profileCustomized: false,
     avatarReviewing: false,
     profileSaving: false,
@@ -114,12 +111,11 @@ Component({
     pairHistoryErrorDescription: '',
     records: [],
     pairRecords: [],
-    totalLabel: '0',
-    pairTotalLabel: '0',
     historyErrorDescription: '暂时无法加载测试记录，请稍后重试。',
     feedbackContent: '',
     feedbackSubmitting: false,
-    versionLabel: ''
+    versionLabel: '',
+    contactEmail: ''
   },
 
   lifetimes: {
@@ -206,7 +202,7 @@ Component({
         return;
       }
       if ('settings' === view) {
-        this.loadVersionLabel();
+        this.loadSettingsConfig();
       }
     },
 
@@ -221,7 +217,8 @@ Component({
         draftNickname: cache.nickname,
         avatarUrl: cache.avatarUrl,
         avatarImage: resolveImageUrl(cache.avatarUrl),
-        profileCustomized: true,
+        // 旧版本缓存只在已提供资料时写入，缺少标记时按已提供处理。
+        profileCustomized: cache.customized === undefined ? true : cache.customized === true,
         avatarReviewing: cache.reviewing === true
       });
       if (cache.reviewing === true) this.scheduleAvatarAuditRefresh();
@@ -232,7 +229,7 @@ Component({
       const token = wx.getStorageSync(TOKEN_STORAGE_KEY) || '';
       this.profileToken = token;
       // 游客无需请求资料：首帧直接显示公共入口，避免先闪登录加载态。
-      this.setData({ profileState: token ? 'loading' : 'guest', nickname: '', avatarUrl: '', avatarImage: '', draftNickname: '', profileCustomized: false, avatarReviewing: false, profileSaving: false, avatarUploading: false });
+      this.setData({ profileState: token ? 'loading' : 'guest', nickname: '', avatarUrl: '', avatarImage: '', draftNickname: '', nicknameEditing: false, profileCustomized: false, avatarReviewing: false, profileSaving: false, avatarUploading: false });
       if (!token) return;
       try {
         const profile = await fetchProfile();
@@ -244,7 +241,7 @@ Component({
         const profileCustomized = profile.customized === true;
         const avatarReviewing = profile.avatarReviewing === true;
         this.setData({ profileState: 'ready', nickname, draftNickname: nickname, avatarUrl, avatarImage: resolveImageUrl(avatarUrl), profileCustomized, avatarReviewing });
-        if (profileCustomized) writeProfileCache(this.profileToken, nickname, avatarUrl, avatarReviewing);
+        writeProfileCache(this.profileToken, nickname, avatarUrl, avatarReviewing, profileCustomized);
         if (avatarReviewing) this.scheduleAvatarAuditRefresh();
       } catch (error) {
         if (!this.componentAttached || epoch !== this.profileEpoch) return;
@@ -255,37 +252,44 @@ Component({
     },
 
     // 游客点击卡片先确认登录，确认后过协议门禁并静默建号，成功提示登录成功。
-    async createGuestSession() {
-      if (this.data.profileState !== 'guest' || this.guestSessionPending) return;
+    createGuestSession() {
+      return this.ensureGuestLogin();
+    },
+
+    // 需要账号的功能（头像、反馈）统一走这里：先弹同一登录确认，确认后过协议门禁并静默建号。
+    async ensureGuestLogin(content) {
+      if (this.data.profileState !== 'guest') return this.data.profileState === 'ready';
+      if (this.guestSessionPending) return false;
       this.guestSessionPending = true;
       let epoch = 0;
       try {
-        if (!await this.confirmGuestLogin()) return;
+        if (!await this.confirmGuestLogin(content)) return false;
         epoch = this.profileEpoch = (this.profileEpoch || 0) + 1;
         this.setData({ profileState: 'loading' });
         const app = typeof getApp === 'function' ? getApp() : null;
         if (app && app.verifyConsent) await app.verifyConsent();
         await loginSession();
-        if (!this.componentAttached || epoch !== this.profileEpoch) return;
+        if (!this.componentAttached || epoch !== this.profileEpoch) return false;
         await this.loadProfile();
-        if (this.componentAttached && this.data.profileState === 'ready') {
-          wx.showToast({ title: '登录成功', icon: 'success' });
-        }
+        const ready = this.componentAttached && this.data.profileState === 'ready';
+        if (ready) wx.showToast({ title: '登录成功', icon: 'success' });
+        return ready;
       } catch (error) {
         if (epoch && this.componentAttached && epoch === this.profileEpoch) {
           this.setData({ profileState: 'guest' });
           this.showProfileError('登录失败', error.message || '创建账号失败，请重试');
         }
+        return false;
       } finally {
         this.guestSessionPending = false;
       }
     },
 
-    confirmGuestLogin() {
+    confirmGuestLogin(content) {
       return new Promise((resolve) => {
         wx.showModal({
           title: '登录？',
-          content: '登录后可设置头像和昵称。',
+          content: content || '登录后可设置头像和昵称。',
           confirmText: '登录',
           cancelText: '不登录',
           success: (result) => resolve(result.confirm === true),
@@ -326,12 +330,27 @@ Component({
       });
     },
 
+    // 昵称平时用文本渲染，点击后才挂载原生输入框：输入框在页面进入时重建会让文字晚一帧出现。
+    editNickname() {
+      if (this.data.profileState !== 'ready' || this.data.profileSaving || this.data.avatarUploading) return;
+      this.setData({ nicknameEditing: true });
+    },
+
     handleNicknameInput(event) {
-      if (!this.data.profileSaving) this.setData({ draftNickname: event.detail.value });
+      if (this.data.profileSaving) return;
+      const value = String(event.detail.value || '');
+      const overLimit = wechatNicknameUnits(value) > WECHAT_NICKNAME_MAX_UNITS;
+      // 只在从未超限进入超限时提示一次，避免连续输入刷屏；保留原值让用户自己修改。
+      if (overLimit && !this.nicknameOverLimit) {
+        wx.showToast({ title: '昵称不能超过16个汉字或32个字符', icon: 'none' });
+      }
+      this.nicknameOverLimit = overLimit;
+      this.setData({ draftNickname: value });
     },
 
     // 失去焦点直接保存：输入过程只更新草稿，值未变化时不重复请求。
     handleNicknameBlur(event) {
+      if (this.data.nicknameEditing) this.setData({ nicknameEditing: false });
       if (this.data.profileSaving || this.data.avatarUploading) return;
       this.handleNicknameInput(event);
       if (String(this.data.draftNickname || '').trim() === this.data.nickname) return;
@@ -360,7 +379,7 @@ Component({
         const avatarUrl = avatarReviewing ? this.data.avatarUrl : (result.avatarUrl || '');
         this.setData({ avatarReviewing, avatarUrl, avatarImage: resolveImageUrl(avatarUrl) });
         // 只缓存当前生效头像和待审标记，重进页面后继续查询新头像的审核结果。
-        if (this.data.profileCustomized) writeProfileCache(this.profileToken, this.data.nickname, avatarUrl, avatarReviewing);
+        writeProfileCache(this.profileToken, this.data.nickname, avatarUrl, avatarReviewing, this.data.profileCustomized);
         if (avatarReviewing) this.scheduleAvatarAuditRefresh();
         else this.clearAvatarAuditRefresh();
         wx.showToast({ title: avatarReviewing ? '头像已提交审核' : '头像已处理', icon: 'none' });
@@ -391,7 +410,7 @@ Component({
         const avatarReviewing = profile.avatarReviewing === true;
         const rejected = this.data.avatarReviewing && !avatarReviewing && avatarUrl === this.data.avatarUrl;
         this.setData({ avatarReviewing, avatarUrl, avatarImage: resolveImageUrl(avatarUrl), profileCustomized });
-        if (profileCustomized) writeProfileCache(this.profileToken, profile.nickname || this.data.nickname, avatarUrl, avatarReviewing);
+        writeProfileCache(this.profileToken, profile.nickname || this.data.nickname, avatarUrl, avatarReviewing, profileCustomized);
         if (rejected) this.showProfileError('头像审核未通过', '请重新选择头像');
       } catch (error) {
         // 静默轮询失败不影响页面，等下一次轮询或下次进入页面再刷新。
@@ -427,9 +446,10 @@ Component({
 
     async saveProfile(event) {
       if (this.data.profileSaving || this.data.avatarUploading || this.data.profileState !== 'ready') return;
+      if (this.data.nicknameEditing) this.setData({ nicknameEditing: false });
       const value = event && event.detail && event.detail.value;
       const nickname = String(typeof value === 'string' ? value : value ? value.nickname : this.data.draftNickname).trim();
-      if (nickname.length > 32) { this.showProfileError('保存失败', '昵称不能超过32字'); return; }
+      if (wechatNicknameUnits(nickname) > WECHAT_NICKNAME_MAX_UNITS) { this.showProfileError('保存失败', '昵称不能超过16个汉字或32个字符'); return; }
       const epoch = this.profileEpoch = (this.profileEpoch || 0) + 1;
       this.setData({ profileSaving: true });
       try {
@@ -440,7 +460,7 @@ Component({
         const profileCustomized = profile.customized === true;
         const avatarReviewing = profile.avatarReviewing === true;
         this.setData({ nickname: savedNickname, draftNickname: savedNickname, avatarUrl: savedAvatarUrl, avatarImage: resolveImageUrl(savedAvatarUrl), profileCustomized, avatarReviewing });
-        if (profileCustomized) writeProfileCache(this.profileToken, savedNickname, savedAvatarUrl, avatarReviewing);
+        writeProfileCache(this.profileToken, savedNickname, savedAvatarUrl, avatarReviewing, profileCustomized);
         wx.showToast({ title: '资料已保存', icon: 'success' });
       } catch (error) {
         if (this.componentAttached && epoch === this.profileEpoch) {
@@ -451,8 +471,11 @@ Component({
       }
     },
 
-    openAccountView(event) {
+    async openAccountView(event) {
       const view = normalizeView(event.currentTarget.dataset.view);
+      // 反馈提交需要账号配合内容安全审核：游客先弹与头像一致的登录确认，确认并建号后再进入。
+      if (view === 'feedback' && this.data.profileState === 'guest'
+          && !await this.ensureGuestLogin('登录后可提交反馈与举报。')) return;
       wx.navigateTo({ url: VIEW_ROUTES[view] });
     },
 
@@ -544,7 +567,6 @@ Component({
         this.setData({
           [prefix + 'State']: records.length > 0 ? 'ready' : 'empty',
           [section.records]: records,
-          [section.totalLabel]: formatCount(page.total),
           [prefix + 'HasMore']: page.records.length > 0 && pageNumber * 20 < Number(page.total)
         });
       } catch (error) {
@@ -644,10 +666,8 @@ Component({
         && epoch === (this.feedbackEpoch || 0);
       this.setData({ feedbackSubmitting: true });
       try {
-        const app = typeof getApp === 'function' ? getApp() : null;
-        if (app && app.verifyConsent) await app.verifyConsent();
-        // 反馈支持匿名提交：不建立账号，登录用户由请求自动携带令牌。
-        await requestData({ url: '/api/miniapp/feedbacks', method: 'POST', data: this.feedbackRequest });
+        // 反馈必须携带账号提交，服务端才能用 openid 送微信内容安全审核。
+        await authenticatedRequestData({ url: '/api/miniapp/feedbacks', method: 'POST', data: this.feedbackRequest });
       } catch (error) {
         if (active()) wx.showToast({ title: error.message || '提交失败，请重试', icon: 'none' });
         return;
@@ -677,19 +697,24 @@ Component({
       }
     },
 
-    async loadVersionLabel() {
-      const request = this.versionRequest = {};
+    async loadSettingsConfig() {
+      const request = this.settingsRequest = {};
       const active = () => this.componentAttached && this.data.currentView === 'settings'
-        && this.versionRequest === request;
-      this.setData({ versionLabel: '加载中...' });
+        && this.settingsRequest === request;
+      this.setData({ versionLabel: '加载中...', contactEmail: '加载中...' });
       try {
-        const key = 'miniapp.version';
-        const config = await requestData({ url: '/api/miniapp/config/values', data: { keys: key } });
+        const versionKey = 'miniapp.version';
+        const contactEmailKey = 'miniapp.contact_email';
+        const config = await requestData({ url: '/api/miniapp/config/values', data: { keys: `${versionKey},${contactEmailKey}` } });
         if (!active()) return;
-        const version = config && typeof config[key] === 'string' ? config[key].trim() : '';
-        this.setData({ versionLabel: version ? (/^v/i.test(version) ? version : `V${version}`) : '未配置' });
+        const version = config && typeof config[versionKey] === 'string' ? config[versionKey].trim() : '';
+        const contactEmail = config && typeof config[contactEmailKey] === 'string' ? config[contactEmailKey].trim() : '';
+        this.setData({
+          versionLabel: version ? (/^v/i.test(version) ? version : `V${version}`) : '未配置',
+          contactEmail: contactEmail || '未配置'
+        });
       } catch (error) {
-        if (active()) this.setData({ versionLabel: '暂不可用' });
+        if (active()) this.setData({ versionLabel: '暂不可用', contactEmail: '暂不可用' });
       }
     },
 

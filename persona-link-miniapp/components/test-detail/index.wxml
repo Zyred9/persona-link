@@ -37,7 +37,7 @@
       <text>1 你先作答</text>
       <text>2 邀请 TA</text>
       <text>3 一起查看</text>
-      <text class="pair-detail-steps__note">默认不展示彼此单题答案</text>
+      <text class="pair-detail-steps__note">报告生成后可回顾彼此选择</text>
     </view>
 
     <view class="pair-detail-actions">

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personalink.server.exception.BusinessException;
 import com.personalink.server.miniapp.WechatAccessTokenProvider;
+import com.personalink.server.miniapp.WechatRestClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Map;
 import java.util.Set;
@@ -44,7 +46,7 @@ public class WechatContentSecurityClient {
     @Autowired
     public WechatContentSecurityClient(WechatAccessTokenProvider accessTokenProvider, ObjectMapper objectMapper) {
         this(accessTokenProvider, objectMapper,
-                RestClient.builder().baseUrl(WECHAT_API_BASE_URL).build());
+                WechatRestClientFactory.builder().baseUrl(WECHAT_API_BASE_URL).build());
     }
 
     WechatContentSecurityClient(WechatAccessTokenProvider accessTokenProvider, ObjectMapper objectMapper,
@@ -73,7 +75,7 @@ public class WechatContentSecurityClient {
             return false;
         }
         if (errorCode != 0) {
-            LOGGER.warn("[内容安全] 微信接口返回错误，用户：{}，场景：{}，错误码：{}", openId, scene, errorCode);
+            LOGGER.warn("[内容安全] 微信接口返回错误，用户：{}，场景：{}，错误码：{}，响应：{}", openId, scene, errorCode, root);
             throw this.checkUnavailable();
         }
         // v2 的 errcode 仅表示调用是否成功，内容结论必须读取 result.suggest。
@@ -84,7 +86,7 @@ public class WechatContentSecurityClient {
         if ("risky".equals(suggestion) || "review".equals(suggestion)) {
             return false;
         }
-        LOGGER.warn("[内容安全] 微信审核结论缺失或未知，用户：{}，场景：{}", openId, scene);
+        LOGGER.warn("[内容安全] 微信审核结论缺失或未知，用户：{}，场景：{}，响应：{}", openId, scene, root);
         throw this.checkUnavailable();
     }
 
@@ -102,12 +104,12 @@ public class WechatContentSecurityClient {
                 accessToken -> this.checkMediaAsync(openId, mediaUrl, scene, accessToken));
         int errorCode = root.path("errcode").asInt(-1);
         if (errorCode != 0) {
-            LOGGER.warn("[内容安全] 微信图片审核提交失败，用户：{}，场景：{}，错误码：{}", openId, scene, errorCode);
+            LOGGER.warn("[内容安全] 微信图片审核提交失败，用户：{}，场景：{}，错误码：{}，响应：{}", openId, scene, errorCode, root);
             throw this.checkUnavailable();
         }
         String traceId = root.path("trace_id").asText();
         if (!StringUtils.hasText(traceId)) {
-            LOGGER.warn("[内容安全] 微信图片审核未返回任务号，用户：{}，场景：{}", openId, scene);
+            LOGGER.warn("[内容安全] 微信图片审核未返回任务号，用户：{}，场景：{}，响应：{}", openId, scene, root);
             throw this.checkUnavailable();
         }
         return traceId;
@@ -130,6 +132,11 @@ public class WechatContentSecurityClient {
                 root = request.apply(this.accessTokenProvider.getToken());
             }
             return root;
+        } catch (RestClientResponseException exception) {
+            LOGGER.error("[内容安全] {}调用失败，用户：{}，场景：{}，HTTP状态：{}，响应：{}",
+                    action, openId, scene, exception.getStatusCode().value(),
+                    exception.getResponseBodyAsString(), exception);
+            throw this.checkUnavailable();
         } catch (RestClientException | BusinessException exception) {
             LOGGER.error("[内容安全] {}调用失败，用户：{}，场景：{}", action, openId, scene, exception);
             throw this.checkUnavailable();
@@ -161,12 +168,13 @@ public class WechatContentSecurityClient {
 
     private JsonNode parseJson(String responseBody) {
         if (!StringUtils.hasText(responseBody)) {
+            LOGGER.warn("[内容安全] 微信响应为空，无法解析");
             throw new BusinessException(HttpStatus.BAD_GATEWAY, 50251, "微信服务返回异常，请稍后重试");
         }
         try {
             return this.objectMapper.readTree(responseBody);
         } catch (JsonProcessingException exception) {
-            LOGGER.warn("[内容安全] 响应解析失败，异常类型：{}", exception.getClass().getSimpleName());
+            LOGGER.warn("[内容安全] 响应解析失败，响应：{}", responseBody, exception);
             throw new BusinessException(HttpStatus.BAD_GATEWAY, 50251, "微信服务返回异常，请稍后重试");
         }
     }

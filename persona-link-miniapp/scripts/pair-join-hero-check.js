@@ -52,6 +52,12 @@ async function run() {
   assert.ok(hero[0].includes('wx:if="{{joinHeroImageUrl}}"'), '头图未按配置值控制展示');
   assert.ok(hero[0].includes('src="{{joinHeroImageUrl}}"'), '头图未绑定配置图片地址');
   assert.ok(hero[0].includes('binderror="handleJoinHeroImageError"'), '头图缺少加载失败隐藏处理');
-  console.log('PAIR_JOIN_HERO_CHECK_OK default/configured/relative/cleared/request-error/image-error');
+  assert.match(template, /<view wx:if="\{\{pairCode\}\}" class="join-clear-icon" catchtap="clearPairCode"/, '清空收进输入框内，避免被当成提交按钮');
+  assert.doesNotMatch(template, /<button[^>]*clearPairCode/, '输入框旁不再放独立清空按钮');
+  assert.match(template, /bindconfirm="confirmJoin"/, '键盘完成键直接提交配对码');
+  const styles = fs.readFileSync(path.join(root, 'subpackages/pair/pages/join/index.wxss'), 'utf8');
+  assert.doesNotMatch(styles, /\.join-clear\s*\{/, '不再保留清空按钮样式');
+  assert.match(styles, /\.join-clear-icon\s*\{[^}]*border-radius: 50%;/, '清空入口使用输入框内小图标样式');
+  console.log('PAIR_JOIN_HERO_CHECK_OK default/configured/relative/cleared/request-error/image-error/clear-in-input/confirm-submit');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -40,6 +40,13 @@ async function run() {
   assert.match(accountTemplate, /class="history-panel history-panel--pair"/);
   assert.equal((accountTemplate.match(/class="history-cover"/g) || []).length, 2);
   assert.doesNotMatch(accountTemplate, /history-face/);
+  assert.match(accountTemplate, /<ai-notice wx:if="\{\{historyTab === 'single' \? historyState === 'ready' : pairHistoryState === 'ready'\}\}"/, '当前页签列表为空时不展示 AI 生成提示');
+  assert.doesNotMatch(accountTemplate, /\{\{totalLabel\}\}|\{\{pairTotalLabel\}\}/, '页签不再展示记录数量');
+  assert.doesNotMatch(accountTemplate, /···/, '记录卡片不再使用三点更多按钮');
+  assert.equal((accountTemplate.match(/>查看结果<\/button>/g) || []).length, 2, '单人/双人记录统一使用查看结果按钮');
+  assert.equal((accountTemplate.match(/history-record__action--result/g) || []).length, 2, '查看结果按钮复用统一操作按钮样式');
+  assert.match(accountTemplate, /history-record__action--invite/, '邀请好友按钮复用统一操作按钮样式');
+  assert.doesNotMatch(read('components/account-center/index.js'), /totalLabel/, '页签数量字段已清理');
   const accountStyle = read('components/account-center/index.wxss');
   const coverStyle = accountStyle.match(/\.history-cover \{[\s\S]*?\}/);
   assert.ok(coverStyle);

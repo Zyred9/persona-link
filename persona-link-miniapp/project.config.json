@@ -2,7 +2,6 @@
   "description": "映见你我微信小程序",
   "packOptions": {
     "ignore": [
-      { "type": "file", "value": "assets/images/home-title.png" },
       { "type": "folder", "value": "scripts" }
     ],
     "include": []

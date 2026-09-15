@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personalink.server.exception.BusinessException;
 import com.personalink.server.miniapp.WechatAccessTokenProvider;
+import com.personalink.server.miniapp.WechatRestClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -32,7 +33,7 @@ public class WechatAnalyticsClient {
     public WechatAnalyticsClient(WechatAccessTokenProvider accessTokenProvider, ObjectMapper objectMapper) {
         this.accessTokenProvider = accessTokenProvider;
         this.objectMapper = objectMapper;
-        this.restClient = RestClient.builder().baseUrl("https://api.weixin.qq.com").build();
+        this.restClient = WechatRestClientFactory.builder().baseUrl("https://api.weixin.qq.com").build();
     }
 
     public WechatDailyMetric getDailyVisitTrend(LocalDate statDate) {

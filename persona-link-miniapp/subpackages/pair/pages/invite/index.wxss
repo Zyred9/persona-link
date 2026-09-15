@@ -5,7 +5,7 @@
 }
 
 .invite-card {
-  padding: 62rpx 52rpx 0;
+  padding: 62rpx 52rpx 22rpx;
   text-align: center;
 }
 
@@ -57,9 +57,11 @@
 }
 
 .invite-share-button {
-  position: relative;
-  top: 22rpx;
-  margin-bottom: -22rpx;
+  margin-top: 22rpx;
+}
+
+.invite-progress-button {
+  margin-top: 22rpx;
 }
 
 .invite-note {

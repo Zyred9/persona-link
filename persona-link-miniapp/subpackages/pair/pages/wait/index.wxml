@@ -17,8 +17,8 @@
   <text class="wait-title">{{waitTitle}}</text>
 
   <view class="paper-card wait-note-card">
-    <text class="wait-note-card__title">双方独立作答，不展示彼此答案</text>
-    <text class="wait-note-card__copy">仅显示已完成 / 待完成状态</text>
+    <text class="wait-note-card__title">双方独立作答，各自完成</text>
+    <text class="wait-note-card__copy">仅显示已完成 / 待完成状态，报告生成后可回顾彼此选择</text>
   </view>
 
   <view class="wait-actions">

@@ -792,11 +792,22 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
         if (reportMap.size() != 2) {
             throw new BusinessException(HttpStatus.CONFLICT.value(), "双方个人报告尚未生成");
         }
+        AnswerSessionEntity initiatorSession = sessions.stream()
+                .filter(session -> Objects.equals(session.getId(), pair.getInitiatorAnswerSessionId()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT.value(), "发起者答卷不存在"));
+        AnswerSessionEntity partnerSession = sessions.stream()
+                .filter(session -> Objects.equals(session.getId(), pair.getPartnerAnswerSessionId()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT.value(), "受邀者答卷不存在"));
+        if (!Objects.equals(initiatorSession.getVersionId(), partnerSession.getVersionId())) {
+            throw new BusinessException(HttpStatus.CONFLICT.value(), "双方答卷版本不一致");
+        }
         JsonNode initiator = this.readJson(
                 reportMap.get(pair.getInitiatorAnswerSessionId()).getResultSnapshot());
         JsonNode partner = this.readJson(
                 reportMap.get(pair.getPartnerAnswerSessionId()).getResultSnapshot());
-        ObjectNode aggregate = this.buildPairAggregate(initiator, partner);
+        ObjectNode aggregate = this.buildPairAggregate(initiatorSession.getVersionId(), initiator, partner);
         PairReportEntity pairReport = new PairReportEntity();
         pairReport.setReportNo(this.businessNo());
         pairReport.setPairSessionId(pair.getId());
@@ -806,34 +817,42 @@ public class AssessmentServiceImpl extends ServiceImpl<AnswerSessionMapper, Answ
         this.updatePairStatus(pair.getId(), PairStatus.REPORT_READY);
     }
 
-    private ObjectNode buildPairAggregate(JsonNode initiator, JsonNode partner) {
+    private ObjectNode buildPairAggregate(Long versionId, JsonNode initiator, JsonNode partner) {
         Map<String, BigDecimal> initiatorScores = this.dimensionScoreMap(initiator);
         Map<String, BigDecimal> partnerScores = this.dimensionScoreMap(partner);
-        Set<String> commonDimensions = new HashSet<>(initiatorScores.keySet());
-        commonDimensions.retainAll(partnerScores.keySet());
-        BigDecimal averageGap = commonDimensions.stream()
-                .map(code -> initiatorScores.get(code).subtract(partnerScores.get(code)).abs())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (!commonDimensions.isEmpty()) {
-            averageGap = averageGap.divide(BigDecimal.valueOf(commonDimensions.size()), 2, RoundingMode.HALF_UP);
+        ScoreDimensionEntity mainDimension = null;
+        BigDecimal mainScore = null;
+        for (ScoreDimensionEntity dimension : this.listDimensions(versionId)) {
+            BigDecimal initiatorScore = initiatorScores.get(dimension.getDimensionCode());
+            BigDecimal partnerScore = partnerScores.get(dimension.getDimensionCode());
+            if (Objects.isNull(initiatorScore) || Objects.isNull(partnerScore)) {
+                continue;
+            }
+            BigDecimal pairScore = initiatorScore.add(partnerScore)
+                    .divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+            if (Objects.isNull(mainScore) || pairScore.compareTo(mainScore) > 0) {
+                mainDimension = dimension;
+                mainScore = pairScore;
+            }
         }
-        boolean closeMatch = averageGap.compareTo(BigDecimal.valueOf(20)) <= 0;
+        if (Objects.isNull(mainDimension)) {
+            throw new BusinessException(HttpStatus.CONFLICT.value(), "双方报告没有可聚合的计分维度");
+        }
+        ResultTemplateEntity template = this.matchTemplate(versionId, mainDimension.getId(), mainScore);
+        JsonNode basicResult = this.readJson(template.getBasicResultJson());
+        JsonNode deepResult = this.readJson(template.getDeepResultJson());
+        JsonNode shareCopy = this.readJson(template.getShareCopyJson());
         ObjectNode aggregate = this.objectMapper.createObjectNode();
-        aggregate.put("roleName", closeMatch ? "默契搭子" : "互补搭子");
-        aggregate.put("summary", closeMatch
-                ? "你们在一些核心倾向上较为接近，也可以继续聊聊彼此不同的感受。"
-                : "你们在部分倾向上各有特点，主动表达会更容易理解彼此。");
-        if (closeMatch) {
-            aggregate.putArray("actions")
-                    .add("有分歧也愿意说清楚")
-                    .add("会把彼此的感受放进计划")
-                    .add("能在日常里给对方稳定回应");
-        } else {
-            aggregate.putArray("actions")
-                    .add("先说清彼此不同的期待")
-                    .add("把差异变成可以商量的选择")
-                    .add("给对方留出适合自己的节奏");
-        }
+        aggregate.put("resultCode", template.getResultCode());
+        aggregate.put("resultName", template.getResultName());
+        aggregate.put("roleName", template.getResultName());
+        aggregate.put("summary", basicResult.path("text").asText());
+        aggregate.put("dimensionCode", mainDimension.getDimensionCode());
+        aggregate.put("dimensionName", mainDimension.getDimensionName());
+        aggregate.put("normalizedScore", mainScore);
+        aggregate.set("basicResult", basicResult);
+        aggregate.set("deepResult", deepResult);
+        aggregate.set("shareCopy", shareCopy);
         aggregate.set("initiatorResult", this.basicResultIdentity(initiator));
         aggregate.set("partnerResult", this.basicResultIdentity(partner));
         return aggregate;

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Instant;
 
@@ -33,11 +34,11 @@ public class WechatAccessTokenProvider {
     private volatile Instant accessTokenExpiresAt = Instant.EPOCH;
 
     @Autowired
-    public WechatAccessTokenProvider(@Value("${WECHAT_APP_ID:}") String appId,
-                                     @Value("${WECHAT_APP_SECRET:}") String appSecret,
+    public WechatAccessTokenProvider(@Value("${wechat.app-id:}") String appId,
+                                     @Value("${wechat.app-secret:}") String appSecret,
                                      ObjectMapper objectMapper) {
         this(appId, appSecret, objectMapper,
-                RestClient.builder().baseUrl(WECHAT_API_BASE_URL).build());
+                WechatRestClientFactory.builder().baseUrl(WECHAT_API_BASE_URL).build());
     }
 
     public WechatAccessTokenProvider(String appId, String appSecret, ObjectMapper objectMapper, RestClient restClient) {
@@ -88,11 +89,12 @@ public class WechatAccessTokenProvider {
             JsonNode root = this.parseJson(responseBody);
             int errorCode = root.path("errcode").asInt(0);
             if (errorCode != 0) {
-                LOGGER.warn("[微信凭证] access_token 获取失败，错误码：{}", errorCode);
+                LOGGER.warn("[微信凭证] access_token 获取失败，错误码：{}，响应：{}", errorCode, root);
                 throw new BusinessException(HttpStatus.BAD_GATEWAY, 50241, "微信服务暂不可用，请稍后重试");
             }
             String token = root.path("access_token").asText();
             if (!StringUtils.hasText(token)) {
+                LOGGER.warn("[微信凭证] access_token 缺失，响应：{}", root);
                 throw new BusinessException(HttpStatus.BAD_GATEWAY, 50241, "微信服务返回异常，请稍后重试");
             }
             int expiresIn = root.path("expires_in").asInt(7200);
@@ -100,6 +102,10 @@ public class WechatAccessTokenProvider {
             this.accessTokenExpiresAt = Instant.now()
                     .plusSeconds(Math.max(60L, expiresIn - REFRESH_AHEAD_SECONDS));
             return token;
+        } catch (RestClientResponseException exception) {
+            LOGGER.error("[微信凭证] access_token 调用失败，HTTP状态：{}，响应：{}",
+                    exception.getStatusCode().value(), exception.getResponseBodyAsString(), exception);
+            throw new BusinessException(HttpStatus.BAD_GATEWAY, 50241, "微信服务暂不可用，请稍后重试");
         } catch (RestClientException exception) {
             LOGGER.error("[微信凭证] access_token 调用失败", exception);
             throw new BusinessException(HttpStatus.BAD_GATEWAY, 50241, "微信服务暂不可用，请稍后重试");
@@ -108,12 +114,13 @@ public class WechatAccessTokenProvider {
 
     private JsonNode parseJson(String responseBody) {
         if (!StringUtils.hasText(responseBody)) {
+            LOGGER.warn("[微信凭证] access_token 响应为空");
             throw new BusinessException(HttpStatus.BAD_GATEWAY, 50241, "微信服务返回异常，请稍后重试");
         }
         try {
             return this.objectMapper.readTree(responseBody);
         } catch (JsonProcessingException exception) {
-            LOGGER.warn("[微信凭证] access_token 响应解析失败，异常类型：{}", exception.getClass().getSimpleName());
+            LOGGER.warn("[微信凭证] access_token 响应解析失败，响应：{}", responseBody, exception);
             throw new BusinessException(HttpStatus.BAD_GATEWAY, 50241, "微信服务返回异常，请稍后重试");
         }
     }

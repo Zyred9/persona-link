@@ -5,13 +5,14 @@ const vm = require('node:vm');
 
 const storage = new Map();
 let http, upload, loginFails = false, loginCount = 0, consentCount = 0;
-let modals = [], toasts = [];
+let modals = [], toasts = [], navigations = [];
 const wx = {
   getStorageSync: (key) => storage.get(key),
   setStorageSync: (key, value) => storage.set(key, value),
   removeStorageSync: (key) => storage.delete(key),
   showToast: (value) => toasts.push(value),
   showModal: (value) => modals.push(value),
+  navigateTo: (value) => navigations.push(value),
   login(options) { loginCount++; loginFails ? options.fail({ errMsg: '微信登录失败' }) : options.success({ code: 'wx-code' }); },
   request(options) {
     if (options.url.endsWith('/auth/wechat')) options.success({ statusCode: 200, data: { code: 0, data: { token: `session-${loginCount}` } } });
@@ -21,15 +22,19 @@ const wx = {
 };
 const app = { verifyConsent: async () => { consentCount++; } };
 const requestModule = { exports: {} };
+const nicknameModule = { exports: {} };
 const source = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 vm.runInNewContext(source('utils/request.js'), { module: requestModule, wx, getApp: () => app, require: () => ({ getApiBaseUrl: () => 'https://example.test' }) });
+vm.runInNewContext(source('utils/nickname.js'), { module: nicknameModule });
 const api = requestModule.exports;
+const nickname = nicknameModule.exports;
 let definition;
 let timerSequence = 0;
 const auditTimers = new Map();
 vm.runInNewContext(source('components/account-center/index.js'), {
   wx, getApp: () => app, Component: (value) => { definition = value; },
-  require: (name) => name.endsWith('/image') ? { resolveImageUrl: (url) => url ? `https://example.test${url}` : '' } : api,
+  require: (name) => name.endsWith('/image') ? { resolveImageUrl: (url) => url ? `https://example.test${url}` : '' }
+    : name.endsWith('/nickname') ? nickname : api,
   setTimeout(callback) { const id = ++timerSequence; auditTimers.set(id, callback); return id; },
   clearTimeout(id) { auditTimers.delete(id); }
 });
@@ -40,12 +45,12 @@ function component() {
 const reply = (options, data, statusCode = 200) => options.success({ statusCode, data: { code: 0, data } });
 async function run() {
   const markup = source('components/account-center/index.wxml');
-  const completedCard = markup.match(/<block wx:if="\{\{profileState === 'ready' && profileCustomized\}\}">([\s\S]*?)<\/block>\s*<block wx:else>/);
-  assert.ok(completedCard, '完整资料使用独立展示分支，缺头像或昵称时保留填写入口');
-  assert.match(completedCard[1], /<image[^>]*src="\{\{avatarImage\}\}"/);
-  assert.match(completedCard[1], /<text class="profile-title">\{\{nickname\}\}<\/text>/);
-  assert.doesNotMatch(completedCard[1], /<button|<input|<form|profile-badge|profile-description|profile-hint/);
+  assert.doesNotMatch(markup, /profileState === 'ready' && profileCustomized/, '完整资料不再切只读展示分支，头像和昵称可再次修改');
+  assert.match(markup, /<button[^>]*class="profile-face profile-avatar"[\s\S]*?<image wx:if="\{\{avatarImage && profileState === 'ready'\}\}"[^>]*src="\{\{avatarImage\}\}"/, '已设置头像同样展示在可点击换头像按钮内');
+  assert.match(markup, /class="profile-title profile-nickname/, '完整资料下的昵称入口保留，可再次修改');
   assert.match(markup, /<button[^>]*class="profile-face profile-avatar"[^>]*open-type="[^\"]*chooseAvatar/);
+  assert.match(markup, /<text[^>]*class="profile-title profile-nickname[^"]*"[^>]*bindtap="editNickname"/, '昵称展示态是文本，避免进入页面时原生输入框重建闪烁');
+  assert.match(markup, /<input wx:if="\{\{nicknameEditing\}\}"[^>]*type="nickname"[^>]*focus="\{\{nicknameEditing\}\}"/, '只有进入编辑态才挂载原生昵称输入框');
   assert.match(markup, /type="nickname"[^>]*bindconfirm="saveProfile"/);
   assert.match(markup, /type="nickname"[^>]*bindblur="handleNicknameBlur"/, '昵称输入失焦直接保存');
   assert.match(markup, /class="paper-card profile-card"\s+bindtap="createGuestSession"/, '游客卡片是显式的重新登录入口');
@@ -54,13 +59,16 @@ async function run() {
   assert.doesNotMatch(markup, /profile-editor|选择头像并保存|保存昵称|profile-name-form|profile-name-save|form-type="submit"/, '昵称区不再保留表单和保存按钮');
   assert.doesNotMatch(markup, /loading="\{\{\s*avatarUploading\s*\}\}"/, '头像按钮不再使用内置 loading，加载图标不能落在头像框内');
   assert.match(markup, /wx:if="\{\{avatarUploading \|\| profileState === 'loading'\}\}"[^>]*class="profile-avatar__mask"/, '上传和资料加载共用在头像框上的遮罩转圈');
-  assert.match(markup, /<input[^>]*bindblur="handleNicknameBlur"[^>]*\/>\s*<text wx:elif="\{\{profileState === 'loading'\}\}" class="profile-title">正在加载个人资料<\/text>\s*<text wx:else class="profile-title">先从一题开始<\/text>/, '昵称输入、加载文案与游客文案依次互斥');
+  assert.match(markup, /<block wx:if="\{\{profileState === 'ready'\}\}">\s*<input wx:if="\{\{nicknameEditing\}\}"[\s\S]*?<\/block>\s*<text wx:elif="\{\{profileState === 'loading'\}\}" class="profile-title">正在加载个人资料<\/text>\s*<text wx:else class="profile-title">先从一题开始<\/text>/, '昵称展示、加载文案与游客文案依次互斥');
   assert.doesNotMatch(markup, /<page-state[^>]*profileState\s*===\s*'loading'/, '登录中不再显示骨架屏');
   assert.match(source('components/account-center/index.wxss'), /@keyframes profile-avatar-spin/);
   assert.doesNotMatch(source('components/account-center/index.wxss'), /profile-name-form|profile-name-save/, '不再保留昵称表单和保存按钮样式');
   assert.match(source('components/account-center/index.wxss'), /\.profile-card\s*\{[^}]*padding: 32rpx 30rpx;/, '头像上方间距基准是卡片上内边距');
   assert.match(source('components/account-center/index.wxss'), /\.profile-copy\s*\{[^}]*margin-top: 32rpx;/, '头像与昵称的间距与头像上方间距一致');
   assert.match(source('components/account-center/index.wxss'), /\.profile-title\s*\{\s*font-size: 37rpx;/, '昵称不再叠加额外上间距');
+  assert.match(source('components/account-center/index.wxss'), /\.profile-nickname--hint\s*\{\s*border-bottom: 3rpx dashed #b5adb8;/, '未填写昵称时才显示可填写虚线');
+  assert.match(source('components/account-center/index.wxss'), /\.profile-nickname--display\s*\{\s*display: block;\s*line-height: 44rpx;/, '昵称展示文本与输入框同尺寸，切换时不跳动');
+  assert.doesNotMatch(source('components/account-center/index.wxss'), /\.profile-nickname\s*\{[^}]*border-bottom/, '完整资料昵称不再是填写态虚线');
   assert.doesNotMatch(markup, /重新加载资料|profile-error|profile-action/, '失败时不再内嵌重试按钮，改由弹窗处理');
   const profile = component();
   let guestRequests = 0;
@@ -80,13 +88,19 @@ async function run() {
   assert.equal(profile.data.nickname, '用户483920', '服务端建号即写入生成的默认昵称');
   assert.equal(loginCount, 1, '资料仅复用核心功能建立的会话');
   assert.equal(profile.data.profileCustomized, false, '服务端默认资料保留填写入口');
-  assert.equal(storage.get('personaLinkProfileCache'), undefined, '默认资料不写本地资料缓存');
+  const defaultCache = storage.get('personaLinkProfileCache');
+  assert.equal(defaultCache.customized, false, '默认资料同样写入本地缓存');
+  assert.equal(defaultCache.avatarUrl, '', '默认头像为空时也能缓存');
+  const restoredDefault = component();
+  definition.lifetimes.attached.call(restoredDefault);
+  assert.ok(restoredDefault.frames.every((frame) => frame.profileState === 'ready'), '默认资料缓存重进首帧不闪 loading');
+  assert.equal(restoredDefault.data.profileCustomized, false, '默认资料缓存恢复后仍保留填写入口');
   http = (options) => reply(options, { nickname: '小明', avatarUrl: '', customized: false });
   await profile.loadProfile();
   assert.equal(profile.data.profileCustomized, false, '缺少头像时保留填写入口');
   http = (options) => reply(options, { nickname: '小明', avatarUrl: '/uploads/a.png', customized: true });
   await profile.loadProfile();
-  assert.equal(profile.data.profileCustomized, true, '用户提供头像昵称后进入展示态');
+  assert.equal(profile.data.profileCustomized, true, '用户提供头像昵称后标记为已提供资料');
   const sessions = loginCount;
   await profile.loadProfile();
   assert.equal(loginCount, sessions, '已有会话仍需GET资料，但不重复wx.login');
@@ -104,18 +118,37 @@ async function run() {
   http = (options) => reply(options, { nickname: '小明', avatarUrl: '' });
   await profile.loadProfile();
   assert.equal(profile.data.profileState, 'ready');
+  assert.equal(profile.data.nicknameEditing, false, '资料就绪时昵称默认是文本展示');
+  profile.editNickname();
+  assert.equal(profile.data.nicknameEditing, true, '点击昵称才进入编辑态并挂载输入框');
   let saved, saveCount = 0;
   http = (options) => { saveCount++; saved = options.data; reply(options, options.data); };
   await profile.saveProfile({ detail: { value: { nickname: ' 新昵称 ' } } });
   assert.equal(saved.nickname, '新昵称');
   assert.equal(profile.data.nickname, '新昵称');
+  assert.equal(profile.data.nicknameEditing, false, '保存后退出编辑态');
   profile.handleNicknameInput({ detail: { value: '微信昵称' } });
   assert.equal(saved.nickname, '新昵称', '输入过程只更新草稿，不自动保存');
   assert.equal(profile.data.draftNickname, '微信昵称');
+  const toastsBeforeLimit = toasts.length;
+  profile.handleNicknameInput({ detail: { value: '昵'.repeat(17) } });
+  assert.equal(profile.data.draftNickname, '昵'.repeat(17), '超限输入保留原值，不能静默裁剪');
+  assert.equal(toasts.length, toastsBeforeLimit + 1, '输入超过微信昵称长度时实时提示');
+  assert.match(toasts.at(-1).title, /昵称不能超过16个汉字或32个字符/);
+  profile.handleNicknameInput({ detail: { value: '昵'.repeat(18) } });
+  assert.equal(toasts.length, toastsBeforeLimit + 1, '持续超限输入不重复提示');
+  profile.handleNicknameInput({ detail: { value: `${'昵'.repeat(15)}ab` } });
+  assert.equal(toasts.length, toastsBeforeLimit + 1, '恰好 32 个长度单位的昵称不提示');
+  profile.handleNicknameInput({ detail: { value: `${'昵'.repeat(15)}abc` } });
+  assert.equal(toasts.length, toastsBeforeLimit + 2, '回到合法长度后重新超限再次提示');
+  profile.handleNicknameInput({ detail: { value: 'a'.repeat(32) } });
+  assert.equal(profile.data.draftNickname, 'a'.repeat(32), '32 个字符的昵称合法保留');
+  profile.editNickname();
   await profile.handleNicknameBlur({ detail: { value: ' 微信昵称 ' } });
   assert.equal(saveCount, 2, '失焦直接保存一次');
   assert.equal(saved.nickname, '微信昵称', '失焦值去除首尾空格后保存');
   assert.equal(profile.data.nickname, '微信昵称');
+  assert.equal(profile.data.nicknameEditing, false, '失焦保存后退出编辑态');
   await profile.handleNicknameBlur({ detail: { value: '微信昵称' } });
   assert.equal(saveCount, 2, '昵称未变化的失焦不重复保存');
 
@@ -142,13 +175,24 @@ async function run() {
   raceProfile.clearAvatarAuditRefresh();
 
   const modalsBeforeLongNickname = modals.length;
-  await profile.saveProfile({ detail: { value: '昵'.repeat(33) } });
-  assert.equal(modals.length, modalsBeforeLongNickname + 1, '超长昵称改为弹窗提示');
+  await profile.saveProfile({ detail: { value: '昵'.repeat(17) } });
+  assert.equal(modals.length, modalsBeforeLongNickname + 1, '超过微信昵称长度的保存改为弹窗提示');
   assert.equal(modals.at(-1).title, '保存失败');
-  assert.match(modals.at(-1).content, /昵称不能超过32字/);
+  assert.match(modals.at(-1).content, /昵称不能超过16个汉字或32个字符/);
   assert.equal(profile.data.profileSaving, false);
   modals.at(-1).complete();
-  const cacheBeforeUpload = JSON.stringify(storage.get('personaLinkProfileCache'));
+  await profile.saveProfile({ detail: { value: 'a'.repeat(33) } });
+  assert.equal(modals.length, modalsBeforeLongNickname + 2, '33 个字符同样超过微信昵称长度');
+  assert.match(modals.at(-1).content, /昵称不能超过16个汉字或32个字符/);
+  modals.at(-1).complete();
+  const saveCountBeforeOverLimitBlur = saveCount;
+  await profile.handleNicknameBlur({ detail: { value: '昵'.repeat(17) } });
+  assert.equal(modals.length, modalsBeforeLongNickname + 3, '超限昵称失焦弹窗提示');
+  assert.match(modals.at(-1).content, /昵称不能超过16个汉字或32个字符/);
+  assert.equal(saveCount, saveCountBeforeOverLimitBlur, '超限昵称失焦不能提交前面的有效部分');
+  modals.at(-1).complete();
+  profile.handleNicknameInput({ detail: { value: '微信昵称' } });
+  const cacheBeforeUpload = storage.get('personaLinkProfileCache');
   upload = (options) => {
     assert.equal(options.filePath, 'wxfile://temporary-avatar');
     assert.equal(options.header['content-type'], undefined);
@@ -158,7 +202,10 @@ async function run() {
   assert.equal(profile.data.avatarReviewing, true, '上传成功后进入审核中，等待微信推送结论');
   assert.equal(profile.data.avatarUrl, '', '审核通过前不展示新头像');
   assert.equal(profile.data.profileCustomized, false, '审核通过前不视为已提供资料');
-  assert.equal(JSON.stringify(storage.get('personaLinkProfileCache')), cacheBeforeUpload, '待审头像不覆盖本地资料缓存');
+  const cacheAfterPendingUpload = storage.get('personaLinkProfileCache');
+  assert.equal(cacheAfterPendingUpload.avatarUrl, profile.data.avatarUrl, '待审头像不覆盖缓存中的当前生效头像');
+  assert.ok(!JSON.stringify(cacheAfterPendingUpload).includes('wxfile://temporary-avatar'), '临时头像地址不写入缓存');
+  assert.equal(cacheAfterPendingUpload.reviewing, true, '待审标记写入缓存，重进后继续等待审核结论');
   profile.clearAvatarAuditRefresh();
   http = (options) => { saved = options.data; reply(options, { nickname: options.data.nickname, avatarUrl: options.data.avatarUrl, customized: false, avatarReviewing: true }); };
   await profile.saveProfile();
@@ -317,10 +364,15 @@ async function run() {
   assert.equal(cached.data.nickname, '切换账号');
 
   const restored = component();
-  api.writeProfileCache('switched-session', '缓存昵称', '/cached.png');
+  api.writeProfileCache('switched-session', '缓存昵称', '/cached.png', false, true);
   definition.lifetimes.attached.call(restored);
   assert.ok(restored.frames.every((frame) => frame.profileState === 'ready'), '同账号缓存首帧不能闪 loading');
   assert.equal(restored.data.nickname, '缓存昵称');
+
+  storage.set('personaLinkProfileCache', { token: 'switched-session', nickname: '旧版昵称', avatarUrl: '/legacy.png', reviewing: false });
+  const legacyRestored = component();
+  definition.lifetimes.attached.call(legacyRestored);
+  assert.equal(legacyRestored.data.profileCustomized, true, '旧版缓存缺少标记时按已提供资料恢复');
 
   const pendingLoads = [];
   http = (options) => pendingLoads.push(options);
@@ -563,21 +615,51 @@ async function run() {
   assert.equal(showRetried.data.nickname, '回到页面重试');
   assert.equal(profileRequests, requestsBeforeShow + 1, '自动重试只加载一次');
 
-  // 游客匿名提交反馈：不建号、不带令牌；登录用户提交自动携带会话。
+  // 游客点击“反馈与举报”：先弹与头像一致的登录确认，取消不进入；确认后建号并进入。
+  api.clearAccountSession();
+  const guestEntry = component();
+  definition.lifetimes.attached.call(guestEntry);
+  const loginsBeforeEntry = loginCount;
+  const modalsBeforeEntry = modals.length;
+  const navsBeforeEntry = navigations.length;
+  const cancelledEntry = guestEntry.openAccountView({ currentTarget: { dataset: { view: 'feedback' } } });
+  assert.equal(modals.length, modalsBeforeEntry + 1, '游客点击反馈先弹登录确认');
+  assert.equal(modals.at(-1).title, '登录？');
+  assert.equal(modals.at(-1).confirmText, '登录');
+  assert.equal(modals.at(-1).cancelText, '不登录');
+  modals.at(-1).success({ confirm: false });
+  await cancelledEntry;
+  assert.equal(loginCount, loginsBeforeEntry, '选择不登录不建立会话也不进入反馈页');
+  assert.equal(navigations.length, navsBeforeEntry, '取消登录不跳转反馈页');
+  assert.equal(guestEntry.data.profileState, 'guest');
+
+  http = (options) => reply(options, { nickname: '用户660003', avatarUrl: '', customized: false });
+  const confirmedEntry = guestEntry.openAccountView({ currentTarget: { dataset: { view: 'feedback' } } });
+  assert.equal(modals.length, modalsBeforeEntry + 2, '再次点击反馈重新弹登录确认');
+  modals.at(-1).success({ confirm: true });
+  await confirmedEntry;
+  assert.equal(loginCount, loginsBeforeEntry + 1, '确认后静默建号');
+  assert.equal(guestEntry.data.profileState, 'ready');
+  assert.equal(navigations.at(-1).url, '/subpackages/account/pages/feedback/index', '建号成功后进入反馈页');
+
+  const modalsAfterReady = modals.length;
+  await guestEntry.openAccountView({ currentTarget: { dataset: { view: 'feedback' } } });
+  assert.equal(modals.length, modalsAfterReady, '已登录点击反馈不再弹登录确认');
+  assert.equal(navigations.at(-1).url, '/subpackages/account/pages/feedback/index');
+
+  // 反馈提交始终携带账号令牌，服务端才能以 openid 送微信内容安全审核。
   api.clearAccountSession();
   const guestFeedback = component();
   guestFeedback.data.currentView = 'feedback';
   guestFeedback.data.feedbackContent = '游客反馈内容';
-  const loginsBeforeFeedback = loginCount;
   let feedbackRequest;
   http = (options) => { feedbackRequest = options; reply(options, { id: 1 }); };
   await guestFeedback.submitFeedback();
-  assert.equal(loginCount, loginsBeforeFeedback, '匿名反馈不建立新会话');
-  assert.equal(storage.get(api.TOKEN_STORAGE_KEY), undefined, '匿名反馈后仍无本地会话');
+  assert.ok(storage.get(api.TOKEN_STORAGE_KEY), '反馈提交前静默建立会话，不再匿名提交');
   assert.ok(feedbackRequest.url.endsWith('/api/miniapp/feedbacks'));
   assert.equal(feedbackRequest.method, 'POST');
   assert.equal(feedbackRequest.data.content, '游客反馈内容');
-  assert.equal(feedbackRequest.header.Authorization, undefined, '匿名反馈不携带令牌');
+  assert.equal(feedbackRequest.header.Authorization, `Bearer ${storage.get(api.TOKEN_STORAGE_KEY)}`, '反馈提交携带会话令牌以支持内容审核');
   assert.equal(guestFeedback.data.feedbackContent, '', '提交成功后清空反馈内容');
   assert.equal(guestFeedback.data.feedbackSubmitting, false);
   assert.equal(toasts.at(-1).title, '提交成功');
@@ -592,7 +674,7 @@ async function run() {
   assert.equal(feedbackRequest.header.Authorization, `Bearer ${storage.get(api.TOKEN_STORAGE_KEY)}`, '登录反馈携带会话令牌');
   loggedFeedback.clearFeedbackRedirect();
   api.clearAccountSession();
-  console.log('PROFILE_LOGIN_CHECK_OK guest-first-frame/cache/no-auto-login/logout-during-load/session-isolation/upload/guest-tap-confirm/profile-error-dialog/guest-feedback');
+  console.log('PROFILE_LOGIN_CHECK_OK guest-first-frame/cache/no-auto-login/logout-during-load/session-isolation/upload/guest-tap-confirm/profile-error-dialog/feedback-login-gate/wechat-nickname-limit-prompt');
 }
 const timeout = setTimeout(() => { console.error('FAIL profile check timed out'); process.exit(1); }, 10000);
 run().then(() => clearTimeout(timeout)).catch((error) => { clearTimeout(timeout); console.error(error); process.exitCode = 1; });

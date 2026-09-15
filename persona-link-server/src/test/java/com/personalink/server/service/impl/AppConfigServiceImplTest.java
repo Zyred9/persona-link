@@ -28,9 +28,13 @@ class AppConfigServiceImplTest {
         var row = new AppConfigEntity();
         row.setConfigKey("miniapp.version");
         row.setConfigValue("1.2.3");
-        when(mapper.selectList(any())).thenReturn(List.of(row));
-        var values = service.readPublicValues(List.of("miniapp.version", "miniapp.pair.waiting_hero_image_url"));
+        var emailRow = new AppConfigEntity();
+        emailRow.setConfigKey("miniapp.contact_email");
+        emailRow.setConfigValue("support@example.com");
+        when(mapper.selectList(any())).thenReturn(List.of(row, emailRow));
+        var values = service.readPublicValues(List.of("miniapp.version", "miniapp.contact_email", "miniapp.pair.waiting_hero_image_url"));
         assertEquals("1.2.3", values.get("miniapp.version"));
+        assertEquals("support@example.com", values.get("miniapp.contact_email"));
         assertEquals("", values.get("miniapp.pair.waiting_hero_image_url"));
         var wrapper = ArgumentCaptor.forClass(Wrapper.class);
         verify(mapper).selectList(wrapper.capture());

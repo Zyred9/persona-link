@@ -61,3 +61,10 @@ oss:
   keyId: ${OSS_ACCESS_KEY_ID:}
   keySecret: ${OSS_ACCESS_KEY_SECRET:}
   bucketName: ${OSS_BUCKET_NAME:pangu-pro}
+wechat:
+  # 小程序凭据，来自微信公众平台；仅服务端通过环境变量注入，不落仓库。
+  app-id: ${WECHAT_APP_ID:}
+  app-secret: ${WECHAT_APP_SECRET:}
+  # 消息推送配置：Token 与 EncodingAESKey 为自定义值，必须与 mp 后台「消息推送」一致。
+  message-token: ${WECHAT_MESSAGE_TOKEN:Z4jZjnvBXU3HNRKUhc3d}
+  message-aes-key: ${WECHAT_MESSAGE_AES_KEY:0hunCfKVLHEhaNAr1yun6WfEVaIBW1R48ZRwStnjgjj}

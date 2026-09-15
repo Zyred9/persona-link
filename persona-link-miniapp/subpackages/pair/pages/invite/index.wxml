@@ -28,6 +28,7 @@
       <button class="paper-button paper-button--primary invite-share-button" open-type="share">发送给微信好友</button>
     </block>
     <text wx:else class="invite-joined-note">对方已加入，无需再次分享</text>
+    <button class="paper-button invite-progress-button" bindtap="viewProgress">查看配对进度</button>
   </view>
 
   <text class="invite-note">邀请好友一起完成双人测试</text>

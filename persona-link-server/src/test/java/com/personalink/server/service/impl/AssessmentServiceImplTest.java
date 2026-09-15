@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personalink.server.dto.ReportResponse;
 import com.personalink.server.entity.QuestionEntity;
 import com.personalink.server.entity.ReportEntity;
+import com.personalink.server.entity.ResultTemplateEntity;
 import com.personalink.server.entity.ScoreDimensionEntity;
 import com.personalink.server.enums.QuestionType;
 import org.junit.jupiter.api.Test;
@@ -13,11 +14,50 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AssessmentServiceImplTest {
+
+    @Test
+    void pairAggregateShouldUseConfiguredResultTemplate() throws Exception {
+        var dimensions = mock(com.personalink.server.mapper.ScoreDimensionMapper.class);
+        var templates = mock(com.personalink.server.mapper.ResultTemplateMapper.class);
+        ScoreDimensionEntity expression = this.dimension(11L, "expression", "直球表达", 0);
+        ScoreDimensionEntity playful = this.dimension(12L, "playful", "玩闹逗趣", 1);
+        when(dimensions.selectList(any())).thenReturn(List.of(expression, playful));
+        ResultTemplateEntity template = new ResultTemplateEntity();
+        template.setResultCode("PLAYFUL_HIGH");
+        template.setResultName("戏精附体欢乐型");
+        template.setScoreMin(java.math.BigDecimal.valueOf(67));
+        template.setScoreMax(java.math.BigDecimal.valueOf(100));
+        template.setBasicResultJson("{\"text\":\"你们是彼此的快乐源泉。\"}");
+        template.setDeepResultJson("{\"text\":\"幽默感是你们关系的超能力。\"}");
+        template.setShareCopyJson("{\"text\":\"我们的日常就是一出喜剧！\"}");
+        when(templates.selectList(any())).thenReturn(List.of(template));
+        AssessmentServiceImpl service = new AssessmentServiceImpl(
+                null, null, dimensions, null, null, templates, null, null,
+                null, null, null, new ObjectMapper(), null);
+        var mapper = new ObjectMapper();
+        var initiator = mapper.readTree("{\"dimensions\":[{\"dimensionCode\":\"expression\",\"normalizedScore\":20},{\"dimensionCode\":\"playful\",\"normalizedScore\":80}]}");
+        var partner = mapper.readTree("{\"dimensions\":[{\"dimensionCode\":\"expression\",\"normalizedScore\":40},{\"dimensionCode\":\"playful\",\"normalizedScore\":60}]}");
+
+        com.fasterxml.jackson.databind.JsonNode aggregate = ReflectionTestUtils.invokeMethod(
+                service, "buildPairAggregate", 9L, initiator, partner);
+
+        assertEquals("PLAYFUL_HIGH", aggregate.path("resultCode").asText());
+        assertEquals("戏精附体欢乐型", aggregate.path("resultName").asText());
+        assertEquals("你们是彼此的快乐源泉。", aggregate.path("summary").asText());
+        assertEquals("幽默感是你们关系的超能力。", aggregate.path("deepResult").path("text").asText());
+        assertEquals("我们的日常就是一出喜剧！", aggregate.path("shareCopy").path("text").asText());
+        assertEquals("playful", aggregate.path("dimensionCode").asText());
+        assertEquals("70.00", aggregate.path("normalizedScore").asText());
+    }
 
     @Test
     void directReportsCannotBypassAccessService() {
@@ -219,6 +259,14 @@ class AssessmentServiceImplTest {
     private ScoreDimensionEntity dimension(Long id) {
         ScoreDimensionEntity dimension = new ScoreDimensionEntity();
         dimension.setId(id);
+        return dimension;
+    }
+
+    private ScoreDimensionEntity dimension(Long id, String code, String name, int sortNo) {
+        ScoreDimensionEntity dimension = this.dimension(id);
+        dimension.setDimensionCode(code);
+        dimension.setDimensionName(name);
+        dimension.setSortNo(sortNo);
         return dimension;
     }
 }

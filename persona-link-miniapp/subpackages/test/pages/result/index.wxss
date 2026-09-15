@@ -51,8 +51,8 @@
 }
 
 .score-row__label {
-  width: 102rpx;
-  font-size: 25rpx;
+  width: 6em;
+  font-size: 23rpx;
   font-weight: 900;
 }
 
@@ -79,7 +79,7 @@
 
 .score-row__value {
   width: 52rpx;
-  font-size: 29rpx;
+  font-size: 25rpx;
   font-weight: 900;
   text-align: right;
 }

@@ -7,7 +7,6 @@ const { trackEvent } = require('../../utils/analytics');
 const { resolveImageUrl } = require('../../utils/image');
 
 const ALL_CATEGORY_ID = 'all';
-const DEFAULT_TITLE_IMAGE = '/assets/images/home-title.jpg';
 
 function prepareTests(tests) {
   return (Array.isArray(tests) ? tests : []).map((item) => Object.assign({}, item, {
@@ -24,7 +23,7 @@ function filterTests(tests, categoryId) {
 Page({
   data: {
     state: 'loading',
-    titleImageUrl: DEFAULT_TITLE_IMAGE,
+    titleImageUrl: '',
     categories: [{ categoryId: ALL_CATEGORY_ID, categoryName: '全部' }],
     selectedCategoryId: ALL_CATEGORY_ID,
     focusTest: null,
@@ -122,7 +121,7 @@ Page({
       const hasContent = categories.length > 1 || focusTests.length > 0 || recommendedTests.length > 0 || allTests.length > 0;
       this.setData({
         state: hasContent ? 'ready' : 'empty',
-        titleImageUrl: resolveImageUrl(home.titleImageUrl) || DEFAULT_TITLE_IMAGE,
+        titleImageUrl: resolveImageUrl(home.titleImageUrl),
         categories,
         selectedCategoryId,
         focusTest: focusTests[0] || null,
@@ -139,8 +138,8 @@ Page({
   },
 
   handleTitleImageError() {
-    if (this.data.titleImageUrl !== DEFAULT_TITLE_IMAGE) {
-      this.setData({ titleImageUrl: DEFAULT_TITLE_IMAGE });
+    if (this.data.titleImageUrl) {
+      this.setData({ titleImageUrl: '' });
     }
   },
 

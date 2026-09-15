@@ -67,9 +67,9 @@ public class WechatMessagePushCodec {
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public WechatMessagePushCodec(@Value("${WECHAT_MESSAGE_TOKEN:}") String messageToken,
-                                  @Value("${WECHAT_MESSAGE_AES_KEY:}") String encodingAesKey,
-                                  @Value("${WECHAT_APP_ID:}") String appId,
+    public WechatMessagePushCodec(@Value("${wechat.message-token:}") String messageToken,
+                                  @Value("${wechat.message-aes-key:}") String encodingAesKey,
+                                  @Value("${wechat.app-id:}") String appId,
                                   ObjectMapper objectMapper) {
         this.messageToken = messageToken;
         this.encodingAesKey = encodingAesKey;

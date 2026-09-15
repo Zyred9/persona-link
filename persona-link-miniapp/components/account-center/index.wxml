@@ -8,15 +8,6 @@
 <block wx:if="{{currentView === 'profile'}}">
   <view class="paper-page profile-page">
     <view class="paper-card profile-card" bindtap="createGuestSession">
-      <block wx:if="{{profileState === 'ready' && profileCustomized}}">
-        <view class="profile-face profile-avatar">
-          <image class="profile-avatar__image" src="{{avatarImage}}" mode="aspectFill" aria-label="用户头像"></image>
-        </view>
-        <view class="profile-copy">
-          <text class="profile-title">{{nickname}}</text>
-        </view>
-      </block>
-      <block wx:else>
       <button class="profile-face profile-avatar" open-type="{{profileState === 'ready' ? 'chooseAvatar' : ''}}" bindchooseavatar="chooseAvatar" disabled="{{(profileState !== 'ready' && profileState !== 'guest') || avatarUploading || profileSaving}}" aria-label="{{avatarUploading ? '头像上传中' : profileState === 'loading' ? '资料加载中' : '使用微信头像'}}">
         <image wx:if="{{avatarImage && profileState === 'ready'}}" class="profile-avatar__image" src="{{avatarImage}}" mode="aspectFill"></image>
         <block wx:else>
@@ -30,11 +21,13 @@
         </view>
       </button>
       <view class="profile-copy">
-        <input wx:if="{{profileState === 'ready'}}" class="profile-title profile-nickname" type="nickname" maxlength="32" value="{{draftNickname}}" placeholder="微信昵称" placeholder-class="profile-nickname__placeholder" disabled="{{profileSaving || avatarUploading}}" bindinput="handleNicknameInput" bindblur="handleNicknameBlur" bindconfirm="saveProfile" confirm-type="done" aria-label="使用微信昵称" />
+        <block wx:if="{{profileState === 'ready'}}">
+          <input wx:if="{{nicknameEditing}}" class="profile-title profile-nickname{{profileCustomized ? '' : ' profile-nickname--hint'}}" type="nickname" focus="{{nicknameEditing}}" maxlength="32" value="{{draftNickname}}" placeholder="微信昵称" placeholder-class="profile-nickname__placeholder" disabled="{{profileSaving || avatarUploading}}" bindinput="handleNicknameInput" bindblur="handleNicknameBlur" bindconfirm="saveProfile" confirm-type="done" aria-label="使用微信昵称" />
+          <text wx:else class="profile-title profile-nickname profile-nickname--display{{profileCustomized ? '' : ' profile-nickname--hint'}}{{draftNickname ? '' : ' profile-nickname__placeholder'}}" bindtap="editNickname" aria-label="修改昵称">{{draftNickname || '微信昵称'}}</text>
+        </block>
         <text wx:elif="{{profileState === 'loading'}}" class="profile-title">正在加载个人资料</text>
         <text wx:else class="profile-title">先从一题开始</text>
       </view>
-      </block>
       <view class="profile-copy profile-summary">
         <text class="profile-description">所有测试和双人配对均可免费体验</text>
         <text class="profile-description profile-hint">头像和昵称可选，用于报告署名</text>
@@ -64,8 +57,8 @@
 <block wx:elif="{{currentView === 'history'}}">
   <view class="paper-page history-page" bindtouchstart="handleHistoryTouchStart" bindtouchend="handleHistoryTouchEnd">
     <view class="history-summary">
-      <view class="history-summary__item {{historyTab === 'single' ? 'history-summary__item--active' : ''}}" data-tab="single" bindtap="switchHistoryTab">单人测试 {{historyState === 'error' ? '加载失败' : totalLabel}}</view>
-      <view class="history-summary__item {{historyTab === 'pair' ? 'history-summary__item--active' : ''}}" data-tab="pair" bindtap="switchHistoryTab">双人配对 {{pairHistoryState === 'error' ? '加载失败' : pairTotalLabel}}</view>
+      <view class="history-summary__item {{historyTab === 'single' ? 'history-summary__item--active' : ''}}" data-tab="single" bindtap="switchHistoryTab">单人测试{{historyState === 'error' ? ' 加载失败' : ''}}</view>
+      <view class="history-summary__item {{historyTab === 'pair' ? 'history-summary__item--active' : ''}}" data-tab="pair" bindtap="switchHistoryTab">双人配对{{pairHistoryState === 'error' ? ' 加载失败' : ''}}</view>
     </view>
     <block wx:if="{{historyTab === 'single'}}">
     <view class="history-panel history-panel--single">
@@ -89,7 +82,7 @@
             <text class="history-record__result">{{item.resultName}}</text>
             <text class="history-record__meta">{{item.generatedAt}}{{item.versionLabel ? ' · ' + item.versionLabel : ''}}</text>
           </view>
-          <button class="history-record__more" data-report-id="{{item.reportId}}" catchtap="openRecordResult" aria-label="查看测试结果">···</button>
+          <button class="history-record__action history-record__action--result" data-report-id="{{item.reportId}}" catchtap="openRecordResult" aria-label="查看测试结果">查看结果</button>
         </view>
 
       <view class="history-pagination">
@@ -123,8 +116,8 @@
             <text class="history-record__result">{{item.resultText}}</text>
             <text class="history-record__meta">{{item.meta}} · 查看作答</text>
           </view>
-          <button wx:if="{{item.canReshare}}" class="history-record__invite" data-pair-session-id="{{item.pairSessionId}}" catchtap="resharePair" aria-label="邀请好友完成配对">邀请好友</button>
-          <button wx:else class="history-record__more" data-pair-session-id="{{item.pairSessionId}}" data-report-ready="{{item.reportReady}}" catchtap="openPairResult" aria-label="查看双人测试结果">···</button>
+          <button wx:if="{{item.canReshare}}" class="history-record__action history-record__action--invite" data-pair-session-id="{{item.pairSessionId}}" catchtap="resharePair" aria-label="邀请好友完成配对">邀请好友</button>
+          <button wx:else class="history-record__action history-record__action--result" data-pair-session-id="{{item.pairSessionId}}" data-report-ready="{{item.reportReady}}" catchtap="openPairResult" aria-label="查看双人测试结果">查看结果</button>
         </view>
 
       <view class="history-pagination">
@@ -136,7 +129,7 @@
     </block>
     </view>
     </block>
-    <ai-notice align="center" text="部分封面与结果名称由 AI 生成"></ai-notice>
+    <ai-notice wx:if="{{historyTab === 'single' ? historyState === 'ready' : pairHistoryState === 'ready'}}" align="center" text="部分封面与结果名称由 AI 生成"></ai-notice>
   </view>
 </block>
 
@@ -187,6 +180,14 @@
     <view class="paper-card settings-row">
       <text>版本信息</text>
       <text class="settings-row__value">{{versionLabel}}</text>
+    </view>
+    <view class="paper-card settings-row">
+      <text>备案编号</text>
+      <text class="settings-row__value">渝ICP备2026021975号</text>
+    </view>
+    <view class="paper-card settings-row">
+      <text>联系邮箱</text>
+      <text class="settings-row__value">{{contactEmail}}</text>
     </view>
   </view>
 </block>

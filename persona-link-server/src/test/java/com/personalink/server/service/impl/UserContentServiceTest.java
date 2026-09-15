@@ -62,29 +62,25 @@ class UserContentServiceTest {
         verify(mapper, never()).insertIdempotent(any());
     }
     @Test
-    void anonymousFeedbackSkipsAccountBoundCheckAndKeepsEmptyIdentity() {
+    void feedbackRejectsMissingLoginIdentity() {
         var mapper = mock(FeedbackMapper.class);
         var security = mock(WechatContentSecurityClient.class);
-        var users = mock(MiniappUserService.class);
-        var service = new FeedbackServiceImpl(security, users);
+        var service = new FeedbackServiceImpl(security, mock(MiniappUserService.class));
         this.initialize(service, mapper, FeedbackEntity.class);
-        var saved = new FeedbackEntity();
-        saved.setId(9L); saved.setContent("匿名反馈"); saved.setCreateDate(LocalDateTime.now());
-        when(mapper.selectOne(any())).thenReturn(saved);
 
-        assertEquals("9", service.submit(null, new FeedbackCreateRequest("anon-key", "匿名反馈")).id());
+        assertThrows(IllegalArgumentException.class, () -> service.submit(null, new FeedbackCreateRequest("key", "反馈")));
+        assertThrows(IllegalArgumentException.class, () -> service.submit(" ", new FeedbackCreateRequest("key", "反馈")));
 
         verify(security, never()).isTextAllowed(any(), any(), anyInt());
-        verify(users, never()).findByOpenId(any());
-        verify(mapper).insertIdempotent(argThat(entity -> "".equals(entity.getOpenId()) && "".equals(entity.getNickname())));
+        verify(mapper, never()).insertIdempotent(any());
     }
     @Test
-    void anonymousFeedbackIsNotDeletedByAnyAccountCancellation() {
+    void feedbackDeletionRequiresAccountIdentity() {
         var mapper = mock(FeedbackMapper.class);
         var service = new FeedbackServiceImpl(mock(WechatContentSecurityClient.class), mock(MiniappUserService.class));
         this.initialize(service, mapper, FeedbackEntity.class);
 
-        service.deleteByOpenId(" ");
+        assertThrows(IllegalArgumentException.class, () -> service.deleteByOpenId(" "));
 
         verifyNoInteractions(mapper);
     }

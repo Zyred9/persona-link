@@ -259,6 +259,7 @@ async function main() {
   const inviteReplies = [];
   const inviteClipboard = [];
   const inviteToasts = [];
+  const inviteNavigations = [];
   vm.runInNewContext(read('subpackages/pair/pages/invite/index.js'), {
     Page(value) { inviteDefinition = value; },
     require: (name) => name.endsWith('/analytics')
@@ -271,6 +272,7 @@ async function main() {
       getStorageSync: () => '',
       setStorageSync() {},
       setClipboardData: (options) => inviteClipboard.push(options),
+      navigateTo: ({ url }) => inviteNavigations.push(url),
       showToast: ({ title }) => inviteToasts.push(title)
     }
   });
@@ -291,8 +293,36 @@ async function main() {
   const inviteTemplate = read('subpackages/pair/pages/invite/index.wxml');
   assert.match(inviteTemplate, /wx:if="\{\{shareable\}\}"/);
   assert.match(inviteTemplate, /invite-joined-note/);
+  assert.match(inviteTemplate, /<\/block>\s*<text wx:else[^>]*>[^<]*<\/text>\s*<button[^>]*bindtap="viewProgress">查看配对进度<\/button>/,
+    '进度入口独立于分享状态，对方加入后仍可进入');
+  assert.match(inviteTemplate, /invite-progress-button[^>]*bindtap="viewProgress"/, '进度按钮使用独立间距样式类');
+  const inviteStyles = read('subpackages/pair/pages/invite/index.wxss');
+  assert.match(inviteStyles, /\.invite-card\s*\{[^}]*padding: 62rpx 52rpx 22rpx;/, '卡片底部与按钮间距一致，不再贴边');
+  assert.match(inviteStyles, /\.invite-share-button\s*\{\s*margin-top: 22rpx;/, '分享按钮间距作为按钮间基准间距');
+  assert.match(inviteStyles, /\.invite-progress-button\s*\{\s*margin-top: 22rpx;/, '进度按钮与分享按钮间距一致');
+  assert.doesNotMatch(inviteStyles, /position: relative/, '分享按钮不再用相对定位顶出卡片');
+  for (const shareable of [true, false]) {
+    invite.setData({ shareable });
+    invite.viewProgress();
+    assert.equal(inviteNavigations.at(-1), '/subpackages/pair/pages/wait/index?pairSessionId=99');
+  }
+  invite.pairSessionId = '';
+  invite.viewProgress();
+  assert.equal(inviteNavigations.length, 2, '参数缺失时不打开无效进度页');
 
-  console.log('PAIR_RESHARE_CHECK_OK wait-share/record-entry/join-routing/blocked/invite-shareable/templates');
+  let resultDefinition;
+  vm.runInNewContext(read('subpackages/pair/pages/result/index.js'), {
+    Page(value) { resultDefinition = value; },
+    require: () => ({ trackEvent() {} })
+  });
+  const result = makePageInstance(resultDefinition);
+  result.setData({ result: { title: '戏精附体欢乐型', shareText: '我们的日常就是一出喜剧！' } });
+  const resultShare = result.onShareAppMessage();
+  assert.equal(resultShare.title, '我们的日常就是一出喜剧！');
+  assert.equal(resultShare.path, '/pages/home/index');
+  assert.match(read('subpackages/pair/pages/result/index.wxml'), /open-type="share">邀请好友来测试<\/button>/);
+
+  console.log('PAIR_RESHARE_CHECK_OK wait-share/record-entry/join-routing/invite-progress/invite-spacing/result-invitation');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

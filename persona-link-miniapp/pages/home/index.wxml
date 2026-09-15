@@ -7,8 +7,8 @@
       <button class="paper-button paper-button--primary" disabled="{{abandoningAssessment}}" bindtap="continueAssessment">继续</button>
       <button class="paper-button" disabled="{{abandoningAssessment}}" bindtap="abandonAssessment">作废</button>
     </view>
-    <view class="home-hero">
-      <image class="home-title-image paper-card" src="{{titleImageUrl}}" mode="widthFix" binderror="handleTitleImageError"></image>
+    <view wx:if="{{titleImageUrl}}" class="home-hero">
+      <image wx:if="{{titleImageUrl}}" class="home-title-image paper-card" src="{{titleImageUrl}}" mode="widthFix" binderror="handleTitleImageError"></image>
     </view>
 
     <view
@@ -68,7 +68,7 @@
   <block wx:elif="{{state === 'loading'}}">
     <view class="home-intro">
       <text class="home-kicker">今日刚好适合认识自己</text>
-      <image class="home-title-image home-title-image--loading paper-card" src="{{titleImageUrl}}" mode="widthFix" binderror="handleTitleImageError"></image>
+      <image wx:if="{{titleImageUrl}}" class="home-title-image home-title-image--loading paper-card" src="{{titleImageUrl}}" mode="widthFix" binderror="handleTitleImageError"></image>
     </view>
     <page-state type="loading" title="内容正在加载"></page-state>
   </block>

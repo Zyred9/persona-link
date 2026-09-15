@@ -38,10 +38,12 @@ public class AppConfigServiceImpl extends ServiceImpl<AppConfigMapper, AppConfig
     private static final String PAIR_COMPLETED_HERO_IMAGE_URL = "miniapp.pair.completed_hero_image_url";
     /** 小程序默认头像配置键。 */
     private static final String MINIAPP_DEFAULT_AVATAR_URL = "miniapp.default_avatar_url";
+    /** 小程序设置页联系邮箱配置键。 */
+    private static final String MINIAPP_CONTACT_EMAIL = "miniapp.contact_email";
     /** 仅允许匿名读取这些展示配置，禁止泄露后台或服务端配置。 */
     private static final Set<String> PUBLIC_KEYS = Set.of("miniapp.version", HOME_TITLE_IMAGE_URL,
             PAIR_JOIN_HERO_IMAGE_URL, PAIR_WAITING_HERO_IMAGE_URL, PAIR_COMPLETED_HERO_IMAGE_URL,
-            MINIAPP_DEFAULT_AVATAR_URL);
+            MINIAPP_DEFAULT_AVATAR_URL, MINIAPP_CONTACT_EMAIL);
 
     @Override
     public Map<String, String> readPublicValues(List<String> keys) {

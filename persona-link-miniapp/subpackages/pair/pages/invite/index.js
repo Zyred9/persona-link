@@ -73,6 +73,11 @@ Page({
     }
   },
 
+  viewProgress() {
+    if (!this.pairSessionId) return;
+    wx.navigateTo({ url: `/subpackages/pair/pages/wait/index?pairSessionId=${encodeURIComponent(this.pairSessionId)}` });
+  },
+
   onShareAppMessage() {
     if (!this.data.shareable) {
       return { title: '映见你我', path: '/pages/home/index' };

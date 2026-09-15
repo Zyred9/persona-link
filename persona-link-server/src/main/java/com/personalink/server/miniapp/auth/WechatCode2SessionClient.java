@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personalink.server.dto.WechatCode2SessionResponse;
 import com.personalink.server.exception.BusinessException;
+import com.personalink.server.miniapp.WechatRestClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,13 +30,13 @@ public class WechatCode2SessionClient {
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
-    public WechatCode2SessionClient(@Value("${WECHAT_APP_ID:}") String appId,
-                                    @Value("${WECHAT_APP_SECRET:}") String appSecret,
+    public WechatCode2SessionClient(@Value("${wechat.app-id:}") String appId,
+                                    @Value("${wechat.app-secret:}") String appSecret,
                                     ObjectMapper objectMapper) {
         this.appId = appId;
         this.appSecret = appSecret;
         this.objectMapper = objectMapper;
-        this.restClient = RestClient.builder()
+        this.restClient = WechatRestClientFactory.builder()
                 .baseUrl(WECHAT_API_BASE_URL)
                 .build();
     }

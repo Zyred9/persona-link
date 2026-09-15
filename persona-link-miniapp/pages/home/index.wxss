@@ -1,7 +1,7 @@
 .home-page {
   position: relative;
   padding-right: 28rpx;
-  padding-bottom: calc(154rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(130rpx + env(safe-area-inset-bottom));
   padding-left: 28rpx;
 }
 
@@ -56,6 +56,11 @@
   overflow-y: hidden;
   padding: 0;
   white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.category-list::-webkit-scrollbar {
+  display: none;
 }
 
 .category {

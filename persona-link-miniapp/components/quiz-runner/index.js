@@ -162,6 +162,10 @@ Component({
       }
       this.assessment.questions[this.data.currentIndex].selectedOptionIds = selectedOptionIds.slice();
       this.applySelection(selectedOptionIds);
+      // 单选题选定后自动进入下一题；多选题和最后一题必须由用户点击按钮继续。
+      if (!this.data.isMultiple && !this.data.isLast && selectedOptionIds.length > 0) {
+        return this.continueTest(event);
+      }
     },
 
     applySelection(selectedOptionIds) {

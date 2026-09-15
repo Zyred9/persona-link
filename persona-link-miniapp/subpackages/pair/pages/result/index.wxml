@@ -22,14 +22,19 @@
     <text class="result-summary">{{result.summary}}</text>
   </view>
 
-  <view class="paper-card result-detail">
+  <view wx:if="{{result.deepDescription}}" class="paper-card result-detail">
+    <text class="result-detail__title">深度解读</text>
+    <text>{{result.deepDescription}}</text>
+  </view>
+
+  <view wx:elif="{{result.actions.length}}" class="paper-card result-detail">
     <text class="result-detail__title">一起做到的事</text>
     <text wx:for="{{result.actions}}" wx:key="*this">• {{item}}</text>
   </view>
 
-  <text class="result-privacy">双方单题答案默认不可见</text>
+  <text class="result-privacy">双方可在「作答回顾」查看彼此选择</text>
   <ai-notice text="结果文案由 AI 生成，仅供娱乐参考"></ai-notice>
 
-  <button class="paper-button result-share" open-type="share">分享结果</button>
+  <button class="paper-button result-share" open-type="share">邀请好友来测试</button>
   </block>
 </view>

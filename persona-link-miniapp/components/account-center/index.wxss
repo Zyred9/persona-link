@@ -5,7 +5,7 @@
 
 .profile-page {
   padding-top: 30rpx;
-  padding-bottom: calc(150rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(130rpx + env(safe-area-inset-bottom));
 }
 
 .profile-card {
@@ -170,9 +170,15 @@
 
 .profile-nickname {
   width: 100%;
-  height: 56rpx;
+  height: 44rpx;
   padding: 0;
   text-align: center;
+}
+.profile-nickname--display {
+  display: block;
+  line-height: 44rpx;
+}
+.profile-nickname--hint {
   border-bottom: 3rpx dashed #b5adb8;
 }
 .profile-nickname__placeholder {
@@ -301,21 +307,7 @@
   flex-direction: column;
 }
 
-.history-record__more {
-  display: flex;
-  flex: 0 0 72rpx;
-  align-items: center;
-  justify-content: center;
-  width: 72rpx;
-  height: 88rpx;
-  margin: 0 0 0 8rpx;
-  padding: 0;
-  font-size: 30rpx;
-  font-weight: 900;
-  letter-spacing: 5rpx;
-}
-
-.history-record__invite {
+.history-record__action {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -326,9 +318,16 @@
   box-sizing: border-box;
   font-size: 22rpx;
   font-weight: 900;
-  background: #ffd867;
   border: 3rpx solid #201b22;
   border-radius: 999rpx;
+}
+
+.history-record__action--invite {
+  background: #ffd867;
+}
+
+.history-record__action--result {
+  background: #d8bafd;
 }
 
 .history-record__title {
@@ -452,8 +451,11 @@
 }
 
 .settings-row__value {
+  max-width: 62%;
   color: #817d81;
   font-size: 24rpx;
+  text-align: right;
+  word-break: break-all;
 }
 
 .settings-about {

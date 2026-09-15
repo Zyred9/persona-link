@@ -35,7 +35,9 @@ class AppConfigManagementTest {
                     new AppConfigSaveRequest("miniapp.version", " 1.2.3 ", 1, "版本", ""),
                     new AppConfigSaveRequest("miniapp.home.title_image_url", " HTTPS://example.com/a.png ", 1, "头图", ""),
                     new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", " HTTPS://example.com/pair.png ", 1, "双人头图", ""),
-                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "", 1, "双人头图", "")}) {
+                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "", 1, "双人头图", ""),
+                    new AppConfigSaveRequest("miniapp.contact_email", " Support@Example.com ", 1, "联系邮箱", ""),
+                    new AppConfigSaveRequest("miniapp.contact_email", "", 1, "联系邮箱", "")}) {
                 assertTrue(validator.validate(request).isEmpty(), request.toString());
             }
             for (var request : new AppConfigSaveRequest[]{
@@ -49,13 +51,19 @@ class AppConfigManagementTest {
                     new AppConfigSaveRequest("miniapp.home.title_image_url", "javascript:alert(1)", 1, "头图", ""),
                     new AppConfigSaveRequest("miniapp.home.title_image_url", "true", 3, "头图", ""),
                     new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "javascript:alert(1)", 1, "双人头图", ""),
-                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "true", 3, "双人头图", "")}) {
+                    new AppConfigSaveRequest("miniapp.pair.join_hero_image_url", "true", 3, "双人头图", ""),
+                    new AppConfigSaveRequest("miniapp.contact_email", "not-an-email", 1, "联系邮箱", ""),
+                    new AppConfigSaveRequest("miniapp.contact_email", "a@b", 1, "联系邮箱", ""),
+                    new AppConfigSaveRequest("miniapp.contact_email", "support@example.com", 2, "联系邮箱", ""),
+                    new AppConfigSaveRequest("miniapp.contact_email", "a".repeat(120) + "@example.com", 1, "联系邮箱", "")}) {
                 assertFalse(validator.validate(request).isEmpty(), request.toString());
             }
             assertEquals("https://example.com/a.png", new AppConfigSaveRequest("miniapp.home.title_image_url",
                     " HTTPS://example.com/a.png ", 1, "头图", null).configValue());
             assertEquals("https://example.com/pair.png", new AppConfigSaveRequest("miniapp.pair.join_hero_image_url",
                     " HTTPS://example.com/pair.png ", 1, "双人头图", null).configValue());
+            assertEquals("Support@Example.com", new AppConfigSaveRequest("miniapp.contact_email",
+                    " Support@Example.com ", 1, "联系邮箱", null).configValue());
         }
     }
 

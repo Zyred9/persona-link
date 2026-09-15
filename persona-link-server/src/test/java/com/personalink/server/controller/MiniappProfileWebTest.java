@@ -46,6 +46,20 @@ class MiniappProfileWebTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"nickname\":\"" + "a".repeat(33) + "\",\"avatarUrl\":\"\"}"))
                 .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/miniapp/profile").header("Authorization", "Bearer valid")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"" + "昵".repeat(17) + "\",\"avatarUrl\":\"\"}"))
+                .andExpect(status().isBadRequest());
         verify(users, never()).updateProfile(anyString(), any());
+        when(users.updateProfile(anyString(), any()))
+                .thenReturn(new MiniappProfileResponse("昵称", "", false, false));
+        mvc.perform(put("/api/miniapp/profile").header("Authorization", "Bearer valid")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"" + "a".repeat(32) + "\",\"avatarUrl\":\"\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(put("/api/miniapp/profile").header("Authorization", "Bearer valid")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"" + "昵".repeat(16) + "\",\"avatarUrl\":\"\"}"))
+                .andExpect(status().isOk());
     }
 }

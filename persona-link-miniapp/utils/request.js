@@ -166,7 +166,8 @@ function ensureSessionOrCreate() {
   return token ? Promise.resolve(token) : createSession();
 }
 
-// 账户中心首次进入时先用缓存的完整资料渲染，避免重复拉取导致的等待。
+// 账户中心首次进入时先用缓存资料渲染，避免重复拉取导致的等待。
+// 默认资料同样缓存：用户未同时提供昵称头像时也必须首帧直接展示，不能每次进入都闪加载态。
 function readProfileCache(token) {
   if (!token) return null;
   let cache;
@@ -175,14 +176,20 @@ function readProfileCache(token) {
   } catch (error) {
     return null;
   }
-  if (!cache || cache.token !== token || !cache.nickname || !cache.avatarUrl) return null;
+  if (!cache || cache.token !== token) return null;
   return cache;
 }
 
-function writeProfileCache(token, nickname, avatarUrl, reviewing) {
-  if (!token || !nickname || !avatarUrl) return;
+function writeProfileCache(token, nickname, avatarUrl, reviewing, customized) {
+  if (!token) return;
   try {
-    wx.setStorageSync(PROFILE_CACHE_KEY, { token, nickname, avatarUrl, reviewing: reviewing === true });
+    wx.setStorageSync(PROFILE_CACHE_KEY, {
+      token,
+      nickname: nickname || '',
+      avatarUrl: avatarUrl || '',
+      reviewing: reviewing === true,
+      customized: customized === true
+    });
   } catch (error) {
     // 缓存失败不影响主流程。
   }

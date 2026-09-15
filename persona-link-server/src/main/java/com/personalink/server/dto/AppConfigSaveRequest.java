@@ -15,6 +15,12 @@ public record AppConfigSaveRequest(
         @NotBlank @Size(max = 100) String configName,
         @Size(max = 500) String remark) {
 
+    /** 小程序设置页联系邮箱配置键。 */
+    private static final String MINIAPP_CONTACT_EMAIL = "miniapp.contact_email";
+    /** 小程序版本号配置键。 */
+    private static final String MINIAPP_VERSION = "miniapp.version";
+    /** 基础邮箱格式校验，允许留空表示不在小程序展示联系邮箱。 */
+    private static final java.util.regex.Pattern EMAIL_PATTERN = java.util.regex.Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
@@ -23,7 +29,7 @@ public record AppConfigSaveRequest(
         remark = Objects.isNull(remark) ? "" : remark.trim();
         if (isMiniappImageKey(configKey)) {
             configValue = MiniappImageUrlUtil.normalize(configValue);
-        } else if ("miniapp.version".equals(configKey) && Objects.nonNull(configValue)) {
+        } else if (Objects.nonNull(configValue) && (MINIAPP_VERSION.equals(configKey) || isContactEmailKey(configKey))) {
             configValue = configValue.trim();
         }
     }
@@ -34,6 +40,10 @@ public record AppConfigSaveRequest(
                 || "miniapp.pair.join_hero_image_url".equals(configKey)
                 || "miniapp.pair.waiting_hero_image_url".equals(configKey)
                 || "miniapp.pair.completed_hero_image_url".equals(configKey);
+    }
+
+    private static boolean isContactEmailKey(String configKey) {
+        return MINIAPP_CONTACT_EMAIL.equals(configKey);
     }
 
     @AssertTrue(message = "配置值与类型不匹配，数字须为有效数字，布尔须为true/false，JSON须为完整JSON")
@@ -55,15 +65,20 @@ public record AppConfigSaveRequest(
         }
     }
 
-    @AssertTrue(message = "小程序图片配置必须为字符串类型的有效图片地址，版本号必须为1至32字符的非空字符串")
+    @AssertTrue(message = "小程序图片配置必须为字符串类型的有效图片地址，版本号必须为1至32字符的非空字符串，联系邮箱必须为1至128字符的有效邮箱地址（可留空）")
     public boolean isBusinessValueValid() {
         if (isMiniappImageKey(configKey)) {
             return Integer.valueOf(1).equals(valueType) && configValue.length() <= 1024
                     && MiniappImageUrlUtil.isValid(configValue);
         }
-        if ("miniapp.version".equals(configKey)) {
+        if (MINIAPP_VERSION.equals(configKey)) {
             return Integer.valueOf(1).equals(valueType) && Objects.nonNull(configValue)
                     && !configValue.isBlank() && configValue.length() <= 32;
+        }
+        if (isContactEmailKey(configKey)) {
+            return Integer.valueOf(1).equals(valueType) && Objects.nonNull(configValue)
+                    && configValue.length() <= 128
+                    && (configValue.isBlank() || EMAIL_PATTERN.matcher(configValue).matches());
         }
         return true;
     }

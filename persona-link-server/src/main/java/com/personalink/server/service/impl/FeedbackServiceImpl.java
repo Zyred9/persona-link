@@ -12,9 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import org.springframework.util.Assert;
 import java.util.Objects;
-/** 反馈持久化，数据库唯一键保证断网重试不会重复收件；未登录提交按匿名收件，不创建账号。 */
+/** 反馈持久化，必须登录提交：数据库唯一键保证断网重试不会重复收件。 */
 @Service
 @RequiredArgsConstructor
 public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, FeedbackEntity> implements FeedbackService {
@@ -23,20 +23,18 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, FeedbackEnt
     @Override
     @Transactional(rollbackFor=Exception.class)
     public FeedbackResponse submit(String openId, FeedbackCreateRequest request) {
-        // 匿名提交没有 openid，无法满足微信文本审核要求，只对已登录用户送审。
-        String identity = StringUtils.hasText(openId) ? openId : "";
-        if (StringUtils.hasText(identity)
-                && !this.contentSecurityClient.isTextAllowed(identity, request.content(),
+        Assert.hasText(openId, "反馈必须登录后提交");
+        if (!this.contentSecurityClient.isTextAllowed(openId, request.content(),
                 WechatContentSecurityClient.SCENE_COMMENT)) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, 40005, "反馈内容含违规信息，请修改后重新提交");
         }
         FeedbackEntity entity = new FeedbackEntity();
-        entity.setOpenId(identity);
-        entity.setNickname(this.nicknameOf(identity));
+        entity.setOpenId(openId);
+        entity.setNickname(this.nicknameOf(openId));
         entity.setRequestId(request.requestId());
         entity.setContent(request.content());
         this.baseMapper.insertIdempotent(entity);
-        FeedbackEntity saved = this.lambdaQuery().eq(FeedbackEntity::getOpenId, identity)
+        FeedbackEntity saved = this.lambdaQuery().eq(FeedbackEntity::getOpenId, openId)
                 .eq(FeedbackEntity::getRequestId, request.requestId()).eq(FeedbackEntity::getDeleted, 0)
                 .last("FOR UPDATE").one();
         if (Objects.isNull(saved) || !Objects.equals(saved.getContent(), request.content())) {
@@ -59,18 +57,12 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, FeedbackEnt
     @Override
     @Transactional(rollbackFor=Exception.class)
     public void deleteByOpenId(String openId) {
-        if (!StringUtils.hasText(openId)) {
-            // 匿名反馈没有可归属的账号，注销时不参与清理。
-            return;
-        }
+        Assert.hasText(openId, "反馈归属用户不能为空");
         this.lambdaUpdate().set(FeedbackEntity::getDeleted, 1)
                 .eq(FeedbackEntity::getOpenId, openId).eq(FeedbackEntity::getDeleted, 0).update();
     }
-    /** 登录提交记录提交时昵称快照；匿名或用户不存在时为空。 */
+    /** 提交时记录用户昵称快照；用户不存在时为空。 */
     private String nicknameOf(String openId) {
-        if (!StringUtils.hasText(openId)) {
-            return "";
-        }
         MiniappUserEntity user = this.miniappUserService.findByOpenId(openId);
         return Objects.isNull(user) || Objects.isNull(user.getNickname()) ? "" : user.getNickname();
     }

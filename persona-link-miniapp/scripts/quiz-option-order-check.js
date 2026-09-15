@@ -43,6 +43,8 @@ async function main() {
     assert.deepStrictEqual(options.map((option) => option.optionCode), ['D', 'C', 'B', 'A'], '展示重编号不得修改原始答卷');
     instance.chooseOption({ currentTarget: { dataset: { optionId: '103', questionToken: instance.data.questionToken } } });
     await instance.continueTest({ currentTarget: { dataset: { questionToken: instance.data.questionToken } } });
+    // 单选题选择后自动进入，等待自动推进的请求与渲染完成。
+    await new Promise((resolve) => setImmediate(resolve));
     assert.deepStrictEqual(Array.from(requests.at(-1).data.optionIds), questionType === 1 ? ['103'] : ['101', '103'],
       '单选、多选必须提交原选项 id');
     assert.strictEqual(requests.at(-1).data.questionId, 'question-1');
